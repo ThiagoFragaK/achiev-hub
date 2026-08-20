@@ -1,0 +1,10 @@
+{
+"SpaProxyServer": {
+"ServerUrl": "https://localhost:53139",
+"RedirectUrl": "",
+"LaunchCommand": "npm run dev",
+"WorkingDirectory": "K:\\Projekten\\MyApps\\achiev-hub\\achiev-hub.Server\\..\\achiev-hub.client",
+"MaxTimeoutInSeconds": "120",
+"KeepRunning": "false"
+}
+}
