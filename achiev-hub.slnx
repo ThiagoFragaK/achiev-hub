@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="achiev-hub.client/achiev-hub.client.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+  <Project Path="achiev-hub.Server/achiev-hub.Server.csproj" />
+</Solution>
