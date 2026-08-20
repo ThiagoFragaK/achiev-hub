@@ -29,7 +29,7 @@ The backend talks to the Steam Web API and persists users, games, achievements, 
    npm install
    ```
 
-2. Create the database and apply migrations from `achiev-hub.Server`:
+2. Ensure PostgreSQL is running (or `docker compose up db`). Migrations apply automatically when the API starts. To apply them manually from `achiev-hub.Server`:
 
    ```bash
    cd achiev-hub.Server
@@ -98,4 +98,25 @@ Server layout in short: `Controllers` → `Services` → `Repositories` / `Appli
 
 ## Docker
 
-`achiev-hub.Server/Dockerfile` builds the API (and the SPA as part of publish). You still need PostgreSQL and `SteamApi:ApiKey` (environment variable or another secrets source) at runtime.
+`achiev-hub.Server/Dockerfile` builds the API (and the SPA as part of publish). Use Compose to run Postgres and the API together.
+
+1. Copy the env template and set your Steam key:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Start the stack:
+
+   ```bash
+   docker compose up --build
+   ```
+
+- App: `http://localhost:8080`
+- Postgres: `localhost:5432` (user/password/db: `postgres` / `postgres` / `achievhub`)
+
+EF Core migrations run automatically on API startup. For local development without the API container, you can run only the database:
+
+```bash
+docker compose up db
+```
