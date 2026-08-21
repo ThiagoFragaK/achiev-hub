@@ -19,8 +19,13 @@
                         <h2>Heading 2</h2>
                         <h3>Heading 3</h3>
                         <p>Body text for primary content and descriptions.</p>
-                        <p class="text-secondary mb-0">
+                        <p class="text-secondary mb-3">
                             Muted text for secondary details and helper copy.
+                        </p>
+                        <p class="lastica display-6 mb-0">Lastica — custom display font</p>
+                        <p class="small text-secondary mb-0 mt-2">
+                            Use class <code>lastica</code> for the Lastica typeface. Default UI font is
+                            Montserrat.
                         </p>
                     </div>
                 </div>

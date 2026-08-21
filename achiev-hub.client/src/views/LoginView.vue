@@ -10,7 +10,7 @@
                 />
             </div>
 
-            <hr class="mb-4" />
+            <hr class="mb-4 text-primary opacity-100" />
 
             <form @submit.prevent="onLogin">
                 <div class="mb-3">
