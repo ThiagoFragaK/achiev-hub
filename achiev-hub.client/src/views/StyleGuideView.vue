@@ -1,292 +1,203 @@
-<script setup lang="ts">
-import { RouterLink } from 'vue-router'
-import { Info } from '@lucide/vue'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-
-const palette = [
-  { name: 'Purple', token: 'purple', hex: '#372649', swatch: 'bg-purple' },
-  { name: 'Slate', token: 'slate', hex: '#6C738C', swatch: 'bg-slate' },
-  { name: 'Green', token: 'green', hex: '#6AC36C', swatch: 'bg-green' },
-  { name: 'Navy', token: 'navy', hex: '#1B4564', swatch: 'bg-navy' },
-  { name: 'Gray', token: 'gray', hex: '#D7D6D0', swatch: 'bg-gray' },
-  { name: 'Ink', token: 'ink', hex: '#0E0500', swatch: 'bg-ink' },
-  { name: 'Cream', token: 'cream', hex: '#FFFECB', swatch: 'bg-cream' },
-  { name: 'Coral', token: 'coral', hex: '#FF6462', swatch: 'bg-coral' },
-] as const
-
-const colorVariants = [
-  'purple',
-  'slate',
-  'green',
-  'navy',
-  'gray',
-  'ink',
-  'cream',
-  'coral',
-] as const
-
-const sampleGames = [
-  { name: 'Hades', progress: '92%', status: 'Nearly done' },
-  { name: 'Celeste', progress: '100%', status: 'Complete' },
-  { name: 'Hollow Knight', progress: '64%', status: 'In progress' },
-  { name: 'Dead Cells', progress: '18%', status: 'Started' },
-]
-
-const cellClass = 'rounded-md border border-purple px-2 py-3 text-center'
-const headClass = `${cellClass} bg-purple text-purple-foreground`
-const bodyClass = `${cellClass} bg-cream text-cream-foreground`
-</script>
-
 <template>
-  <div class="min-h-svh bg-background text-foreground">
-    <div class="mx-auto flex w-full max-w-4xl flex-col gap-12 px-6 py-12">
-      <header class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div class="space-y-2">
-          <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">
-            Style Guide
-          </h1>
-          <p class="text-muted-foreground max-w-xl text-balance">
-            AchievHub design tokens and UI components used across the app.
-          </p>
-        </div>
-        <Button as-child variant="outline">
-          <RouterLink to="/">
-            Back to Home
-          </RouterLink>
-        </Button>
-      </header>
+    <div class="min-vh-100 py-5">
+        <div class="container" style="max-width: 56rem">
+            <header
+                class="d-flex flex-column flex-sm-row align-items-sm-start justify-content-between gap-3 mb-5"
+            >
+                <div>
+                    <h1 class="display-6 mb-2">Style Guide</h1>
+                    <p class="text-secondary mb-0">Custom Bootstrap theme used across the app.</p>
+                </div>
+                <RouterLink to="/" class="btn btn-outline-primary"> Back to Home </RouterLink>
+            </header>
 
-      <section class="space-y-4">
-        <h2 class="text-xl font-semibold tracking-tight">
-          Colors
-        </h2>
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div
-            v-for="color in palette"
-            :key="color.token"
-            class="overflow-hidden rounded-xl border border-border"
-          >
-            <div
-              class="h-20 border-b border-border"
-              :class="[color.swatch, color.token === 'ink' ? 'border-purple' : '']"
-            />
-            <div class="space-y-0.5 p-3">
-              <p class="font-medium">
-                {{ color.name }}
-              </p>
-              <p class="text-muted-foreground text-xs uppercase tracking-wide">
-                {{ color.hex }}
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+            <section class="mb-5">
+                <h2 class="h4 mb-3">Typography</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <h1>Heading 1</h1>
+                        <h2>Heading 2</h2>
+                        <h3>Heading 3</h3>
+                        <p>Body text for primary content and descriptions.</p>
+                        <p class="text-secondary mb-0">
+                            Muted text for secondary details and helper copy.
+                        </p>
+                    </div>
+                </div>
+            </section>
 
-      <section class="space-y-4">
-        <h2 class="text-xl font-semibold tracking-tight">
-          Typography
-        </h2>
-        <div class="space-y-3 rounded-xl border border-border p-5">
-          <h1 class="text-4xl font-semibold tracking-tight">
-            Heading 1
-          </h1>
-          <h2 class="text-2xl font-semibold tracking-tight">
-            Heading 2
-          </h2>
-          <h3 class="text-xl font-semibold tracking-tight">
-            Heading 3
-          </h3>
-          <p class="text-base">
-            Body text for primary content and descriptions.
-          </p>
-          <p class="text-muted-foreground text-sm">
-            Muted text for secondary details and helper copy.
-          </p>
-        </div>
-      </section>
+            <section class="mb-5">
+                <h2 class="h4 mb-3">Buttons</h2>
+                <div class="d-flex flex-wrap gap-2">
+                    <button
+                        v-for="variant in buttonVariants"
+                        :key="variant.label"
+                        type="button"
+                        class="btn"
+                        :class="variant.className"
+                    >
+                        {{ variant.label }}
+                    </button>
+                </div>
+            </section>
 
-      <section class="space-y-4">
-        <h2 class="text-xl font-semibold tracking-tight">
-          Buttons
-        </h2>
-        <div class="flex flex-wrap gap-2">
-          <Button
-            v-for="variant in colorVariants"
-            :key="variant"
-            :variant="variant"
-          >
-            {{ variant }}
-          </Button>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <Button variant="default">
-            Default
-          </Button>
-          <Button variant="outline">
-            Outline
-          </Button>
-          <Button variant="secondary">
-            Secondary
-          </Button>
-          <Button variant="ghost">
-            Ghost
-          </Button>
-          <Button variant="destructive">
-            Destructive
-          </Button>
-          <Button variant="link">
-            Link
-          </Button>
-        </div>
-      </section>
+            <section class="mb-5">
+                <h2 class="h4 mb-3">Badges</h2>
+                <div class="d-flex flex-wrap gap-2">
+                    <span
+                        v-for="variant in badgeVariants"
+                        :key="variant.label"
+                        class="badge"
+                        :class="variant.className"
+                    >
+                        {{ variant.label }}
+                    </span>
+                </div>
+            </section>
 
-      <section class="space-y-4">
-        <h2 class="text-xl font-semibold tracking-tight">
-          Badges
-        </h2>
-        <div class="flex flex-wrap gap-2">
-          <Badge
-            v-for="variant in colorVariants"
-            :key="variant"
-            :variant="variant"
-          >
-            {{ variant }}
-          </Badge>
+            <section class="mb-5">
+                <h2 class="h4 mb-3">Notifications</h2>
+                <div class="d-flex flex-column gap-2">
+                    <div
+                        v-for="variant in alertVariants"
+                        :key="variant.label"
+                        class="alert d-flex align-items-start gap-2 mb-0"
+                        :class="variant.className"
+                        role="alert"
+                    >
+                        <Info :size="18" class="flex-shrink-0 mt-1" />
+                        <div>
+                            <strong class="d-block">{{ variant.label }} notification</strong>
+                            Sample alert using Bootstrap {{ variant.label.toLowerCase() }} style.
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="mb-5">
+                <h2 class="h4 mb-3">Form</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <h3 class="h5">Sample input</h3>
+                        <p class="text-secondary">Input and button pairing used in forms.</p>
+                        <form class="row g-2" @submit.prevent>
+                            <div class="col-sm">
+                                <input
+                                    type="text"
+                                    name="sample"
+                                    class="form-control"
+                                    placeholder="Enter a value"
+                                />
+                            </div>
+                            <div class="col-sm-auto">
+                                <button type="submit" class="btn btn-primary w-100">Submit</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <section class="mb-5">
+                <h2 class="h4 mb-3">Card</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <h3 class="h5 card-title">Achievement card</h3>
+                        <p class="card-text text-secondary">
+                            Cards group related content and actions.
+                        </p>
+                        <p>Use cards for lookup results, game summaries, and settings panels.</p>
+                        <div class="d-flex flex-wrap gap-2">
+                            <span class="badge text-bg-success">Unlocked</span>
+                            <span class="badge text-bg-secondary">Rare</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <h2 class="h4 mb-3">Table</h2>
+                <div class="card">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table
+                                class="table table-bordered table-hover text-center mb-0 align-middle"
+                            >
+                                <thead class="table-primary">
+                                    <tr>
+                                        <th scope="col">Game</th>
+                                        <th scope="col">Progress</th>
+                                        <th scope="col">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="game in sampleGames" :key="game.name">
+                                        <td>
+                                            {{ game.name }}
+                                        </td>
+                                        <td>
+                                            {{ game.progress }}
+                                        </td>
+                                        <td>
+                                            {{ game.status }}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
         </div>
-      </section>
-
-      <section class="space-y-4">
-        <h2 class="text-xl font-semibold tracking-tight">
-          Notifications
-        </h2>
-        <div class="grid gap-3">
-          <Alert
-            v-for="variant in colorVariants"
-            :key="variant"
-            :variant="variant"
-          >
-            <Info />
-            <AlertTitle class="capitalize">
-              {{ variant }} notification
-            </AlertTitle>
-            <AlertDescription>
-              Sample alert using the {{ variant }} palette color.
-            </AlertDescription>
-          </Alert>
-        </div>
-      </section>
-
-      <section class="space-y-4">
-        <h2 class="text-xl font-semibold tracking-tight">
-          Form
-        </h2>
-        <Card>
-          <CardHeader>
-            <CardTitle>Sample input</CardTitle>
-            <CardDescription>
-              Input and button pairing used in forms.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form class="flex flex-col gap-3 sm:flex-row" @submit.prevent>
-              <Input
-                type="text"
-                name="sample"
-                placeholder="Enter a value"
-                class="sm:flex-1"
-              />
-              <Button type="submit">
-                Submit
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section class="space-y-4">
-        <h2 class="text-xl font-semibold tracking-tight">
-          Card
-        </h2>
-        <Card>
-          <CardHeader>
-            <CardTitle>Achievement card</CardTitle>
-            <CardDescription>
-              Cards group related content and actions.
-            </CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-3">
-            <p>
-              Use cards for lookup results, game summaries, and settings panels.
-            </p>
-            <div class="flex flex-wrap gap-2">
-              <Badge variant="green">
-                Unlocked
-              </Badge>
-              <Badge variant="slate">
-                Rare
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section class="space-y-4">
-        <h2 class="text-xl font-semibold tracking-tight">
-          Table
-        </h2>
-        <div class="rounded-xl border border-purple p-4">
-          <Table class="border-separate border-spacing-2">
-            <TableHeader class="[&_tr]:border-0">
-              <TableRow class="border-0 hover:bg-transparent">
-                <TableHead :class="headClass">
-                  Game
-                </TableHead>
-                <TableHead :class="headClass">
-                  Progress
-                </TableHead>
-                <TableHead :class="headClass">
-                  Status
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow
-                v-for="game in sampleGames"
-                :key="game.name"
-                class="border-0 hover:bg-transparent"
-              >
-                <TableCell :class="bodyClass">
-                  {{ game.name }}
-                </TableCell>
-                <TableCell :class="bodyClass">
-                  {{ game.progress }}
-                </TableCell>
-                <TableCell :class="bodyClass">
-                  {{ game.status }}
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </div>
-      </section>
     </div>
-  </div>
 </template>
+
+<script>
+import { Info } from '@lucide/vue'
+
+export default {
+    name: 'StyleGuideView',
+    components: {
+        Info
+    },
+    data() {
+        return {
+            sampleGames: [
+                { name: 'Hades', progress: '92%', status: 'Nearly done' },
+                { name: 'Celeste', progress: '100%', status: 'Complete' },
+                { name: 'Hollow Knight', progress: '64%', status: 'In progress' },
+                { name: 'Dead Cells', progress: '18%', status: 'Started' }
+            ],
+            buttonVariants: [
+                { label: 'Primary', className: 'btn-primary' },
+                { label: 'Secondary', className: 'btn-secondary' },
+                { label: 'Success', className: 'btn-success' },
+                { label: 'Danger', className: 'btn-danger' },
+                { label: 'Warning', className: 'btn-warning' },
+                { label: 'Info', className: 'btn-info' },
+                { label: 'Light', className: 'btn-light' },
+                { label: 'Dark', className: 'btn-dark' },
+                { label: 'Outline', className: 'btn-outline-primary' },
+                { label: 'Link', className: 'btn-link' }
+            ],
+            badgeVariants: [
+                { label: 'Primary', className: 'text-bg-primary' },
+                { label: 'Secondary', className: 'text-bg-secondary' },
+                { label: 'Success', className: 'text-bg-success' },
+                { label: 'Danger', className: 'text-bg-danger' },
+                { label: 'Warning', className: 'text-bg-warning' },
+                { label: 'Info', className: 'text-bg-info' },
+                { label: 'Light', className: 'text-bg-light' },
+                { label: 'Dark', className: 'text-bg-dark' }
+            ],
+            alertVariants: [
+                { label: 'Primary', className: 'alert-primary' },
+                { label: 'Secondary', className: 'alert-secondary' },
+                { label: 'Success', className: 'alert-success' },
+                { label: 'Danger', className: 'alert-danger' },
+                { label: 'Warning', className: 'alert-warning' },
+                { label: 'Info', className: 'alert-info' }
+            ]
+        }
+    }
+}
+</script>

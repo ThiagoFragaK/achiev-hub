@@ -1,102 +1,98 @@
-<script setup lang="ts">
-import { ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+<template>
+    <div class="min-vh-100 d-flex align-items-center justify-content-center px-3 py-5">
+        <div class="w-100" style="max-width: 28rem">
+            <div class="text-center mb-4">
+                <img
+                    src="/assets/achievHub-logo2.png"
+                    alt="Achievements Hub"
+                    class="img-fluid"
+                    style="max-height: 4rem"
+                />
+            </div>
+
+            <hr class="mb-4" />
+
+            <form @submit.prevent="onLogin">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="steamId"> Steam ID </label>
+                    <input
+                        id="steamId"
+                        v-model="steamId"
+                        type="text"
+                        name="steamId"
+                        autocomplete="username"
+                        class="form-control"
+                        :class="{ 'is-invalid': steamIdError }"
+                        :aria-invalid="steamIdError"
+                    />
+                    <div
+                        v-if="steamIdError"
+                        class="invalid-feedback d-block text-center"
+                        role="alert"
+                    >
+                        Required
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-semibold" for="password"> Password </label>
+                    <input
+                        id="password"
+                        v-model="password"
+                        type="password"
+                        name="password"
+                        autocomplete="current-password"
+                        class="form-control"
+                    />
+                </div>
+
+                <div class="d-grid mb-3">
+                    <button type="submit" class="btn btn-primary btn-lg">Login</button>
+                </div>
+            </form>
+
+            <div class="text-center mb-3">
+                <button type="button" class="btn btn-link" @click="continueAsGuest">
+                    Continue without login.
+                </button>
+            </div>
+
+            <div class="text-center">
+                <RouterLink to="/style-guide" class="small text-secondary">
+                    Style Guide
+                </RouterLink>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
 import { setAuthenticated } from '@/lib/session'
 
-const router = useRouter()
-const route = useRoute()
-const steamId = ref('')
-const password = ref('')
-const steamIdError = ref(false)
-
-function enterApp() {
-  setAuthenticated(true)
-  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
-  void router.push(redirect)
-}
-
-function onLogin() {
-  steamIdError.value = !steamId.value.trim()
-  if (steamIdError.value) return
-  enterApp()
-}
-
-function continueAsGuest() {
-  enterApp()
+export default {
+    name: 'LoginView',
+    data() {
+        return {
+            steamId: '',
+            password: '',
+            steamIdError: false
+        }
+    },
+    methods: {
+        enterApp() {
+            setAuthenticated(true)
+            const redirect =
+                typeof this.$route.query.redirect === 'string' ? this.$route.query.redirect : '/'
+            this.$router.push(redirect)
+        },
+        onLogin() {
+            this.steamIdError = !this.steamId.trim()
+            if (this.steamIdError) return
+            this.enterApp()
+        },
+        continueAsGuest() {
+            this.enterApp()
+        }
+    }
 }
 </script>
-
-<template>
-  <div class="flex min-h-svh items-center justify-center bg-background px-6 py-12 text-foreground">
-    <div class="flex w-full max-w-md flex-col items-center gap-8">
-      <img
-        src="/assets/achiev-hub-complete-logo.png"
-        alt="Achievements Hub"
-        class="h-14 w-auto sm:h-16"
-      >
-
-      <div class="h-px w-full bg-purple" />
-
-      <form class="flex w-full flex-col gap-5" @submit.prevent="onLogin">
-        <div class="space-y-2">
-          <label class="text-sm font-semibold" for="steamId">
-            Steam ID
-          </label>
-          <Input
-            id="steamId"
-            v-model="steamId"
-            type="text"
-            name="steamId"
-            autocomplete="username"
-            class="bg-background"
-            :aria-invalid="steamIdError"
-          />
-          <p
-            v-if="steamIdError"
-            class="text-center text-sm text-coral"
-            role="alert"
-          >
-            Required
-          </p>
-        </div>
-
-        <div class="space-y-2">
-          <label class="text-sm font-semibold" for="password">
-            Password
-          </label>
-          <Input
-            id="password"
-            v-model="password"
-            type="password"
-            name="password"
-            autocomplete="current-password"
-            class="bg-background"
-          />
-        </div>
-
-        <div class="flex justify-center pt-2">
-          <Button type="submit" variant="purple" size="lg" class="min-w-40">
-            Login
-          </Button>
-        </div>
-      </form>
-
-      <button
-        type="button"
-        class="text-sm text-cream underline-offset-4 hover:underline"
-        @click="continueAsGuest"
-      >
-        Continue without login.
-      </button>
-
-      <RouterLink
-        to="/style-guide"
-        class="text-muted-foreground text-xs underline-offset-4 hover:underline"
-      >
-        Style Guide
-      </RouterLink>
-    </div>
-  </div>
-</template>

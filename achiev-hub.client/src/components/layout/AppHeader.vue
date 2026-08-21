@@ -1,83 +1,89 @@
-<script setup lang="ts">
-import { RouterLink, useRoute, useRouter } from 'vue-router'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+<template>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-primary border-2">
+        <div class="container">
+            <RouterLink to="/" class="navbar-brand py-0">
+                <img src="/assets/achievHub-logo2.png" alt="Achievements Hub" height="40" />
+            </RouterLink>
+
+            <button
+                class="navbar-toggler"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#appNavbar"
+                aria-controls="appNavbar"
+                aria-expanded="false"
+                aria-label="Toggle navigation"
+            >
+                <span class="navbar-toggler-icon" />
+            </button>
+
+            <div id="appNavbar" class="collapse navbar-collapse">
+                <ul class="navbar-nav mx-auto mb-2 mb-lg-0 text-uppercase small fw-medium">
+                    <li v-for="link in links" :key="link.to" class="nav-item">
+                        <RouterLink
+                            :to="link.to"
+                            class="nav-link"
+                            :class="{ active: isActive(link.name) }"
+                        >
+                            {{ link.label }}
+                        </RouterLink>
+                    </li>
+                </ul>
+
+                <div class="dropdown">
+                    <button
+                        class="btn btn-link text-decoration-none text-white dropdown-toggle d-flex align-items-center gap-2"
+                        type="button"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false"
+                        aria-label="User menu"
+                    >
+                        <span class="small fw-medium">T.K.</span>
+                        <span
+                            class="d-inline-block rounded border bg-secondary"
+                            style="width: 2.25rem; height: 2.25rem"
+                            aria-hidden="true"
+                        />
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <button type="button" class="dropdown-item text-danger" @click="logout">
+                                Logout
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </nav>
+</template>
+
+<script>
 import { setAuthenticated } from '@/lib/session'
 
-const route = useRoute()
-const router = useRouter()
-
-const links = [
-  { to: '/', label: 'Home', name: 'home' },
-  { to: '/games', label: 'My games', name: 'games' },
-  { to: '/stats', label: 'Stats', name: 'stats' },
-  { to: '/steam', label: 'Steam', name: 'steam' },
-] as const
-
-function isActive(name: string) {
-  if (name === 'games') {
-    return route.name === 'games' || route.name === 'game-detail'
-  }
-  return route.name === name
-}
-
-function logout() {
-  setAuthenticated(false)
-  void router.push({ name: 'login' })
+export default {
+    name: 'AppHeader',
+    data() {
+        return {
+            links: [
+                { to: '/', label: 'Home', name: 'home' },
+                { to: '/games', label: 'My games', name: 'games' },
+                { to: '/stats', label: 'Stats', name: 'stats' },
+                { to: '/steam', label: 'Steam', name: 'steam' }
+            ]
+        }
+    },
+    methods: {
+        isActive(name) {
+            if (name === 'games') {
+                return this.$route.name === 'games' || this.$route.name === 'game-detail'
+            }
+            return this.$route.name === name
+        },
+        logout() {
+            setAuthenticated(false)
+            this.$router.push({ name: 'login' })
+        }
+    }
 }
 </script>
-
-<template>
-  <header class="border-b border-purple">
-    <div class="mx-auto flex w-full max-w-6xl items-center gap-6 px-6 py-4">
-      <RouterLink to="/" class="shrink-0">
-        <img
-          src="/assets/achiev-hub-complete-logo.png"
-          alt="Achievements Hub"
-          class="h-10 w-auto"
-        >
-      </RouterLink>
-
-      <nav class="flex flex-1 flex-wrap items-center justify-center gap-6 text-sm font-medium uppercase tracking-wide">
-        <RouterLink
-          v-for="link in links"
-          :key="link.to"
-          :to="link.to"
-          class="transition-colors hover:text-cream"
-          :class="isActive(link.name) ? 'text-cream' : 'text-muted-foreground'"
-        >
-          {{ link.label }}
-        </RouterLink>
-      </nav>
-
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          class="flex shrink-0 items-center gap-3 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-          aria-label="User menu"
-        >
-          <span class="text-sm font-medium tracking-wide">
-            T.K.
-          </span>
-          <div
-            class="size-9 overflow-hidden rounded-md border border-purple bg-navy"
-            aria-hidden="true"
-          >
-            <div class="flex h-full flex-col">
-              <div class="h-1/2 bg-navy" />
-              <div class="h-1/2 bg-green/70" />
-            </div>
-          </div>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" class="min-w-36">
-          <DropdownMenuItem variant="destructive" @click="logout">
-            Logout
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  </header>
-</template>
