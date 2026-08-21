@@ -1,41 +1,65 @@
-<script setup lang="ts">
-withDefaults(defineProps<{
-  value?: number
-  label?: string
-}>(), {
-  value: 67,
-  label: 'Users Average',
-})
-</script>
-
 <template>
-  <div class="flex flex-col items-center gap-3">
-    <p class="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-      {{ label }}
-    </p>
-    <div class="relative w-full max-w-[220px]">
-      <svg viewBox="0 0 200 120" class="h-auto w-full" aria-hidden="true">
-        <path
-          d="M 20 100 A 80 80 0 0 1 180 100"
-          fill="none"
-          stroke="var(--purple)"
-          stroke-width="18"
-          stroke-linecap="round"
-        />
-        <path
-          d="M 20 100 A 80 80 0 0 1 180 100"
-          fill="none"
-          stroke="var(--navy)"
-          stroke-width="18"
-          stroke-linecap="round"
-          :stroke-dasharray="`${(value / 100) * 251} 251`"
-        />
-      </svg>
-      <div class="absolute inset-0 flex items-end justify-center pb-2">
-        <span class="text-3xl font-semibold tracking-tight">
-          {{ value }}%
-        </span>
-      </div>
+    <div class="d-flex flex-column align-items-center gap-2">
+        <p class="text-uppercase text-secondary small fw-medium mb-0">
+            {{ label }}
+        </p>
+        <div class="w-100" style="max-width: 220px">
+            <apexchart type="radialBar" height="200" :options="chartOptions" :series="series" />
+        </div>
     </div>
-  </div>
 </template>
+
+<script>
+export default {
+    name: 'SemiGauge',
+    props: {
+        value: {
+            type: Number,
+            default: 67
+        },
+        label: {
+            type: String,
+            default: 'Users Average'
+        }
+    },
+    computed: {
+        series() {
+            return [this.value]
+        },
+        chartOptions() {
+            return {
+                chart: {
+                    type: 'radialBar',
+                    sparkline: { enabled: true }
+                },
+                plotOptions: {
+                    radialBar: {
+                        startAngle: -90,
+                        endAngle: 90,
+                        hollow: {
+                            size: '60%'
+                        },
+                        track: {
+                            background: '#e9ecef',
+                            strokeWidth: '97%'
+                        },
+                        dataLabels: {
+                            name: { show: false },
+                            value: {
+                                offsetY: -10,
+                                fontSize: '1.75rem',
+                                fontWeight: 600,
+                                formatter(val) {
+                                    return `${val}%`
+                                }
+                            }
+                        }
+                    }
+                },
+                colors: ['#0d6efd'],
+                labels: [this.label]
+            }
+        }
+    }
+}
+</script>

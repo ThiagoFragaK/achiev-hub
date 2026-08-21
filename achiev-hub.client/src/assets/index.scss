@@ -1,0 +1,39 @@
+// AchievHub Bootstrap theme
+$primary: #372649;
+$secondary: #6c738c;
+$success: #6ac36c;
+$info: #1b4564;
+$light: #d7d6d0;
+$dark: #0e0500;
+$warning: #fffecb;
+$danger: #ff6462;
+
+// Dark page background (data-bs-theme="dark")
+$body-bg-dark: $dark;
+$body-color-dark: $light;
+
+@import 'bootstrap/scss/bootstrap';
+
+// Table borders use solid primary
+.table {
+  --bs-table-border-color: #{$primary};
+}
+
+// Match card corner radius on bordered tables
+.table-responsive:has(> .table-bordered) {
+  border-radius: var(--bs-border-radius);
+  overflow: hidden;
+}
+
+// Solid primary table headers (Bootstrap's table-primary is a pale tint by default)
+.table-primary {
+  --bs-table-color: #{$light};
+  --bs-table-bg: #{$primary};
+  --bs-table-border-color: #{$primary};
+  --bs-table-striped-bg: #{$primary};
+  --bs-table-striped-color: #{$light};
+  --bs-table-active-bg: #{$primary};
+  --bs-table-active-color: #{$light};
+  --bs-table-hover-bg: #{$primary};
+  --bs-table-hover-color: #{$light};
+}

@@ -1,26 +1,31 @@
-<script setup lang="ts">
-import AppShell from '@/components/layout/AppShell.vue'
-</script>
-
 <template>
-  <AppShell>
-    <div class="space-y-6">
-      <div class="flex items-center gap-4">
-        <img
-          src="/assets/steam-logo.png"
-          alt="Steam"
-          class="size-16 rounded-full sm:size-20"
-        >
-        <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">
-          Steam
-        </h1>
-      </div>
+    <AppShell>
+        <div class="d-flex align-items-center gap-3 mb-4">
+            <img
+                src="/assets/steam-logo.png"
+                alt="Steam"
+                class="rounded-circle"
+                width="64"
+                height="64"
+            />
+            <h1 class="h2 mb-0">Steam</h1>
+        </div>
 
-      <div class="min-h-80 rounded-xl border border-purple p-6">
-        <p class="text-muted-foreground text-sm">
-          Steam integration content will appear here.
-        </p>
-      </div>
-    </div>
-  </AppShell>
+        <div class="card">
+            <div class="card-body" style="min-height: 20rem">
+                <p class="text-secondary mb-0">Steam integration content will appear here.</p>
+            </div>
+        </div>
+    </AppShell>
 </template>
+
+<script>
+import AppShell from '@/components/layout/AppShell.vue'
+
+export default {
+    name: 'SteamView',
+    components: {
+        AppShell
+    }
+}
+</script>
