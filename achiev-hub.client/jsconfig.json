@@ -1,8 +1,16 @@
 {
-  "compilerOptions": {
-    "paths": {
-      "@/*": ["./src/*"]
-    }
-  },
-  "exclude": ["node_modules", "dist"]
+    "compilerOptions": {
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["./src/*"]
+        },
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "target": "ESNext",
+        "jsx": "preserve",
+        "lib": ["ESNext", "DOM"],
+        "skipLibCheck": true
+    },
+    "include": ["src/**/*", "vite.config.js"],
+    "exclude": ["node_modules", "dist"]
 }

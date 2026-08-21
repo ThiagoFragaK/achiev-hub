@@ -1,0 +1,69 @@
+// AchievHub Bootstrap theme
+$primary: #372649;
+$secondary: #6c738c;
+$success: #6ac36c;
+$info: #1b4564;
+$light: #d7d6d0;
+$dark: #0e0500;
+$warning: #fffecb;
+$danger: #ff6462;
+
+// Default app typeface
+$font-family-sans-serif:
+  'Montserrat',
+  system-ui,
+  -apple-system,
+  'Segoe UI',
+  Roboto,
+  'Helvetica Neue',
+  'Noto Sans',
+  'Liberation Sans',
+  Arial,
+  sans-serif,
+  'Apple Color Emoji',
+  'Segoe UI Emoji',
+  'Segoe UI Symbol',
+  'Noto Color Emoji';
+
+// Dark page background (data-bs-theme="dark")
+$body-bg-dark: $dark;
+$body-color-dark: $light;
+
+@import 'bootstrap/scss/bootstrap';
+
+@font-face {
+  font-family: 'Lastica';
+  src: url('./fonts/Lastica.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+// Opt-in display font — does not replace the app default
+.lastica {
+  font-family: 'Lastica', sans-serif;
+}
+
+// Table borders use solid primary
+.table {
+  --bs-table-border-color: #{$primary};
+}
+
+// Match card corner radius on bordered tables
+.table-responsive:has(> .table-bordered) {
+  border-radius: var(--bs-border-radius);
+  overflow: hidden;
+}
+
+// Solid primary table headers (Bootstrap's table-primary is a pale tint by default)
+.table-primary {
+  --bs-table-color: #{$light};
+  --bs-table-bg: #{$primary};
+  --bs-table-border-color: #{$primary};
+  --bs-table-striped-bg: #{$primary};
+  --bs-table-striped-color: #{$light};
+  --bs-table-active-bg: #{$primary};
+  --bs-table-active-color: #{$light};
+  --bs-table-hover-bg: #{$primary};
+  --bs-table-hover-color: #{$light};
+}
