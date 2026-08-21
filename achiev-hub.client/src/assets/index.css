@@ -1,0 +1,204 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@import 'tailwindcss';
+@import "tw-animate-css";
+@import "shadcn-vue/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    --font-heading: var(--font-sans);
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-primary-hover: var(--primary-hover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --color-purple: var(--purple);
+    --color-purple-foreground: var(--purple-foreground);
+    --color-purple-hover: var(--purple-hover);
+    --color-slate: var(--slate);
+    --color-slate-foreground: var(--slate-foreground);
+    --color-slate-hover: var(--slate-hover);
+    --color-green: var(--green);
+    --color-green-foreground: var(--green-foreground);
+    --color-green-hover: var(--green-hover);
+    --color-navy: var(--navy);
+    --color-navy-foreground: var(--navy-foreground);
+    --color-navy-hover: var(--navy-hover);
+    --color-gray: var(--gray);
+    --color-gray-foreground: var(--gray-foreground);
+    --color-gray-hover: var(--gray-hover);
+    --color-ink: var(--ink);
+    --color-ink-foreground: var(--ink-foreground);
+    --color-ink-hover: var(--ink-hover);
+    --color-cream: var(--cream);
+    --color-cream-foreground: var(--cream-foreground);
+    --color-cream-hover: var(--cream-hover);
+    --color-coral: var(--coral);
+    --color-coral-foreground: var(--coral-foreground);
+    --color-coral-hover: var(--coral-hover);
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+    --background: #0E0500;
+    --foreground: #372649;
+    --card: #0E0500;
+    --card-foreground: #372649;
+    --popover: #0E0500;
+    --popover-foreground: #372649;
+    --primary: #372649;
+    --primary-foreground: #FFFECB;
+    --primary-hover: #56406E;
+    --secondary: #372649;
+    --secondary-foreground: #FFFECB;
+    --muted: #372649;
+    --muted-foreground: #372649;
+    --accent: #6AC36C;
+    --accent-foreground: #0E0500;
+    --destructive: #FF6462;
+    --border: #372649;
+    --input: #372649;
+    --ring: #372649;
+    --chart-1: #372649;
+    --chart-2: #6AC36C;
+    --chart-3: #FF6462;
+    --chart-4: #1B4564;
+    --chart-5: #6C738C;
+    --radius: 0.625rem;
+    --sidebar: #0E0500;
+    --sidebar-foreground: #372649;
+    --sidebar-primary: #372649;
+    --sidebar-primary-foreground: #FFFECB;
+    --sidebar-accent: #56406E;
+    --sidebar-accent-foreground: #FFFECB;
+    --sidebar-border: #372649;
+    --sidebar-ring: #372649;
+
+    --purple: #372649;
+    --purple-foreground: #FFFECB;
+    --purple-hover: #56406E;
+    --slate: #6C738C;
+    --slate-foreground: #FFFECB;
+    --slate-hover: #838AA0;
+    --green: #6AC36C;
+    --green-foreground: #0E0500;
+    --green-hover: #82D084;
+    --navy: #1B4564;
+    --navy-foreground: #FFFECB;
+    --navy-hover: #2A5A7C;
+    --gray: #D7D6D0;
+    --gray-foreground: #0E0500;
+    --gray-hover: #E4E3DE;
+    --ink: #0E0500;
+    --ink-foreground: #FFFECB;
+    --ink-hover: #2A1A14;
+    --cream: #FFFECB;
+    --cream-foreground: #0E0500;
+    --cream-hover: #FFFEE0;
+    --coral: #FF6462;
+    --coral-foreground: #0E0500;
+    --coral-hover: #FF8583;
+}
+
+.dark {
+    --background: #0E0500;
+    --foreground: #372649;
+    --card: #0E0500;
+    --card-foreground: #372649;
+    --popover: #0E0500;
+    --popover-foreground: #372649;
+    --primary: #372649;
+    --primary-foreground: #FFFECB;
+    --primary-hover: #56406E;
+    --secondary: #372649;
+    --secondary-foreground: #FFFECB;
+    --muted: #372649;
+    --muted-foreground: #372649;
+    --accent: #6AC36C;
+    --accent-foreground: #0E0500;
+    --destructive: #FF6462;
+    --border: #372649;
+    --input: #372649;
+    --ring: #372649;
+    --chart-1: #372649;
+    --chart-2: #6AC36C;
+    --chart-3: #FF6462;
+    --chart-4: #1B4564;
+    --chart-5: #6C738C;
+    --sidebar: #0E0500;
+    --sidebar-foreground: #372649;
+    --sidebar-primary: #372649;
+    --sidebar-primary-foreground: #FFFECB;
+    --sidebar-accent: #56406E;
+    --sidebar-accent-foreground: #FFFECB;
+    --sidebar-border: #372649;
+    --sidebar-ring: #372649;
+
+    --purple: #372649;
+    --purple-foreground: #FFFECB;
+    --purple-hover: #56406E;
+    --slate: #6C738C;
+    --slate-foreground: #FFFECB;
+    --slate-hover: #838AA0;
+    --green: #6AC36C;
+    --green-foreground: #0E0500;
+    --green-hover: #82D084;
+    --navy: #1B4564;
+    --navy-foreground: #FFFECB;
+    --navy-hover: #2A5A7C;
+    --gray: #D7D6D0;
+    --gray-foreground: #0E0500;
+    --gray-hover: #E4E3DE;
+    --ink: #0E0500;
+    --ink-foreground: #FFFECB;
+    --ink-hover: #2A1A14;
+    --cream: #FFFECB;
+    --cream-foreground: #0E0500;
+    --cream-hover: #FFFEE0;
+    --coral: #FF6462;
+    --coral-foreground: #0E0500;
+    --coral-hover: #FF8583;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    @apply font-sans;
+    }
+}
