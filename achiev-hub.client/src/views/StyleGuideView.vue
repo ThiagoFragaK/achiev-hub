@@ -44,11 +44,15 @@ const colorVariants = [
 ] as const
 
 const sampleGames = [
-  { name: 'Hades', progress: '92%', status: 'green' as const, label: 'Nearly done' },
-  { name: 'Celeste', progress: '100%', status: 'navy' as const, label: 'Complete' },
-  { name: 'Hollow Knight', progress: '64%', status: 'slate' as const, label: 'In progress' },
-  { name: 'Dead Cells', progress: '18%', status: 'coral' as const, label: 'Started' },
+  { name: 'Hades', progress: '92%', status: 'Nearly done' },
+  { name: 'Celeste', progress: '100%', status: 'Complete' },
+  { name: 'Hollow Knight', progress: '64%', status: 'In progress' },
+  { name: 'Dead Cells', progress: '18%', status: 'Started' },
 ]
+
+const cellClass = 'rounded-md border border-purple px-2 py-3 text-center'
+const headClass = `${cellClass} bg-purple text-purple-foreground`
+const bodyClass = `${cellClass} bg-cream text-cream-foreground`
 </script>
 
 <template>
@@ -248,30 +252,35 @@ const sampleGames = [
         <h2 class="text-xl font-semibold tracking-tight">
           Table
         </h2>
-        <div class="overflow-hidden rounded-xl border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Game</TableHead>
-                <TableHead>Progress</TableHead>
-                <TableHead>Status</TableHead>
+        <div class="rounded-xl border border-purple p-4">
+          <Table class="border-separate border-spacing-2">
+            <TableHeader class="[&_tr]:border-0">
+              <TableRow class="border-0 hover:bg-transparent">
+                <TableHead :class="headClass">
+                  Game
+                </TableHead>
+                <TableHead :class="headClass">
+                  Progress
+                </TableHead>
+                <TableHead :class="headClass">
+                  Status
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <TableRow
                 v-for="game in sampleGames"
                 :key="game.name"
+                class="border-0 hover:bg-transparent"
               >
-                <TableCell class="font-medium">
+                <TableCell :class="bodyClass">
                   {{ game.name }}
                 </TableCell>
-                <TableCell>
+                <TableCell :class="bodyClass">
                   {{ game.progress }}
                 </TableCell>
-                <TableCell>
-                  <Badge :variant="game.status">
-                    {{ game.label }}
-                  </Badge>
+                <TableCell :class="bodyClass">
+                  {{ game.status }}
                 </TableCell>
               </TableRow>
             </TableBody>
