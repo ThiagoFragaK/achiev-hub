@@ -62,6 +62,7 @@ export default {
                     max: this.max
                 },
                 tooltip: {
+                    theme: 'dark',
                     shared: true,
                     intersect: false
                 }

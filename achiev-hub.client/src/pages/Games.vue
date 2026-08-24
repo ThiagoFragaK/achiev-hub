@@ -43,7 +43,7 @@
                     class="btn btn-outline-secondary btn-sm"
                     aria-label="Sync game data"
                 >
-                    <RefreshCw :size="18" />
+                    <LucideIcon icon="RefreshCw" :size="18" />
                 </button>
             </div>
         </div>
@@ -57,39 +57,33 @@
                         class="btn btn-outline-secondary btn-sm"
                         aria-label="Filter achievements"
                     >
-                        <Funnel :size="18" />
+                        <LucideIcon icon="Funnel" :size="18" />
                     </button>
                 </div>
 
-                <div class="table-responsive">
-                    <table class="table table-bordered table-hover text-center mb-0 align-middle">
-                        <thead class="table-primary">
-                            <tr>
-                                <th scope="col">Achievement</th>
-                                <th scope="col">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="achievement in demoAchievements" :key="achievement.id">
-                                <td>
-                                    {{ achievement.name }}
-                                </td>
-                                <td>
-                                    {{ achievement.unlocked ? 'Unlocked' : 'Locked' }}
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                <TableComponent :data="pagedAchievements" :columns="achievementColumns">
+                    <template #cell-status="{ data }">
+                        {{ data.row.unlocked ? 'Unlocked' : 'Locked' }}
+                    </template>
+                </TableComponent>
+                <PaginationComponent
+                    :current-page="currentPage"
+                    :total-pages="totalPages"
+                    :per-page="perPage"
+                    :total-items="demoAchievements.length"
+                    @change-page="currentPage = $event"
+                />
             </div>
         </div>
     </AppShell>
 </template>
 
 <script>
-import { Funnel, RefreshCw } from '@lucide/vue'
 import AppShell from '@/components/layout/AppShell.vue'
 import LineAreaChart from '@/components/charts/LineAreaChart.vue'
+import LucideIcon from '@/components/global/LucideIcon.vue'
+import PaginationComponent from '@/components/global/PaginationComponent.vue'
+import TableComponent from '@/components/global/TableComponent.vue'
 import { demoAchievements, demoGames } from '@/data/demo'
 
 export default {
@@ -97,12 +91,19 @@ export default {
     components: {
         AppShell,
         LineAreaChart,
-        Funnel,
-        RefreshCw
+        LucideIcon,
+        PaginationComponent,
+        TableComponent
     },
     data() {
         return {
             demoAchievements,
+            currentPage: 1,
+            perPage: 10,
+            achievementColumns: [
+                { key: 'name', label: 'Achievement' },
+                { key: 'status', label: 'Status' }
+            ],
             percentageLabels: ['ITEM 1', 'ITEM 2', 'ITEM 3', 'ITEM 4', 'ITEM 5'],
             percentageData: [
                 {
@@ -117,6 +118,13 @@ export default {
         game() {
             const id = String(this.$route.params.id)
             return demoGames.find((g) => g.id === id) ?? demoGames[0]
+        },
+        totalPages() {
+            return Math.max(1, Math.ceil(this.demoAchievements.length / this.perPage))
+        },
+        pagedAchievements() {
+            const start = (this.currentPage - 1) * this.perPage
+            return this.demoAchievements.slice(start, start + this.perPage)
         }
     }
 }

@@ -1,7 +1,7 @@
 <template>
     <AppShell>
         <div class="row g-4 mb-4">
-            <div class="col-lg-4">
+            <div class="col-lg">
                 <div class="card h-100">
                     <div class="card-body">
                         <p class="text-uppercase text-secondary small fw-medium mb-3">
@@ -16,7 +16,7 @@
                 </div>
             </div>
 
-            <div class="col-lg-4">
+            <div class="col-lg-3">
                 <div class="card h-100">
                     <div class="card-body d-flex align-items-center justify-content-center">
                         <SemiGauge :value="67" label="Users Average" />
@@ -24,7 +24,7 @@
                 </div>
             </div>
 
-            <div class="col-lg-4">
+            <div class="col-lg">
                 <div class="card h-100">
                     <div class="card-body">
                         <p class="text-uppercase text-secondary small fw-medium mb-3">Per Years</p>

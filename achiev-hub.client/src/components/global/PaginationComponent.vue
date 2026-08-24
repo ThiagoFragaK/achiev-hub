@@ -1,24 +1,29 @@
 <template>
-    <nav class="mt-3">
+    <nav class="mt-3" aria-label="Pagination">
         <ul class="pagination justify-content-center">
             <li class="page-item" :class="{ disabled: current === 1 }">
                 <a
                     class="page-link d-flex align-items-center justify-content-center"
                     href="#"
+                    aria-label="Previous page"
                     @click.prevent="changePage(current - 1)"
                 >
-                    <LucideIcon icon="ChevronsLeft" class="me-1" />
-                    Previous
+                    <LucideIcon icon="ChevronsLeft" :size="18" />
                 </a>
             </li>
 
             <li
                 v-for="page in pages"
                 :key="page"
-                :class="{ active: page === current }"
                 class="page-item"
+                :class="{ active: page === current }"
             >
-                <a class="page-link" href="#" @click.prevent="changePage(page)">
+                <a
+                    class="page-link"
+                    href="#"
+                    :aria-current="page === current ? 'page' : undefined"
+                    @click.prevent="changePage(page)"
+                >
                     {{ page }}
                 </a>
             </li>
@@ -27,10 +32,10 @@
                 <a
                     class="page-link d-flex align-items-center justify-content-center"
                     href="#"
+                    aria-label="Next page"
                     @click.prevent="changePage(current + 1)"
                 >
-                    Next
-                    <LucideIcon icon="ChevronsRight" class="ms-1" />
+                    <LucideIcon icon="ChevronsRight" :size="18" />
                 </a>
             </li>
         </ul>
