@@ -3,12 +3,12 @@
         <div class="d-flex align-items-center gap-2 mb-4">
             <button
                 type="button"
-                class="btn btn-outline-secondary btn-sm"
+                class="btn btn-outline-light btn-sm"
                 aria-label="Filter games"
             >
                 <Funnel :size="18" />
             </button>
-            <h1 class="h2 mb-0">My Games</h1>
+            <h1 class="lastica-h3 mb-0">My Games</h1>
         </div>
 
         <div class="card">
@@ -49,7 +49,7 @@ import AppShell from '@/components/layout/AppShell.vue'
 import { demoGames } from '@/data/demo'
 
 export default {
-    name: 'MyGamesView',
+    name: 'MyGames',
     components: {
         AppShell,
         Funnel

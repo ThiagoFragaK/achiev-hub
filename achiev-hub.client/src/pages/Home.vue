@@ -80,7 +80,7 @@ import SemiGauge from '@/components/charts/SemiGauge.vue'
 import { demoRecentHours } from '@/data/demo'
 
 export default {
-    name: 'HomeView',
+    name: 'Home',
     components: {
         AppShell,
         LineAreaChart,
