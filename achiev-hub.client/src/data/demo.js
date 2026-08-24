@@ -34,3 +34,28 @@ export const demoRecentHours = [
     { name: 'Dead Cells', hours: '4h', percentage: '18%', status: 'Start' },
     { name: 'Balatro', hours: '15h', percentage: '58%', status: 'Play' }
 ]
+
+const dayFormatter = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' })
+
+function lastFourteenDays() {
+    const labels = []
+    const today = new Date()
+    for (let i = 13; i >= 0; i -= 1) {
+        const day = new Date(today)
+        day.setDate(today.getDate() - i)
+        labels.push(dayFormatter.format(day))
+    }
+    return labels
+}
+
+export const demoAchievementsLast14Days = {
+    labels: lastFourteenDays(),
+    data: [2, 0, 1, 4, 3, 0, 6, 1, 2, 5, 0, 3, 4, 2]
+}
+
+const currentYear = new Date().getFullYear()
+
+export const demoAchievementsPerYear = {
+    labels: Array.from({ length: 5 }, (_, i) => String(currentYear - 4 + i)),
+    data: [48, 61, 73, 89, 54]
+}
