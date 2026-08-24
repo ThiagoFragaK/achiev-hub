@@ -59,7 +59,14 @@ export default {
                 },
                 legend: { show: false },
                 xaxis: {
-                    categories: this.labels
+                    categories: this.labels,
+                    // Rotation is disabled so every chart reserves the same label
+                    // strip and therefore the same plot area height.
+                    labels: {
+                        rotate: 0,
+                        rotateAlways: false,
+                        hideOverlappingLabels: true
+                    }
                 },
                 yaxis: {
                     min: 0,
