@@ -1,6 +1,6 @@
 <template>
-    <div class="w-100" style="min-height: 14rem">
-        <apexchart type="area" height="220" :options="chartOptions" :series="series" />
+    <div class="w-100" :style="{ minHeight: `${height}px` }">
+        <apexchart type="area" :height="height" :options="chartOptions" :series="series" />
     </div>
 </template>
 
@@ -23,6 +23,10 @@ export default {
         max: {
             type: Number,
             default: undefined
+        },
+        height: {
+            type: Number,
+            default: 220
         }
     },
     computed: {
