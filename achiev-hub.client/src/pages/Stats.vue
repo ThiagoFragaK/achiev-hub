@@ -1,6 +1,6 @@
 <template>
     <AppShell>
-        <h1 class="h2 mb-4">Stats</h1>
+        <h1 class="lastica-h3 mb-4">Stats</h1>
         <div class="card">
             <div class="card-body" style="min-height: 16rem">
                 <p class="text-secondary mb-0">Detailed stats coming soon.</p>

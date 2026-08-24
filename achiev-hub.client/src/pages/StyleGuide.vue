@@ -5,7 +5,7 @@
                 class="d-flex flex-column flex-sm-row align-items-sm-start justify-content-between gap-3 mb-5"
             >
                 <div>
-                    <h1 class="display-6 mb-2">Style Guide</h1>
+                    <h1 class="lastica-h3 mb-2">Style Guide</h1>
                     <p class="text-secondary mb-0">Custom Bootstrap theme used across the app.</p>
                 </div>
                 <RouterLink to="/" class="btn btn-outline-primary"> Back to Home </RouterLink>
