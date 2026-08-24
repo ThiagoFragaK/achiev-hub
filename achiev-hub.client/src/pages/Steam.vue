@@ -8,7 +8,7 @@
                 width="64"
                 height="64"
             />
-            <h1 class="h2 mb-0">Steam</h1>
+            <h1 class="lastica-h3 mb-0">Steam</h1>
         </div>
 
         <div class="card">

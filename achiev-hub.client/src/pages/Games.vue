@@ -9,7 +9,7 @@
             </div>
 
             <div class="col-md-5 col-lg-4">
-                <h1 class="h2 text-uppercase mb-3">
+                <h1 class="lastica-h3 mb-3">
                     {{ game.name }}
                 </h1>
                 <div class="row g-3">
