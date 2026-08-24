@@ -3,8 +3,8 @@
         <p class="text-uppercase text-secondary small fw-medium mb-0">
             {{ label }}
         </p>
-        <div class="w-100" style="max-width: 220px">
-            <apexchart type="radialBar" height="200" :options="chartOptions" :series="series" />
+        <div class="w-100" style="max-width: 320px">
+            <apexchart type="radialBar" height="260" :options="chartOptions" :series="series" />
         </div>
     </div>
 </template>
@@ -32,12 +32,18 @@ export default {
                     type: 'radialBar',
                     sparkline: { enabled: true }
                 },
+                stroke: {
+                    lineCap: 'round'
+                },
                 plotOptions: {
                     radialBar: {
                         startAngle: -90,
                         endAngle: 90,
+                        // Drops the arc so it lines up with the plot area of the
+                        // neighbouring line charts instead of riding above them.
+                        offsetY: 24,
                         hollow: {
-                            size: '60%'
+                            size: '62%'
                         },
                         track: {
                             background: '#e9ecef',
@@ -49,6 +55,8 @@ export default {
                                 offsetY: -10,
                                 fontSize: '1.75rem',
                                 fontWeight: 600,
+                                fontFamily:
+                                    'Montserrat, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
                                 formatter(val) {
                                     return `${val}%`
                                 }

@@ -97,6 +97,33 @@ $lastica-cap-scale: 0.956;
   }
 }
 
+// Borderless cards
+.card {
+  --bs-card-border-width: 0;
+}
+
+// Borderless primary pagination
+.pagination {
+  --bs-pagination-color: #{$primary};
+  --bs-pagination-bg: transparent;
+  --bs-pagination-border-width: 0;
+  --bs-pagination-hover-color: #{$primary};
+  --bs-pagination-hover-bg: transparent;
+  --bs-pagination-focus-color: #{$primary};
+  --bs-pagination-focus-bg: transparent;
+  --bs-pagination-active-color: #{$light};
+  --bs-pagination-active-bg: #{$primary};
+  --bs-pagination-active-border-color: transparent;
+  --bs-pagination-disabled-color: #{$primary};
+  --bs-pagination-disabled-bg: transparent;
+  --bs-pagination-disabled-border-color: transparent;
+  --bs-pagination-border-radius: var(--bs-border-radius);
+
+  .page-link {
+    border-radius: var(--bs-pagination-border-radius);
+  }
+}
+
 // Table borders use solid primary
 .table {
   --bs-table-border-color: #{$primary};

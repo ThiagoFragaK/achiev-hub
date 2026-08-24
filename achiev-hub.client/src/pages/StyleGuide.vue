@@ -72,7 +72,7 @@
                         :class="variant.className"
                         role="alert"
                     >
-                        <Info :size="18" class="flex-shrink-0 mt-1" />
+                        <LucideIcon icon="Info" :size="18" class="flex-shrink-0 mt-1" />
                         <div>
                             <strong class="d-block">{{ variant.label }} notification</strong>
                             Sample alert using Bootstrap {{ variant.label.toLowerCase() }} style.
@@ -121,53 +121,83 @@
                 </div>
             </section>
 
-            <section>
+            <section class="mb-5">
                 <h2 class="h4 mb-3">Table</h2>
                 <div class="card">
                     <div class="card-body">
-                        <div class="table-responsive">
-                            <table
-                                class="table table-bordered table-hover text-center mb-0 align-middle"
-                            >
-                                <thead class="table-primary">
-                                    <tr>
-                                        <th scope="col">Game</th>
-                                        <th scope="col">Progress</th>
-                                        <th scope="col">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="game in sampleGames" :key="game.name">
-                                        <td>
-                                            {{ game.name }}
-                                        </td>
-                                        <td>
-                                            {{ game.progress }}
-                                        </td>
-                                        <td>
-                                            {{ game.status }}
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
+                        <TableComponent :data="sampleGames" :columns="sampleTableColumns" />
                     </div>
                 </div>
+            </section>
+
+            <section>
+                <h2 class="h4 mb-3">Components</h2>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h3 class="h5">Loading</h3>
+                        <LoadingComponent />
+                    </div>
+                </div>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h3 class="h5">Pagination</h3>
+                        <PaginationComponent
+                            :current-page="demoPage"
+                            :total-pages="5"
+                            :per-page="10"
+                            :total-items="50"
+                            @change-page="demoPage = $event"
+                        />
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-body">
+                        <h3 class="h5">Confirm modal</h3>
+                        <p class="text-secondary">Opens a confirmation dialog with typed confirm.</p>
+                        <button type="button" class="btn btn-danger" @click="openConfirmModal">
+                            Delete sample
+                        </button>
+                    </div>
+                </div>
+                <ConfirmModal
+                    id="style-guide-confirm"
+                    ref="confirmModal"
+                    title="Delete sample"
+                    message="This is a demo confirmation. Type DELETE to continue."
+                    confirm-word="DELETE"
+                    confirm-prompt="Type DELETE to confirm"
+                    confirm-text="Delete"
+                    @confirm="onConfirmDemo"
+                />
             </section>
         </div>
     </div>
 </template>
 
 <script>
-import { Info } from '@lucide/vue'
+import ConfirmModal from '@/components/global/ConfirmModal.vue'
+import LoadingComponent from '@/components/global/LoadingComponent.vue'
+import LucideIcon from '@/components/global/LucideIcon.vue'
+import PaginationComponent from '@/components/global/PaginationComponent.vue'
+import TableComponent from '@/components/global/TableComponent.vue'
 
 export default {
     name: 'StyleGuide',
     components: {
-        Info
+        ConfirmModal,
+        LoadingComponent,
+        LucideIcon,
+        PaginationComponent,
+        TableComponent
     },
     data() {
         return {
+            demoPage: 1,
+            sampleTableColumns: [
+                { key: 'name', label: 'Game' },
+                { key: 'progress', label: 'Progress' },
+                { key: 'status', label: 'Status' }
+            ],
             sampleGames: [
                 { name: 'Hades', progress: '92%', status: 'Nearly done' },
                 { name: 'Celeste', progress: '100%', status: 'Complete' },
@@ -204,6 +234,14 @@ export default {
                 { label: 'Warning', className: 'alert-warning' },
                 { label: 'Info', className: 'alert-info' }
             ]
+        }
+    },
+    methods: {
+        openConfirmModal() {
+            this.$refs.confirmModal.open()
+        },
+        onConfirmDemo() {
+            this.$refs.confirmModal.close()
         }
     }
 }
