@@ -56,10 +56,41 @@
                         type="button"
                         class="btn btn-outline-secondary btn-sm"
                         aria-label="Filter achievements"
+                        aria-controls="game-achievement-filters"
+                        @click="toggleFilters"
                     >
                         <LucideIcon icon="Funnel" :size="18" />
                     </button>
                 </div>
+
+                <CollapseComponent ref="filters" collapse-id="game-achievement-filters">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="filter-achievement-name">
+                                Achievement
+                            </label>
+                            <input
+                                id="filter-achievement-name"
+                                v-model="filters.name"
+                                type="search"
+                                class="form-control"
+                                placeholder="Search by name"
+                            />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="filter-achievement-status">Status</label>
+                            <select
+                                id="filter-achievement-status"
+                                v-model="filters.status"
+                                class="form-select"
+                            >
+                                <option value="">All</option>
+                                <option value="unlocked">Unlocked</option>
+                                <option value="locked">Locked</option>
+                            </select>
+                        </div>
+                    </div>
+                </CollapseComponent>
 
                 <TableComponent :data="pagedAchievements" :columns="achievementColumns">
                     <template #cell-status="{ data }">
@@ -81,6 +112,7 @@
 <script>
 import AppShell from '@/components/layout/AppShell.vue'
 import LineAreaChart from '@/components/charts/LineAreaChart.vue'
+import CollapseComponent from '@/components/global/CollapseComponent.vue'
 import LucideIcon from '@/components/global/LucideIcon.vue'
 import PaginationComponent from '@/components/global/PaginationComponent.vue'
 import TableComponent from '@/components/global/TableComponent.vue'
@@ -91,6 +123,7 @@ export default {
     components: {
         AppShell,
         LineAreaChart,
+        CollapseComponent,
         LucideIcon,
         PaginationComponent,
         TableComponent
@@ -100,6 +133,10 @@ export default {
             demoAchievements,
             currentPage: 1,
             perPage: 10,
+            filters: {
+                name: '',
+                status: ''
+            },
             achievementColumns: [
                 { key: 'name', label: 'Achievement' },
                 { key: 'status', label: 'Status' }
@@ -125,6 +162,11 @@ export default {
         pagedAchievements() {
             const start = (this.currentPage - 1) * this.perPage
             return this.demoAchievements.slice(start, start + this.perPage)
+        }
+    },
+    methods: {
+        toggleFilters() {
+            this.$refs.filters.toggle()
         }
     }
 }

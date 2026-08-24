@@ -10,7 +10,7 @@
                         <LineAreaChart
                             :labels="achievementsLabels"
                             :datasets="achievementsData"
-                            :max="40"
+                            :max="8"
                         />
                     </div>
                 </div>
@@ -27,8 +27,14 @@
             <div class="col-lg">
                 <div class="card h-100">
                     <div class="card-body">
-                        <p class="text-uppercase text-secondary small fw-medium mb-3">Per Years</p>
-                        <LineAreaChart :labels="perYearLabels" :datasets="perYearData" :max="50" />
+                        <p class="text-uppercase text-secondary small fw-medium mb-3">
+                            Achievements per year
+                        </p>
+                        <LineAreaChart
+                            :labels="perYearLabels"
+                            :datasets="perYearData"
+                            :max="100"
+                        />
                     </div>
                 </div>
             </div>
@@ -77,7 +83,7 @@
 import AppShell from '@/components/layout/AppShell.vue'
 import LineAreaChart from '@/components/charts/LineAreaChart.vue'
 import SemiGauge from '@/components/charts/SemiGauge.vue'
-import { demoRecentHours } from '@/data/demo'
+import { demoAchievementsLast14Days, demoAchievementsPerYear, demoRecentHours } from '@/data/demo'
 
 export default {
     name: 'Home',
@@ -89,39 +95,20 @@ export default {
     data() {
         return {
             demoRecentHours,
-            achievementsLabels: ['2021', '2023', '2025'],
+            achievementsLabels: demoAchievementsLast14Days.labels,
             achievementsData: [
                 {
                     label: 'Achievements',
-                    data: [10, 24, 38],
+                    data: demoAchievementsLast14Days.data,
                     color: '#0d6efd'
                 }
             ],
-            perYearLabels: [
-                'JAN',
-                'FEV',
-                'MAR',
-                'APR',
-                'MAY',
-                'JUN',
-                'JUL',
-                'AUG',
-                'SEP',
-                'OCT',
-                'NOV',
-                'DEC'
-            ],
+            perYearLabels: demoAchievementsPerYear.labels,
             perYearData: [
                 {
-                    label: 'Series A',
-                    data: [12, 18, 15, 22, 28, 25, 30, 27, 32, 35, 30, 40],
+                    label: 'Achievements',
+                    data: demoAchievementsPerYear.data,
                     color: '#0d6efd',
-                    fill: true
-                },
-                {
-                    label: 'Series B',
-                    data: [8, 14, 20, 18, 24, 30, 26, 34, 28, 36, 42, 38],
-                    color: '#6610f2',
                     fill: true
                 }
             ]

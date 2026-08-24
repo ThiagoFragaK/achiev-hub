@@ -1,11 +1,53 @@
 <template>
     <AppShell>
         <div class="d-flex align-items-center gap-2 mb-4">
-            <button type="button" class="btn btn-outline-light btn-sm" aria-label="Filter games">
+            <button
+                type="button"
+                class="btn btn-outline-light btn-sm"
+                aria-label="Filter games"
+                aria-controls="my-games-filters"
+                @click="toggleFilters"
+            >
                 <LucideIcon icon="Funnel" :size="18" />
             </button>
             <h1 class="lastica-h3 mb-0">My Games</h1>
         </div>
+
+        <CollapseComponent ref="filters" collapse-id="my-games-filters">
+            <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                    <label class="form-label" for="filter-game-name">Game</label>
+                    <input
+                        id="filter-game-name"
+                        v-model="filters.name"
+                        type="search"
+                        class="form-control"
+                        placeholder="Search by name"
+                    />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="filter-min-hours">Min hours</label>
+                    <input
+                        id="filter-min-hours"
+                        v-model="filters.minHours"
+                        type="number"
+                        min="0"
+                        class="form-control"
+                    />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="filter-min-percentage">Min percentage</label>
+                    <input
+                        id="filter-min-percentage"
+                        v-model="filters.minPercentage"
+                        type="number"
+                        min="0"
+                        max="100"
+                        class="form-control"
+                    />
+                </div>
+            </div>
+        </CollapseComponent>
 
         <div class="card">
             <div class="card-body">
@@ -35,6 +77,7 @@
 
 <script>
 import AppShell from '@/components/layout/AppShell.vue'
+import CollapseComponent from '@/components/global/CollapseComponent.vue'
 import LucideIcon from '@/components/global/LucideIcon.vue'
 import PaginationComponent from '@/components/global/PaginationComponent.vue'
 import TableComponent from '@/components/global/TableComponent.vue'
@@ -44,6 +87,7 @@ export default {
     name: 'MyGames',
     components: {
         AppShell,
+        CollapseComponent,
         LucideIcon,
         PaginationComponent,
         TableComponent
@@ -53,6 +97,11 @@ export default {
             demoGames,
             currentPage: 1,
             perPage: 10,
+            filters: {
+                name: '',
+                minHours: '',
+                minPercentage: ''
+            },
             gameColumns: [
                 { key: 'name', label: 'Game' },
                 { key: 'hours', label: 'Hours' },
@@ -67,6 +116,11 @@ export default {
         pagedGames() {
             const start = (this.currentPage - 1) * this.perPage
             return this.demoGames.slice(start, start + this.perPage)
+        }
+    },
+    methods: {
+        toggleFilters() {
+            this.$refs.filters.toggle()
         }
     }
 }
