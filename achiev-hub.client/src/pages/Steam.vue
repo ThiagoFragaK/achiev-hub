@@ -23,7 +23,7 @@
 import AppShell from '@/components/layout/AppShell.vue'
 
 export default {
-    name: 'SteamView',
+    name: 'Steam',
     components: {
         AppShell
     }

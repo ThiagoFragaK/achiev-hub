@@ -1,12 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { isAuthenticated } from '@/lib/session'
-import GameDetailView from '@/views/GameDetailView.vue'
-import HomeView from '@/views/HomeView.vue'
-import LoginView from '@/views/LoginView.vue'
-import MyGamesView from '@/views/MyGamesView.vue'
-import StatsView from '@/views/StatsView.vue'
-import SteamView from '@/views/SteamView.vue'
-import StyleGuideView from '@/views/StyleGuideView.vue'
+import Games from '@/pages/Games.vue'
+import Home from '@/pages/Home.vue'
+import Login from '@/pages/Login.vue'
+import MyGames from '@/pages/MyGames.vue'
+import Stats from '@/pages/Stats.vue'
+import Steam from '@/pages/Steam.vue'
+import StyleGuide from '@/pages/StyleGuide.vue'
 
 const router = createRouter({
     history: createWebHistory(),
@@ -14,38 +14,38 @@ const router = createRouter({
         {
             path: '/login',
             name: 'login',
-            component: LoginView,
+            component: Login,
             meta: { public: true }
         },
         {
             path: '/',
             name: 'home',
-            component: HomeView
+            component: Home
         },
         {
             path: '/games',
             name: 'games',
-            component: MyGamesView
+            component: MyGames
         },
         {
             path: '/games/:id',
             name: 'game-detail',
-            component: GameDetailView
+            component: Games
         },
         {
             path: '/stats',
             name: 'stats',
-            component: StatsView
+            component: Stats
         },
         {
             path: '/steam',
             name: 'steam',
-            component: SteamView
+            component: Steam
         },
         {
             path: '/style-guide',
             name: 'style-guide',
-            component: StyleGuideView,
+            component: StyleGuide,
             meta: { public: true }
         }
     ]

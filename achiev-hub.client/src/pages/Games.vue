@@ -93,7 +93,7 @@ import LineAreaChart from '@/components/charts/LineAreaChart.vue'
 import { demoAchievements, demoGames } from '@/data/demo'
 
 export default {
-    name: 'GameDetailView',
+    name: 'Games',
     components: {
         AppShell,
         LineAreaChart,

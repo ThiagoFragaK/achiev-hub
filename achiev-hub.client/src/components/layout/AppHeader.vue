@@ -1,5 +1,7 @@
 <template>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-primary border-2">
+    <nav
+        class="app-navbar navbar navbar-expand-lg navbar-dark bg-dark border-bottom border-primary border-2"
+    >
         <div class="container">
             <RouterLink to="/" class="navbar-brand py-0">
                 <img src="/assets/achievHub-logo2.png" alt="Achievements Hub" height="40" />
@@ -30,7 +32,7 @@
                     </li>
                 </ul>
 
-                <div class="dropdown">
+                <div class="navbar-user dropdown">
                     <button
                         class="btn btn-link text-decoration-none text-white dropdown-toggle d-flex align-items-center gap-2"
                         type="button"

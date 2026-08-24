@@ -8,6 +8,9 @@ $dark: #0e0500;
 $warning: #fffecb;
 $danger: #ff6462;
 
+// Scales the whole rem-based UI (cards, spacing, controls), like a 80% browser zoom
+$font-size-root: 70%;
+
 // Default app typeface
 $font-family-sans-serif:
   'Montserrat',
@@ -40,8 +43,58 @@ $body-color-dark: $light;
 }
 
 // Opt-in display font — does not replace the app default
-.lastica {
+.lastica,
+.lastica-h1,
+.lastica-h3 {
   font-family: 'Lastica', sans-serif;
+}
+
+// Lastica is all-caps and its capitals sit at 0.732em against Montserrat's
+// 0.700em, so sized variants are scaled to keep both capitals the same height.
+$lastica-cap-scale: 0.956;
+
+.lastica-h1 {
+  @include font-size($h1-font-size * $lastica-cap-scale);
+  line-height: $headings-line-height;
+}
+
+.lastica-h3 {
+  @include font-size($h3-font-size * $lastica-cap-scale);
+  line-height: $headings-line-height;
+}
+
+// Center the nav links on the page rather than in the gap left over by the
+// brand. Unwrapping the collapse lifts the links and user menu into the
+// container's flex row, where the brand and user menu claim equal shares of
+// the free space, so the links stay centered at any logo size.
+@include media-breakpoint-up(lg) {
+  .app-navbar {
+    .navbar-collapse {
+      display: contents !important;
+    }
+
+    .navbar-brand,
+    .navbar-user {
+      flex: 1 1 0;
+    }
+
+    .navbar-user {
+      display: flex;
+      justify-content: flex-end;
+    }
+  }
+}
+
+// Borderless outline buttons. The border-width is kept and only the color is
+// cleared, so these stay the same size as their solid counterparts and their
+// hover/active fills are untouched.
+@each $name in map-keys($theme-colors) {
+  .btn-outline-#{$name} {
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-border-color: transparent;
+    --bs-btn-disabled-border-color: transparent;
+  }
 }
 
 // Table borders use solid primary

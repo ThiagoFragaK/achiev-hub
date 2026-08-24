@@ -70,7 +70,7 @@
 import { setAuthenticated } from '@/lib/session'
 
 export default {
-    name: 'LoginView',
+    name: 'Login',
     data() {
         return {
             steamId: '',
