@@ -22,6 +22,21 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasMaxLength(512);
 
+        builder.Property(e => e.Role)
+            .IsRequired()
+            .HasMaxLength(32)
+            .HasDefaultValue("user");
+
+        builder.Property(e => e.Status)
+            .IsRequired()
+            .HasDefaultValue(1);
+
+        builder.Property(e => e.TokenVersion)
+            .IsRequired()
+            .HasDefaultValue(0);
+
+        builder.Property(e => e.LastLogin);
+
         builder.HasIndex(e => e.Email).IsUnique();
         builder.HasIndex(e => e.SteamId)
             .IsUnique()

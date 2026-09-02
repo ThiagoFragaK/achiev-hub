@@ -32,22 +32,28 @@
                     </li>
                 </ul>
 
-                <div class="navbar-user dropdown">
+                <div ref="userMenu" class="navbar-user dropdown">
                     <button
                         class="btn btn-link text-decoration-none text-white dropdown-toggle d-flex align-items-center gap-2"
+                        :class="{ show: isUserMenuOpen }"
                         type="button"
-                        data-bs-toggle="dropdown"
-                        aria-expanded="false"
+                        :aria-expanded="isUserMenuOpen"
                         aria-label="User menu"
+                        @click="toggleUserMenu"
                     >
-                        <span class="small fw-medium">T.K.</span>
+                        <span class="small fw-medium">{{ displayName }}</span>
                         <span
                             class="d-inline-block rounded border bg-secondary"
                             style="width: 2.25rem; height: 2.25rem"
                             aria-hidden="true"
                         />
                     </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
+                    <!-- data-bs-popper enables Bootstrap's CSS-only placement, used for navbar dropdowns -->
+                    <ul
+                        class="dropdown-menu dropdown-menu-end"
+                        :class="{ show: isUserMenuOpen }"
+                        data-bs-popper="static"
+                    >
                         <li>
                             <button type="button" class="dropdown-item text-danger" @click="logout">
                                 Logout
@@ -61,12 +67,14 @@
 </template>
 
 <script>
-import { setAuthenticated } from '@/lib/session'
+import { logout } from '@/services/authService'
+import { getUser } from '@/lib/session'
 
 export default {
     name: 'AppHeader',
     data() {
         return {
+            isUserMenuOpen: false,
             links: [
                 { to: '/', label: 'Home', name: 'home' },
                 { to: '/games', label: 'My games', name: 'games' },
@@ -75,6 +83,27 @@ export default {
             ]
         }
     },
+    computed: {
+        displayName() {
+            const user = getUser()
+            if (!user) return 'Guest'
+            if (user.steamId) return user.steamId.slice(-4)
+            return user.email?.split('@')[0] || 'User'
+        }
+    },
+    watch: {
+        $route() {
+            this.isUserMenuOpen = false
+        }
+    },
+    mounted() {
+        document.addEventListener('click', this.onDocumentClick)
+        document.addEventListener('keydown', this.onKeydown)
+    },
+    beforeUnmount() {
+        document.removeEventListener('click', this.onDocumentClick)
+        document.removeEventListener('keydown', this.onKeydown)
+    },
     methods: {
         isActive(name) {
             if (name === 'games') {
@@ -82,8 +111,22 @@ export default {
             }
             return this.$route.name === name
         },
-        logout() {
-            setAuthenticated(false)
+        toggleUserMenu() {
+            this.isUserMenuOpen = !this.isUserMenuOpen
+        },
+        onDocumentClick(event) {
+            if (this.isUserMenuOpen && !this.$refs.userMenu?.contains(event.target)) {
+                this.isUserMenuOpen = false
+            }
+        },
+        onKeydown(event) {
+            if (event.key === 'Escape') {
+                this.isUserMenuOpen = false
+            }
+        },
+        async logout() {
+            this.isUserMenuOpen = false
+            await logout()
             this.$router.push({ name: 'login' })
         }
     }

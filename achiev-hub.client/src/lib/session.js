@@ -1,13 +1,33 @@
-const SESSION_KEY = 'achiev-hub-session'
+const TOKEN_KEY = 'achiev-hub-token'
+const USER_KEY = 'achiev-hub-user'
 
-export function isAuthenticated() {
-    return localStorage.getItem(SESSION_KEY) === '1'
+export function getToken() {
+    return localStorage.getItem(TOKEN_KEY)
 }
 
-export function setAuthenticated(value) {
-    if (value) {
-        localStorage.setItem(SESSION_KEY, '1')
-    } else {
-        localStorage.removeItem(SESSION_KEY)
+export function getUser() {
+    const raw = localStorage.getItem(USER_KEY)
+    if (!raw) return null
+    try {
+        return JSON.parse(raw)
+    } catch {
+        return null
     }
+}
+
+export function isAuthenticated() {
+    return !!getToken()
+}
+
+export function setSession({ accessToken, user }) {
+    localStorage.setItem(TOKEN_KEY, accessToken)
+    if (user) {
+        localStorage.setItem(USER_KEY, JSON.stringify(user))
+    }
+}
+
+export function clearSession() {
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
+    localStorage.removeItem('achiev-hub-session')
 }
