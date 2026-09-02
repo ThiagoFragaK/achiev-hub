@@ -3,7 +3,7 @@
 </template>
 
 <script>
-import MyGamesComponent from '@/components/games/MyGamesComponent.vue'
+import MyGamesComponent from '@/components/mygames/MyGamesComponent.vue'
 
 export default {
     name: 'MyGames',

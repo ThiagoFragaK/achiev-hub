@@ -1,16 +1,15 @@
 using achiev_hub.Server.DTOs.Persistence;
 using achiev_hub.Server.Entities;
+using achiev_hub.Server.Enums;
 using achiev_hub.Server.Exceptions;
 using achiev_hub.Server.Repositories.Interfaces;
 using achiev_hub.Server.Services.Interfaces;
-using Microsoft.AspNetCore.Identity;
 
 namespace achiev_hub.Server.Services;
 
 public class UserService : IUserService
 {
     private readonly IRepository<User> _users;
-    private readonly PasswordHasher<User> _passwordHasher = new();
 
     public UserService(IRepository<User> users)
     {
@@ -36,9 +35,12 @@ public class UserService : IUserService
         var user = new User
         {
             Email = request.Email.Trim(),
-            SteamId = NormalizeSteamId(request.SteamId)
+            SteamId = NormalizeSteamId(request.SteamId),
+            Password = BCrypt.Net.BCrypt.HashPassword(request.Password),
+            Role = "user",
+            Status = (int)StatusEnum.Active,
+            TokenVersion = 0
         };
-        user.Password = _passwordHasher.HashPassword(user, request.Password);
 
         await _users.AddAsync(user, cancellationToken);
         await _users.SaveChangesAsync(cancellationToken);
@@ -55,7 +57,7 @@ public class UserService : IUserService
         user.SteamId = NormalizeSteamId(request.SteamId);
         if (!string.IsNullOrWhiteSpace(request.Password))
         {
-            user.Password = _passwordHasher.HashPassword(user, request.Password);
+            user.Password = BCrypt.Net.BCrypt.HashPassword(request.Password);
         }
 
         _users.Update(user);

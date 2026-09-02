@@ -24,6 +24,7 @@
                         class="form-control"
                         :class="{ 'is-invalid': steamIdError }"
                         :aria-invalid="steamIdError"
+                        :disabled="loading"
                     />
                     <div
                         v-if="steamIdError"
@@ -43,16 +44,24 @@
                         name="password"
                         autocomplete="current-password"
                         class="form-control"
+                        :class="{ 'is-invalid': !!loginError }"
+                        :disabled="loading"
                     />
                 </div>
 
+                <div v-if="loginError" class="alert alert-danger py-2" role="alert">
+                    {{ loginError }}
+                </div>
+
                 <div class="d-grid mb-3">
-                    <button type="submit" class="btn btn-primary btn-lg">Login</button>
+                    <button type="submit" class="btn btn-primary btn-lg" :disabled="loading">
+                        {{ loading ? 'Logging in…' : 'Login' }}
+                    </button>
                 </div>
             </form>
 
             <div class="text-center mb-3">
-                <button type="button" class="btn btn-link" @click="continueAsGuest">
+                <button type="button" class="btn btn-link" :disabled="loading" @click="continueAsGuest">
                     Continue without login.
                 </button>
             </div>
@@ -67,7 +76,7 @@
 </template>
 
 <script>
-import { setAuthenticated } from '@/lib/session'
+import { login } from '@/services/authService'
 
 export default {
     name: 'LoginComponent',
@@ -75,23 +84,35 @@ export default {
         return {
             steamId: '',
             password: '',
-            steamIdError: false
+            steamIdError: false,
+            loginError: '',
+            loading: false
         }
     },
     methods: {
-        enterApp() {
-            setAuthenticated(true)
+        redirectAfterLogin() {
             const redirect =
                 typeof this.$route.query.redirect === 'string' ? this.$route.query.redirect : '/'
             this.$router.push(redirect)
         },
-        onLogin() {
+        async onLogin() {
             this.steamIdError = !this.steamId.trim()
+            this.loginError = ''
             if (this.steamIdError) return
-            this.enterApp()
+
+            this.loading = true
+            try {
+                await login(this.steamId.trim(), this.password)
+                this.redirectAfterLogin()
+            } catch (error) {
+                this.loginError = error.body?.message || error.message || 'Login failed'
+            } finally {
+                this.loading = false
+            }
         },
         continueAsGuest() {
-            this.enterApp()
+            // Public UI only; protected APIs require a real token.
+            this.$router.push({ name: 'style-guide' })
         }
     }
 }

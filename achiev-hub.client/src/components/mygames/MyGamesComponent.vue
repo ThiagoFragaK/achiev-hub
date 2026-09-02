@@ -13,6 +13,7 @@
             <h1 class="lastica-h3 mb-0">My Games</h1>
         </div>
 
+        <!-- Move to MyGamesFilters -->
         <CollapseComponent ref="filters" collapse-id="my-games-filters">
             <div class="row g-3 mb-4">
                 <div class="col-md-4">
@@ -49,6 +50,7 @@
             </div>
         </CollapseComponent>
 
+        <!-- Move to MyGamesTable -->
         <div class="card">
             <div class="card-body">
                 <TableComponent :data="pagedGames" :columns="gameColumns">
