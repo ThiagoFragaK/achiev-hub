@@ -1,0 +1,149 @@
+// AchievHub Bootstrap theme
+$primary: #372649;
+$secondary: #6c738c;
+$success: #6ac36c;
+$info: #1b4564;
+$light: #d7d6d0;
+$dark: #0e0500;
+$warning: #fffecb;
+$danger: #ff6462;
+
+// Scales the whole rem-based UI (cards, spacing, controls), like a 80% browser zoom
+$font-size-root: 70%;
+
+// Default app typeface
+$font-family-sans-serif:
+  'Montserrat',
+  system-ui,
+  -apple-system,
+  'Segoe UI',
+  Roboto,
+  'Helvetica Neue',
+  'Noto Sans',
+  'Liberation Sans',
+  Arial,
+  sans-serif,
+  'Apple Color Emoji',
+  'Segoe UI Emoji',
+  'Segoe UI Symbol',
+  'Noto Color Emoji';
+
+// Dark page background (data-bs-theme="dark")
+$body-bg-dark: $dark;
+$body-color-dark: $light;
+
+@import 'bootstrap/scss/bootstrap';
+
+@font-face {
+  font-family: 'Lastica';
+  src: url('./fonts/Lastica.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+// Opt-in display font — does not replace the app default
+.lastica,
+.lastica-h1,
+.lastica-h3 {
+  font-family: 'Lastica', sans-serif;
+}
+
+// Lastica is all-caps and its capitals sit at 0.732em against Montserrat's
+// 0.700em, so sized variants are scaled to keep both capitals the same height.
+$lastica-cap-scale: 0.956;
+
+.lastica-h1 {
+  @include font-size($h1-font-size * $lastica-cap-scale);
+  line-height: $headings-line-height;
+}
+
+.lastica-h3 {
+  @include font-size($h3-font-size * $lastica-cap-scale);
+  line-height: $headings-line-height;
+}
+
+// Center the nav links on the page rather than in the gap left over by the
+// brand. Unwrapping the collapse lifts the links and user menu into the
+// container's flex row, where the brand and user menu claim equal shares of
+// the free space, so the links stay centered at any logo size.
+@include media-breakpoint-up(lg) {
+  .app-navbar {
+    .navbar-collapse {
+      display: contents !important;
+    }
+
+    .navbar-brand,
+    .navbar-user {
+      flex: 1 1 0;
+    }
+
+    .navbar-user {
+      display: flex;
+      justify-content: flex-end;
+    }
+  }
+}
+
+// Borderless outline buttons. The border-width is kept and only the color is
+// cleared, so these stay the same size as their solid counterparts and their
+// hover/active fills are untouched.
+@each $name in map-keys($theme-colors) {
+  .btn-outline-#{$name} {
+    --bs-btn-border-color: transparent;
+    --bs-btn-hover-border-color: transparent;
+    --bs-btn-active-border-color: transparent;
+    --bs-btn-disabled-border-color: transparent;
+  }
+}
+
+// Borderless cards
+.card {
+  --bs-card-border-width: 0;
+}
+
+// Borderless primary pagination
+.pagination {
+  --bs-pagination-color: #{$primary};
+  --bs-pagination-bg: transparent;
+  --bs-pagination-border-width: 0;
+  --bs-pagination-hover-color: #{$primary};
+  --bs-pagination-hover-bg: transparent;
+  --bs-pagination-focus-color: #{$primary};
+  --bs-pagination-focus-bg: transparent;
+  --bs-pagination-active-color: #{$light};
+  --bs-pagination-active-bg: #{$primary};
+  --bs-pagination-active-border-color: transparent;
+  --bs-pagination-disabled-color: #{$primary};
+  --bs-pagination-disabled-bg: transparent;
+  --bs-pagination-disabled-border-color: transparent;
+  --bs-pagination-border-radius: var(--bs-border-radius);
+
+  .page-link {
+    border-radius: var(--bs-pagination-border-radius);
+  }
+}
+
+// Table borders use solid primary
+.table {
+  --bs-table-border-color: #{$primary};
+}
+
+// Match card corner radius on bordered tables
+.table-responsive:has(> .table-bordered) {
+  border-radius: var(--bs-border-radius);
+  overflow: hidden;
+}
+
+// Solid primary table headers (Bootstrap's table-primary is a pale tint by default)
+.table-primary {
+  --bs-table-color: #{$light};
+  --bs-table-bg: #{$primary};
+  --bs-table-border-color: #{$primary};
+  --bs-table-striped-bg: #{$primary};
+  --bs-table-striped-color: #{$light};
+  --bs-table-active-bg: #{$primary};
+  --bs-table-active-color: #{$light};
+  --bs-table-hover-bg: #{$primary};
+  --bs-table-hover-color: #{$light};
+}

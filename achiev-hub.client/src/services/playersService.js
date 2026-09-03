@@ -1,5 +1,5 @@
-import { getJson } from './http';
+import { getJson } from './http'
 
 export function getPlayer(steamId) {
-  return getJson(`/api/steam/players/${encodeURIComponent(steamId)}`);
+    return getJson(`/api/steam/players/${encodeURIComponent(steamId)}`)
 }
