@@ -1,9 +1,11 @@
 using achiev_hub.Server.DTOs;
 using achiev_hub.Server.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace achiev_hub.Server.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/steam/players")]
 public class SteamPlayersController : ControllerBase

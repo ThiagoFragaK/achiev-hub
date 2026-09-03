@@ -1,12 +1,13 @@
 services:
-  db:
-    image: postgres:16
+  postgres:
+    image: postgres:16-alpine
+    container_name: achievhub-postgres
     environment:
-      POSTGRES_DB: achievhub
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: achievhub
     ports:
-      - "5672:5432"
+      - "6110:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -23,11 +24,15 @@ services:
       - "8080:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=achievhub;Username=postgres;Password=postgres
-      SteamApi__ApiKey: ${STEAM_API_KEY:-}
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=achievhub;Username=postgres;Password=postgres;SSL Mode=Disable"
+      Jwt__Key: "AchievHubDevSecretKey_ChangeInProduction_Min32Chars!"
+      Jwt__Issuer: "achiev-hub.Server"
+      Jwt__Audience: "achiev-hub.Client"
+      Jwt__ExpiryMinutes: "30"
+      SteamApi__ApiKey: "${STEAM_API_KEY:-}"
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
 
 volumes:

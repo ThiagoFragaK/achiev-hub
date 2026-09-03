@@ -24,6 +24,15 @@ public class Repository<T> : IRepository<T> where T : class, IEntity
         return await _set.FindAsync([id], cancellationToken);
     }
 
+    public async Task<T?> FirstOrDefaultAsync(
+        Expression<Func<T, bool>> predicate,
+        bool trackChanges = true,
+        CancellationToken cancellationToken = default)
+    {
+        var query = trackChanges ? _set.AsQueryable() : _set.AsNoTracking();
+        return await query.FirstOrDefaultAsync(predicate, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<T>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _set.AsNoTracking().ToListAsync(cancellationToken);

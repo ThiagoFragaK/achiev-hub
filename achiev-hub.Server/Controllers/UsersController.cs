@@ -1,9 +1,11 @@
 using achiev_hub.Server.DTOs.Persistence;
 using achiev_hub.Server.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace achiev_hub.Server.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/users")]
 public class UsersController : ApiControllerBase

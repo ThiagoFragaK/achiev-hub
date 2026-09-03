@@ -29,7 +29,7 @@ The backend talks to the Steam Web API and persists users, games, achievements, 
    npm install
    ```
 
-2. Ensure PostgreSQL is running (or `docker compose up db`). Migrations apply automatically when the API starts. To apply them manually from `achiev-hub.Server`:
+2. Ensure PostgreSQL is running (or `docker compose up postgres`). Migrations and seed users apply automatically when the API starts. To apply migrations manually from `achiev-hub.Server`:
 
    ```bash
    cd achiev-hub.Server
@@ -38,7 +38,9 @@ The backend talks to the Steam Web API and persists users, games, achievements, 
 
    The default connection string in `appsettings.json` is:
 
-   `Host=localhost;Port=5432;Database=achievhub;Username=postgres;Password=postgres`
+   `Host=localhost;Port=6110;Database=achievhub;Username=postgres;Password=postgres`
+
+   Optional local overrides: copy `appsettings.Development.local.json.example` to `appsettings.Development.local.json` (gitignored).
 
 3. Put your Steam API key in [user secrets](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets) (do not commit it):
 
@@ -46,6 +48,24 @@ The backend talks to the Steam Web API and persists users, games, achievements, 
    cd achiev-hub.Server
    dotnet user-secrets set "SteamApi:ApiKey" "YOUR_KEY"
    ```
+
+## Auth
+
+Login uses Steam ID + password and returns a JWT Bearer token.
+
+Seed users (password `achiev456`):
+
+| Steam ID | Email | Role |
+| --- | --- | --- |
+| `76561198000000001` | `user@example.com` | user |
+| `76561198000000002` | `admin@example.com` | admin |
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `POST` | `/api/login` | `{ steamId, password }` → access token |
+| `POST` | `/api/logout` | Revoke current token (requires Bearer) |
+
+Protected APIs require `Authorization: Bearer <token>`.
 
 ## Run
 
@@ -113,10 +133,10 @@ Server layout in short: `Controllers` → `Services` → `Repositories` / `Appli
    ```
 
 - App: `http://localhost:8080`
-- Postgres: `localhost:5432` (user/password/db: `postgres` / `postgres` / `achievhub`)
+- Postgres: `localhost:6110` (user/password/db: `postgres` / `postgres` / `achievhub`)
 
-EF Core migrations run automatically on API startup. For local development without the API container, you can run only the database:
+EF Core migrations and seed users run automatically on API startup. For local development without the API container, you can run only the database:
 
 ```bash
-docker compose up db
+docker compose up postgres
 ```

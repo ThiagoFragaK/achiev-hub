@@ -1,0 +1,14 @@
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=localhost;Port=6110;Database=achievhub;Username=postgres;Password=YOUR_PASSWORD;SSL Mode=Disable"
+  },
+  "Jwt": {
+    "Key": "AchievHubDevSecretKey_ChangeInProduction_Min32Chars!",
+    "Issuer": "achiev-hub.Server",
+    "Audience": "achiev-hub.Client",
+    "ExpiryMinutes": 30
+  },
+  "SteamApi": {
+    "ApiKey": "YOUR_STEAM_API_KEY"
+  }
+}
