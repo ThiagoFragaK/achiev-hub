@@ -19,7 +19,6 @@
 **/azds.yaml
 **/bin
 **/obj
-**/charts
 **/docker-compose*
 **/Dockerfile*
 **/node_modules
