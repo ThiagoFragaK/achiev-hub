@@ -61,7 +61,7 @@
             </form>
 
             <div class="text-center mb-3">
-                <button type="button" class="btn btn-link" :disabled="loading" @click="continueAsGuest">
+                <button type="button" class="btn btn-link" disabled @click="continueAsGuest">
                     Continue without login.
                 </button>
             </div>
@@ -112,7 +112,7 @@ export default {
         },
         continueAsGuest() {
             // Public UI only; protected APIs require a real token.
-            this.$router.push({ name: 'style-guide' })
+            this.$router.push({ name: '/' })
         }
     }
 }
