@@ -10,6 +10,7 @@ public class ApplicationDbContext : DbContext
     }
 
     public DbSet<User> Users => Set<User>();
+    public DbSet<EmailVerification> EmailVerifications => Set<EmailVerification>();
     public DbSet<Game> Games => Set<Game>();
     public DbSet<Achievement> Achievements => Set<Achievement>();
     public DbSet<Goal> Goals => Set<Goal>();
