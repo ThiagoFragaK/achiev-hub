@@ -6,6 +6,11 @@ public class LoginRequest
     public string Password { get; set; } = string.Empty;
 }
 
+public class GuestRequest
+{
+    public string SteamId { get; set; } = string.Empty;
+}
+
 public class AuthUserDto
 {
     public int Id { get; set; }

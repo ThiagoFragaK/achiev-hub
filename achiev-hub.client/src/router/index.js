@@ -4,6 +4,7 @@ import Games from '@/pages/Games.vue'
 import Home from '@/pages/Home.vue'
 import Login from '@/pages/Login.vue'
 import MyGames from '@/pages/MyGames.vue'
+import Register from '@/pages/Register.vue'
 import Stats from '@/pages/Stats.vue'
 import Steam from '@/pages/Steam.vue'
 import StyleGuide from '@/pages/StyleGuide.vue'
@@ -15,6 +16,12 @@ const router = createRouter({
             path: '/login',
             name: 'login',
             component: Login,
+            meta: { public: true }
+        },
+        {
+            path: '/register',
+            name: 'register',
+            component: Register,
             meta: { public: true }
         },
         {
