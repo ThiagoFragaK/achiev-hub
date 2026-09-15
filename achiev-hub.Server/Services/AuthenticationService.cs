@@ -53,6 +53,23 @@ public class AuthenticationService : IAuthenticationService
         };
     }
 
+    public object ContinueAsGuest(string steamId)
+    {
+        var normalizedSteamId = steamId.Trim();
+        return new LoginResponseDto
+        {
+            AccessToken = _jwtTokenService.GenerateGuestToken(normalizedSteamId),
+            TokenType = "Bearer",
+            User = new AuthUserDto
+            {
+                Id = 0,
+                Email = string.Empty,
+                SteamId = normalizedSteamId,
+                Role = JwtTokenService.GuestRole
+            }
+        };
+    }
+
     public async Task LogoutAsync(int userId, CancellationToken cancellationToken = default)
     {
         var user = await _users.GetByIdAsync(userId, cancellationToken);

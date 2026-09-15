@@ -33,6 +33,7 @@ public static class DbSeeder
                     Password = passwordHash,
                     Role = seed.Role,
                     Status = (int)StatusEnum.Active,
+                    IsEmailVerified = true,
                     TokenVersion = 0
                 });
             }
@@ -42,6 +43,7 @@ public static class DbSeeder
                 user.SteamId = seed.SteamId;
                 user.Role = seed.Role;
                 user.Status = (int)StatusEnum.Active;
+                user.IsEmailVerified = true;
                 user.Password = passwordHash;
             }
         }

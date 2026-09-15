@@ -13,6 +13,7 @@ public class User : IEntity
 
     public string Role { get; set; } = "user";
     public int Status { get; set; } = 1;
+    public bool IsEmailVerified { get; set; }
 
     [JsonIgnore]
     public int TokenVersion { get; set; }

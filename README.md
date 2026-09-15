@@ -79,7 +79,7 @@ dotnet run
 ```
 
 - API: `https://localhost:7254` (or `http://localhost:5067`)
-- Vue dev server (via SPA proxy): `https://localhost:53139`
+- Vue dev server (via SPA proxy): `https://localhost:9100`
 - OpenAPI document in Development: `/openapi/v1.json`
 
 ## API

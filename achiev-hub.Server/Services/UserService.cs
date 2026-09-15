@@ -4,6 +4,7 @@ using achiev_hub.Server.Enums;
 using achiev_hub.Server.Exceptions;
 using achiev_hub.Server.Repositories.Interfaces;
 using achiev_hub.Server.Services.Interfaces;
+using achiev_hub.Server.Support;
 
 namespace achiev_hub.Server.Services;
 
@@ -29,6 +30,11 @@ public class UserService : IUserService
 
     public async Task<UserDto> CreateAsync(CreateUserRequest request, CancellationToken cancellationToken = default)
     {
+        if (!PasswordValidator.IsValid(request.Password, out var passwordError))
+        {
+            throw new ConflictException(passwordError);
+        }
+
         await EnsureEmailIsUniqueAsync(request.Email, null, cancellationToken);
         await EnsureSteamIdIsUniqueAsync(request.SteamId, null, cancellationToken);
 
@@ -39,6 +45,7 @@ public class UserService : IUserService
             Password = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Role = "user",
             Status = (int)StatusEnum.Active,
+            IsEmailVerified = true,
             TokenVersion = 0
         };
 
@@ -57,6 +64,11 @@ public class UserService : IUserService
         user.SteamId = NormalizeSteamId(request.SteamId);
         if (!string.IsNullOrWhiteSpace(request.Password))
         {
+            if (!PasswordValidator.IsValid(request.Password, out var passwordError))
+            {
+                throw new ConflictException(passwordError);
+            }
+
             user.Password = BCrypt.Net.BCrypt.HashPassword(request.Password);
         }
 
