@@ -19,15 +19,18 @@ public class RegistrationService : IRegistrationService
     private readonly IRepository<User> _users;
     private readonly IRepository<EmailVerification> _verifications;
     private readonly IEmailSender _emailSender;
+    private readonly IHostEnvironment _environment;
 
     public RegistrationService(
         IRepository<User> users,
         IRepository<EmailVerification> verifications,
-        IEmailSender emailSender)
+        IEmailSender emailSender,
+        IHostEnvironment environment)
     {
         _users = users;
         _verifications = verifications;
         _emailSender = emailSender;
+        _environment = environment;
     }
 
     public async Task<object> SendVerificationAsync(string email, CancellationToken cancellationToken = default)
@@ -124,13 +127,18 @@ public class RegistrationService : IRegistrationService
     {
         var normalizedEmail = NormalizeEmail(request.Email);
         var steamId = NormalizeSteamId(request.SteamId);
+        var bypassEmailVerification = _environment.IsDevelopment();
 
         if (string.IsNullOrWhiteSpace(normalizedEmail)
             || string.IsNullOrWhiteSpace(steamId)
             || string.IsNullOrWhiteSpace(request.Password)
-            || string.IsNullOrWhiteSpace(request.EmailVerifiedToken))
+            || (!bypassEmailVerification && string.IsNullOrWhiteSpace(request.EmailVerifiedToken)))
         {
-            return AuthResult.Fail("Steam ID, email, password, and verified email token are required", 422);
+            return AuthResult.Fail(
+                bypassEmailVerification
+                    ? "Steam ID, email, and password are required"
+                    : "Steam ID, email, password, and verified email token are required",
+                422);
         }
 
         if (!PasswordValidator.IsValid(request.Password, out var passwordError))
@@ -148,19 +156,23 @@ public class RegistrationService : IRegistrationService
             return AuthResult.Fail("Steam ID is already registered", 409);
         }
 
-        var verification = await _verifications.FirstOrDefaultAsync(
-            v => v.Email == normalizedEmail,
-            trackChanges: true,
-            cancellationToken);
-
-        if (verification is null
-            || verification.VerifiedAt is null
-            || verification.ConsumeTokenHash is null
-            || verification.ConsumeTokenExpiresAt is null
-            || verification.ConsumeTokenExpiresAt < DateTime.UtcNow
-            || !SecureEquals(verification.ConsumeTokenHash, HashValue(request.EmailVerifiedToken)))
+        EmailVerification? verification = null;
+        if (!bypassEmailVerification)
         {
-            return AuthResult.Fail("Email has not been verified", 400);
+            verification = await _verifications.FirstOrDefaultAsync(
+                v => v.Email == normalizedEmail,
+                trackChanges: true,
+                cancellationToken);
+
+            if (verification is null
+                || verification.VerifiedAt is null
+                || verification.ConsumeTokenHash is null
+                || verification.ConsumeTokenExpiresAt is null
+                || verification.ConsumeTokenExpiresAt < DateTime.UtcNow
+                || !SecureEquals(verification.ConsumeTokenHash, HashValue(request.EmailVerifiedToken)))
+            {
+                return AuthResult.Fail("Email has not been verified", 400);
+            }
         }
 
         var user = new User
@@ -170,12 +182,16 @@ public class RegistrationService : IRegistrationService
             Password = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Role = "user",
             Status = (int)StatusEnum.Active,
-            IsEmailVerified = true,
+            IsEmailVerified = !bypassEmailVerification,
             TokenVersion = 0
         };
 
         await _users.AddAsync(user, cancellationToken);
-        _verifications.Remove(verification);
+        if (verification is not null)
+        {
+            _verifications.Remove(verification);
+        }
+
         await _users.SaveChangesAsync(cancellationToken);
 
         return new UserDto
