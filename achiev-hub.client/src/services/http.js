@@ -23,7 +23,7 @@ async function request(url, options = {}) {
 
     const response = await fetch(url, { ...options, headers })
 
-    if (response.status === 401 && !url.includes('/api/login')) {
+    if (response.status === 401 && !url.includes('/api/login') && !url.includes('/api/guest') && !url.includes('/api/register')) {
         clearSession()
         if (router.currentRoute.value.name !== 'login') {
             router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })

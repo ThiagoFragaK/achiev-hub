@@ -2,6 +2,7 @@ using System.Security.Claims;
 using achiev_hub.Server.DTOs.Auth;
 using achiev_hub.Server.Services;
 using achiev_hub.Server.Services.Interfaces;
+using achiev_hub.Server.Support;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -41,10 +42,35 @@ public class AuthenticationController : ControllerBase
         });
     }
 
+    [AllowAnonymous]
+    [HttpPost("guest")]
+    public IActionResult ContinueAsGuest([FromBody] GuestRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.SteamId))
+        {
+            return UnprocessableEntity(new { message = "Steam ID is required" });
+        }
+
+        var response = _service.ContinueAsGuest(request.SteamId);
+        return Ok(new
+        {
+            success = true,
+            message = "Guest session created",
+            data = response
+        });
+    }
+
     [Authorize]
     [HttpPost("logout")]
     public async Task<IActionResult> Logout(CancellationToken cancellationToken)
     {
+        var isGuest = User.IsInRole(JwtTokenService.GuestRole)
+            || User.FindFirstValue(JwtTokenService.TokenKindClaim) == JwtTokenService.GuestTokenKind;
+        if (isGuest)
+        {
+            return Ok(new { success = true, message = "Logged out successfully" });
+        }
+
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!int.TryParse(userIdClaim, out var userId))
         {

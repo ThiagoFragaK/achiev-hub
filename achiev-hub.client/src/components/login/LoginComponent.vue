@@ -57,14 +57,26 @@
                     <button type="submit" class="btn btn-primary btn-lg" :disabled="loading">
                         {{ loading ? 'Logging in…' : 'Login' }}
                     </button>
+                    <button type="button" class="btn btn-secondary btn-lg mt-4" :disabled="loading" @click="onRegister">
+                        Register
+                    </button>
                 </div>
             </form>
 
             <div class="text-center mb-3">
-                <button type="button" class="btn btn-link" disabled @click="continueAsGuest">
+                <button
+                    type="button"
+                    class="btn btn-link"
+                    :disabled="loading"
+                    @click="onContinueAsGuest"
+                >
                     Continue without login.
                 </button>
             </div>
+
+            <!-- <div class="text-center mb-2">
+                <RouterLink to="/register" class="small"> Create an account </RouterLink>
+            </div> -->
 
             <div class="text-center">
                 <RouterLink to="/style-guide" class="small text-secondary">
@@ -76,7 +88,7 @@
 </template>
 
 <script>
-import { login } from '@/services/authService'
+import { continueAsGuest, login } from '@/services/authService'
 
 export default {
     name: 'LoginComponent',
@@ -90,6 +102,9 @@ export default {
         }
     },
     methods: {
+        onRegister() {
+            this.$router.push('/register')
+        },
         redirectAfterLogin() {
             const redirect =
                 typeof this.$route.query.redirect === 'string' ? this.$route.query.redirect : '/'
@@ -110,9 +125,20 @@ export default {
                 this.loading = false
             }
         },
-        continueAsGuest() {
-            // Public UI only; protected APIs require a real token.
-            this.$router.push({ name: '/' })
+        async onContinueAsGuest() {
+            this.steamIdError = !this.steamId.trim()
+            this.loginError = ''
+            if (this.steamIdError) return
+
+            this.loading = true
+            try {
+                await continueAsGuest(this.steamId.trim())
+                this.$router.push({ name: 'home' })
+            } catch (error) {
+                this.loginError = error.body?.message || error.message || 'Guest session failed'
+            } finally {
+                this.loading = false
+            }
         }
     }
 }

@@ -31,6 +31,10 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasDefaultValue(1);
 
+        builder.Property(e => e.IsEmailVerified)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(e => e.TokenVersion)
             .IsRequired()
             .HasDefaultValue(0);

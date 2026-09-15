@@ -24,6 +24,7 @@ if (builder.Environment.IsDevelopment())
 }
 
 builder.Services.Configure<SteamApiOptions>(builder.Configuration.GetSection(SteamApiOptions.SectionName));
+builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection(SendGridOptions.SectionName));
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddHttpClient<ISteamRepository, SteamRepository>();
@@ -36,6 +37,8 @@ builder.Services.AddScoped<IPlayersService, PlayersService>();
 builder.Services.AddScoped<IGamesService, GamesService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
+builder.Services.AddScoped<IRegistrationService, RegistrationService>();
+builder.Services.AddScoped<IEmailSender, SendGridEmailSender>();
 builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddScoped<IAchievementService, AchievementService>();
 builder.Services.AddScoped<IGoalService, GoalService>();
@@ -65,6 +68,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         {
             OnTokenValidated = async context =>
             {
+                var isGuest = context.Principal?.IsInRole(JwtTokenService.GuestRole) == true
+                    || context.Principal?.FindFirstValue(JwtTokenService.TokenKindClaim) == JwtTokenService.GuestTokenKind;
+                if (isGuest)
+                {
+                    return;
+                }
+
                 var userIdClaim = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier)
                     ?? context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Sub);
                 var tokenVersionClaim = context.Principal?.FindFirstValue("token_version");
