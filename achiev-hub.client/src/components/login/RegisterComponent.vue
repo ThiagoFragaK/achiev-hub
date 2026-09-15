@@ -43,20 +43,69 @@
 
                 <div class="mb-3">
                     <label class="form-label fw-semibold" for="regPassword">Password</label>
-                    <input
-                        id="regPassword"
-                        v-model="password"
-                        type="password"
-                        class="form-control"
-                        :class="{ 'is-invalid': fieldErrors.password }"
-                        :disabled="loading || emailVerified"
-                        autocomplete="new-password"
-                    />
+                    <div class="position-relative">
+                        <input
+                            id="regPassword"
+                            v-model="password"
+                            :type="showPassword ? 'text' : 'password'"
+                            class="form-control pe-5"
+                            :class="{ 'is-invalid': fieldErrors.password }"
+                            :disabled="loading || emailVerified"
+                            autocomplete="new-password"
+                        />
+                        <button
+                            type="button"
+                            class="btn btn-link text-secondary position-absolute top-50 end-0 translate-middle-y px-3 py-0 border-0"
+                            :disabled="loading || emailVerified"
+                            :aria-label="showPassword ? 'Hide password' : 'Show password'"
+                            :aria-pressed="showPassword"
+                            @click="showPassword = !showPassword"
+                        >
+                            <LucideIcon :icon="showPassword ? 'EyeOff' : 'Eye'" :size="18" />
+                        </button>
+                    </div>
                     <div class="form-text">
                         At least 12 characters, with uppercase, number, and special character.
                     </div>
                     <div v-if="fieldErrors.password" class="invalid-feedback d-block">
                         {{ fieldErrors.password }}
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="regConfirmPassword">
+                        Confirm password
+                    </label>
+                    <div class="position-relative">
+                        <input
+                            id="regConfirmPassword"
+                            v-model="confirmPassword"
+                            :type="showConfirmPassword ? 'text' : 'password'"
+                            class="form-control pe-5"
+                            :class="{ 'is-invalid': fieldErrors.confirmPassword }"
+                            :disabled="loading || emailVerified"
+                            autocomplete="new-password"
+                        />
+                        <button
+                            type="button"
+                            class="btn btn-link text-secondary position-absolute top-50 end-0 translate-middle-y px-3 py-0 border-0"
+                            :disabled="loading || emailVerified"
+                            :aria-label="
+                                showConfirmPassword
+                                    ? 'Hide confirm password'
+                                    : 'Show confirm password'
+                            "
+                            :aria-pressed="showConfirmPassword"
+                            @click="showConfirmPassword = !showConfirmPassword"
+                        >
+                            <LucideIcon
+                                :icon="showConfirmPassword ? 'EyeOff' : 'Eye'"
+                                :size="18"
+                            />
+                        </button>
+                    </div>
+                    <div v-if="fieldErrors.confirmPassword" class="invalid-feedback d-block">
+                        {{ fieldErrors.confirmPassword }}
                     </div>
                 </div>
 
@@ -133,16 +182,23 @@
 </template>
 
 <script>
-import { confirmCode, register, sendVerification } from '@/services/authService';
-import { validatePassword } from '@/utils/PasswordHelper';
+import { confirmCode, register, sendVerification } from '@/services/authService'
+import LucideIcon from '@/components/global/LucideIcon.vue'
+import { validatePassword } from '@/utils/PasswordHelper'
 
 export default {
     name: 'RegisterComponent',
+    components: {
+        LucideIcon
+    },
     data() {
         return {
             steamId: '',
             email: '',
             password: '',
+            confirmPassword: '',
+            showPassword: false,
+            showConfirmPassword: false,
             code: '',
             codeSent: false,
             emailVerified: false,
@@ -155,7 +211,8 @@ export default {
             fieldErrors: {
                 steamId: false,
                 email: false,
-                password: ''
+                password: '',
+                confirmPassword: ''
             }
         }
     },
@@ -185,7 +242,21 @@ export default {
             this.fieldErrors.steamId = !this.steamId.trim()
             this.fieldErrors.email = !this.email.trim()
             this.fieldErrors.password = validatePassword(this.password)
-            return !this.fieldErrors.steamId && !this.fieldErrors.email && !this.fieldErrors.password
+
+            if (!this.confirmPassword) {
+                this.fieldErrors.confirmPassword = 'Required'
+            } else if (this.confirmPassword !== this.password) {
+                this.fieldErrors.confirmPassword = 'Passwords do not match.'
+            } else {
+                this.fieldErrors.confirmPassword = ''
+            }
+
+            return (
+                !this.fieldErrors.steamId &&
+                !this.fieldErrors.email &&
+                !this.fieldErrors.password &&
+                !this.fieldErrors.confirmPassword
+            )
         },
         onCancel() {
             this.$router.push({ name: 'login' })
@@ -247,6 +318,7 @@ export default {
         },
         async onRegister() {
             if (!this.emailVerified || !this.emailVerifiedToken) return
+            if (!this.validateBaseFields()) return
 
             this.formError = ''
             this.formSuccess = ''
