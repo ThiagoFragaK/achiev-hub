@@ -57,6 +57,9 @@
                     <button type="submit" class="btn btn-primary btn-lg" :disabled="loading">
                         {{ loading ? 'Logging in…' : 'Login' }}
                     </button>
+                    <button type="button" class="btn btn-secondary btn-lg mt-4" :disabled="loading" @click="onRegister">
+                        Register
+                    </button>
                 </div>
             </form>
 
@@ -71,9 +74,9 @@
                 </button>
             </div>
 
-            <div class="text-center mb-2">
+            <!-- <div class="text-center mb-2">
                 <RouterLink to="/register" class="small"> Create an account </RouterLink>
-            </div>
+            </div> -->
 
             <div class="text-center">
                 <RouterLink to="/style-guide" class="small text-secondary">
@@ -99,6 +102,9 @@ export default {
         }
     },
     methods: {
+        onRegister() {
+            this.$router.push('/register')
+        },
         redirectAfterLogin() {
             const redirect =
                 typeof this.$route.query.redirect === 'string' ? this.$route.query.redirect : '/'

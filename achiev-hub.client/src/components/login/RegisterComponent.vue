@@ -178,10 +178,6 @@
                     </button>
                 </div>
             </form>
-
-            <div class="text-center mt-3">
-                <RouterLink to="/login" class="small"> Back to login </RouterLink>
-            </div>
         </div>
     </div>
 </template>
