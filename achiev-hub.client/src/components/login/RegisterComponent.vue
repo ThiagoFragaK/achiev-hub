@@ -21,7 +21,7 @@
                         type="text"
                         class="form-control"
                         :class="{ 'is-invalid': fieldErrors.steamId }"
-                        :disabled="loading || emailVerified"
+                        :disabled="loading || fieldsLocked"
                         autocomplete="username"
                     />
                     <div v-if="fieldErrors.steamId" class="invalid-feedback d-block">Required</div>
@@ -35,7 +35,7 @@
                         type="email"
                         class="form-control"
                         :class="{ 'is-invalid': fieldErrors.email }"
-                        :disabled="loading || emailVerified"
+                        :disabled="loading || fieldsLocked"
                         autocomplete="email"
                     />
                     <div v-if="fieldErrors.email" class="invalid-feedback d-block">Required</div>
@@ -50,13 +50,13 @@
                             :type="showPassword ? 'text' : 'password'"
                             class="form-control pe-5"
                             :class="{ 'is-invalid': fieldErrors.password }"
-                            :disabled="loading || emailVerified"
+                            :disabled="loading || fieldsLocked"
                             autocomplete="new-password"
                         />
                         <button
                             type="button"
                             class="btn btn-link text-secondary position-absolute top-50 end-0 translate-middle-y px-3 py-0 border-0"
-                            :disabled="loading || emailVerified"
+                            :disabled="loading || fieldsLocked"
                             :aria-label="showPassword ? 'Hide password' : 'Show password'"
                             :aria-pressed="showPassword"
                             @click="showPassword = !showPassword"
@@ -83,13 +83,13 @@
                             :type="showConfirmPassword ? 'text' : 'password'"
                             class="form-control pe-5"
                             :class="{ 'is-invalid': fieldErrors.confirmPassword }"
-                            :disabled="loading || emailVerified"
+                            :disabled="loading || fieldsLocked"
                             autocomplete="new-password"
                         />
                         <button
                             type="button"
                             class="btn btn-link text-secondary position-absolute top-50 end-0 translate-middle-y px-3 py-0 border-0"
-                            :disabled="loading || emailVerified"
+                            :disabled="loading || fieldsLocked"
                             :aria-label="
                                 showConfirmPassword
                                     ? 'Hide confirm password'
@@ -109,7 +109,7 @@
                     </div>
                 </div>
 
-                <div v-if="codeSent" class="mb-3">
+                <div v-if="!bypassEmailVerification && codeSent" class="mb-3">
                     <label class="form-label fw-semibold" for="regCode">Verification code</label>
                     <input
                         id="regCode"
@@ -132,6 +132,10 @@
                     {{ formSuccess }}
                 </div>
 
+                <div v-if="bypassEmailVerification" class="alert alert-warning py-2" role="alert">
+                    Development mode: email verification is skipped.
+                </div>
+
                 <div class="d-grid gap-2">
                     <button
                         type="button"
@@ -143,6 +147,7 @@
                     </button>
 
                     <button
+                        v-if="!bypassEmailVerification"
                         type="button"
                         class="btn btn-primary"
                         :disabled="
@@ -166,10 +171,10 @@
                     <button
                         type="button"
                         class="btn btn-success"
-                        :disabled="loading || !emailVerified"
+                        :disabled="loading || (!bypassEmailVerification && !emailVerified)"
                         @click="onRegister"
                     >
-                        {{ loading && emailVerified ? 'Registering…' : 'Register' }}
+                        {{ loading ? 'Registering…' : 'Register' }}
                     </button>
                 </div>
             </form>
@@ -193,6 +198,7 @@ export default {
     },
     data() {
         return {
+            bypassEmailVerification: import.meta.env.DEV,
             steamId: '',
             email: '',
             password: '',
@@ -214,6 +220,11 @@ export default {
                 password: '',
                 confirmPassword: ''
             }
+        }
+    },
+    computed: {
+        fieldsLocked() {
+            return !this.bypassEmailVerification && this.emailVerified
         }
     },
     beforeUnmount() {
@@ -265,7 +276,7 @@ export default {
             this.formError = ''
             this.formSuccess = ''
 
-            if (this.emailVerified) return
+            if (this.bypassEmailVerification || this.emailVerified) return
 
             if (this.codeSent && this.code.trim().length >= 6) {
                 await this.confirmVerificationCode()
@@ -317,7 +328,9 @@ export default {
             }
         },
         async onRegister() {
-            if (!this.emailVerified || !this.emailVerifiedToken) return
+            if (!this.bypassEmailVerification && (!this.emailVerified || !this.emailVerifiedToken)) {
+                return
+            }
             if (!this.validateBaseFields()) return
 
             this.formError = ''
@@ -328,7 +341,9 @@ export default {
                     steamId: this.steamId.trim(),
                     email: this.email.trim(),
                     password: this.password,
-                    emailVerifiedToken: this.emailVerifiedToken
+                    emailVerifiedToken: this.bypassEmailVerification
+                        ? ''
+                        : this.emailVerifiedToken
                 })
                 this.$router.push({ name: 'login' })
             } catch (error) {
