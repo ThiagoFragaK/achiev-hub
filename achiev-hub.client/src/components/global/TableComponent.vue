@@ -22,7 +22,7 @@
                         :colspan="columns.length + (hasSelection ? 1 : 0)"
                         class="text-center py-4"
                     >
-                        <LoadingComponent />
+                        <LoadingComponent :color="light" />
                     </td>
                 </tr>
             </tbody>
