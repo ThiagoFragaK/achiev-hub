@@ -22,17 +22,17 @@
             </div>
         </div>
 
-        <RecentGamesTable :games="demoRecentHours" />
+        <RecentGamesTable/>
     </AppShell>
 </template>
 
 <script>
+import { demoAchievementsLast14Days, demoAchievementsPerYear } from '@/data/demo'
 import AppShell from '@/components/layout/AppShell.vue'
 import AchievementsLast14DaysGraph from '@/components/home/AchievementsLast14DaysGraph.vue'
 import AchievementsPerYearGraph from '@/components/home/AchievementsPerYearGraph.vue'
-import RecentGamesTable from '@/components/home/RecentGamesTable.vue'
 import UsersAverageSemiGauge from '@/components/home/UsersAverageSemiGauge.vue'
-import { demoAchievementsLast14Days, demoAchievementsPerYear, demoRecentHours } from '@/data/demo'
+import RecentGamesTable from '@/components/home/RecentGamesTable.vue'
 
 export default {
     name: 'HomeComponent',
@@ -45,7 +45,6 @@ export default {
     },
     data() {
         return {
-            demoRecentHours,
             achievementsLabels: demoAchievementsLast14Days.labels,
             achievementsData: [
                 {
@@ -64,6 +63,6 @@ export default {
                 }
             ]
         }
-    }
+    },
 }
 </script>

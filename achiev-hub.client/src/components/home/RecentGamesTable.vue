@@ -1,52 +1,117 @@
 <template>
-    <div class="card">
-        <div class="card-body">
-            <h2 class="h5 mb-3">{{ title }}</h2>
-            <div class="table-responsive">
-                <table class="table table-bordered table-sm text-center mb-0">
-                    <thead class="table-primary">
-                        <tr>
-                            <th v-for="game in games" :key="game.name" scope="col">
-                                {{ game.name }}
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td v-for="game in games" :key="`${game.name}-hours`">
-                                {{ game.hours }}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td v-for="game in games" :key="`${game.name}-percentage`">
-                                {{ game.percentage }}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td v-for="game in games" :key="`${game.name}-status`">
-                                {{ game.status }}
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+    <h2 class="h5 mb-3">Recent Games</h2>
+    <TableComponent 
+        :data="table.data" 
+        :columns="table.columns" 
+        :isLoading="table.isLoading"
+    >
+        <template #cell-name="{ data }">
+            <div class="d-flex align-items-center gap-2">
+                <img
+                    v-if="iconUrl(data.row)"
+                    :src="iconUrl(data.row)"
+                    :alt="data.row.name"
+                    width="32"
+                    height="32"
+                    class="rounded"
+                />
+                <RouterLink
+                    :to="{ name: 'game-detail', params: { id: data.row.appId } }"
+                    class="fw-medium"
+                >
+                    {{ data.row.name }}
+                </RouterLink>
             </div>
-        </div>
-    </div>
+        </template>
+        <template #cell-playTimeWeeks="{ data }">
+            {{ data.row.playTimeWeeks }} hours
+        </template>
+        <template #cell-playTimeTotal="{ data }">
+            {{ data.row.playTimeTotal }} hours
+        </template>
+        <template #cell-achievements="{ data }">
+            <ProgressComponent 
+                :value="data.row.achievements.percentage" 
+                :label="data.row.achievements.percentage + '%'" 
+                :color="data.row.achievements.percentage > 50 ? 'success' : 'warning'" 
+            />
+            <span class="text-muted">
+                {{ data.row.achievements.unlocked }}/{{ data.row.achievements.total }}
+            </span>
+        </template>
+    </TableComponent>
 </template>
 
 <script>
+import { getSessionSteamId, steamAppIconUrl } from '@/lib/steam'
+import { getRecentGames } from '@/services/gamesService';
+import TableComponent from '@/components/global/TableComponent.vue';
+import ProgressComponent from '@/components/global/ProgressComponent.vue';
+
 export default {
     name: 'RecentGamesTable',
-    props: {
-        title: {
-            type: String,
-            required: false,
-            default: '76hrs in last 14 days'
-        },
-        games: {
-            type: Array,
-            required: true
+    components: {
+        TableComponent,
+        ProgressComponent
+    },
+    data() {
+        return {
+            steamId: null,
+            table: {
+                isLoading: true,
+                data: [],
+                columns: [
+                    {
+                        label: 'Game',
+                        key: 'name',
+                        type: 'link',
+                        to: { name: 'game-detail', params: { id: 'appId' } }
+                    },
+                    {
+                        label: '2 weeks (h)',
+                        key: 'playTimeWeeks'
+                    },
+                    {
+                        label: 'Total (h)',
+                        key: 'playTimeTotal'
+                    },
+                    {
+                        label: 'Achievements',
+                        key: 'achievements'
+                    }
+                ]
+            }
         }
+    },
+    methods: {
+        iconUrl(game) {
+            return steamAppIconUrl(game.appId, game.image)
+        },
+        async setSteamId() {
+            this.steamId = await getSessionSteamId();
+        },
+        async getUsersRecentGames() {
+            if (!this.steamId) {
+                this.error = 'Steam ID is missing from your session.'
+                this.recentGames = []
+                return
+            }
+
+            this.table.isLoading = true;
+            try {
+                const result = await getRecentGames(this.steamId);
+                this.table.data = result.data ?? [];
+            } catch (err) {
+                this.table.data = [];
+                this.error = err?.message || 'Failed to load recent games.';
+            } finally {
+                this.table.isLoading = false;
+            }
+        }
+    },
+    async created() {
+        await this.setSteamId();
+        await this.getUsersRecentGames();
     }
 }
 </script>
