@@ -13,11 +13,15 @@
             <h1 class="lastica-h3 mb-0">My Games</h1>
         </div>
 
-        <MyGamesFilters 
-            ref="filters"
+        <MyGamesFilters
+            @apply-filters="applyFilters"
+            ref="MyGamesFilters"
         />
 
-        <MyGamesTable />
+        <MyGamesTable
+            :key="appliedFilters"
+            :filters="filters" 
+        />
     </AppShell>
 </template>
 
@@ -43,12 +47,17 @@ export default {
                 minHours: '',
                 minPercentage: ''
             },
+            appliedFilters: 0,
         }
     },
     methods: {
         toggleFilters() {
-            this.$refs.filters.toggle()
+            this.$refs.MyGamesFilters.toggleFilters()
         },
+        applyFilters(filters) {
+            this.filters = filters;
+            this.appliedFilters++;
+        }
     }
 }
 </script>
