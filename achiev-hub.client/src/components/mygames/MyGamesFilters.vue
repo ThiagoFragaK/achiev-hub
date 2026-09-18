@@ -11,7 +11,7 @@
                     placeholder="Search by name"
                 />
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="form-label" for="filter-min-hours">Min hours</label>
                 <input
                     id="filter-min-hours"
@@ -21,7 +21,7 @@
                     class="form-control"
                 />
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="form-label" for="filter-min-percentage">Min percentage</label>
                 <input
                     id="filter-min-percentage"
@@ -31,6 +31,9 @@
                     max="100"
                     class="form-control"
                 />
+            </div>
+            <div class="col-md-2 mt-4">
+                <button class="btn btn-primary mt-4" @click="applyFilters">Apply</button>
             </div>
         </div>
     </CollapseComponent>
@@ -55,6 +58,10 @@ export default {
     methods: {
         toggleFilters() {
             this.$refs.filters.toggle();
+        },
+        applyFilters() {
+            console.log(this.filters);
+            this.$emit('apply-filters', this.filters);
         }
     }
 }

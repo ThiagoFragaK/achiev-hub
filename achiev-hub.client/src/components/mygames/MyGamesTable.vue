@@ -42,6 +42,12 @@ export default {
     components: {
         TableComponent
     },
+    props: {
+        filters: {
+            type: Object,
+            required: true
+        }
+    },
     data() {
         return {
             steamId: null,
@@ -91,7 +97,12 @@ export default {
 
             this.table.isLoading = true;
             try {
-                const result = await getLibrary(this.steamId, this.table.pagination.currentPage, this.table.pagination.perPage)
+                const result = await getLibrary(
+                    this.steamId,
+                    this.table.pagination.currentPage,
+                    this.table.pagination.perPage,
+                    this.filters
+                )
                 this.table.data = result?.data ?? []
                 this.table.pagination.currentPage = result?.currentPage ?? 1
                 this.table.pagination.totalPages = Math.max(1, result?.lastPage ?? 1)
@@ -100,7 +111,6 @@ export default {
                 this.table.data = []
             } finally {
                 this.table.isLoading = false;
-                console.log(this.table);
             }
         }
     },
