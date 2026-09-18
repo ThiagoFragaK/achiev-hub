@@ -33,7 +33,7 @@
             <ProgressComponent 
                 :value="data.row.achievements.percentage" 
                 :label="data.row.achievements.percentage + '%'" 
-                :color="data.row.achievements.percentage > 50 ? 'success' : 'warning'" 
+                :color="getColor(data.row.achievements.percentage)"
             />
             <span class="text-muted">
                 {{ data.row.achievements.unlocked }}/{{ data.row.achievements.total }}
@@ -86,6 +86,12 @@ export default {
     methods: {
         iconUrl(game) {
             return steamAppIconUrl(game.appId, game.image)
+        },
+        getColor(percentage) {
+            if(percentage == 100) {
+                return 'success';
+            }
+            return percentage > 50 ? 'info' : 'danger';
         },
         async setSteamId() {
             this.steamId = await getSessionSteamId();

@@ -7,7 +7,11 @@
         :aria-valuemin="0" 
         :aria-valuemax="100"
     >
-        <div class="progress-bar bg-{{ color }}" :style="{ width: value + '%' }">
+        <div 
+            class="progress-bar"
+            :class="'bg-' + color"
+            :style="{ width: value + '%' }"
+        >
             {{ label }}
         </div>
     </div>
