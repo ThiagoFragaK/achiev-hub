@@ -43,7 +43,7 @@
 </template>
 
 <script>
-import { getSessionSteamId, steamAppIconUrl } from '@/lib/steam'
+import { getSessionSteamId, steamAppIconUrl } from '@/lib/steam';
 import { getRecentGames } from '@/services/gamesService';
 import TableComponent from '@/components/global/TableComponent.vue';
 import ProgressComponent from '@/components/global/ProgressComponent.vue';
@@ -93,7 +93,7 @@ export default {
         async getUsersRecentGames() {
             if (!this.steamId) {
                 this.error = 'Steam ID is missing from your session.'
-                this.recentGames = []
+                this.table.data = []
                 return
             }
 
