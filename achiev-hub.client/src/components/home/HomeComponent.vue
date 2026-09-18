@@ -29,9 +29,9 @@
 <script>
 import { demoAchievementsLast14Days, demoAchievementsPerYear } from '@/data/demo'
 import AppShell from '@/components/layout/AppShell.vue'
-import AchievementsLast14DaysGraph from '@/components/home/AchievementsLast14DaysGraph.vue'
-import AchievementsPerYearGraph from '@/components/home/AchievementsPerYearGraph.vue'
-import UsersAverageSemiGauge from '@/components/home/UsersAverageSemiGauge.vue'
+import AchievementsLast14DaysGraph from '@/components/home/graphs/AchievementsLast14DaysGraph.vue'
+import AchievementsPerYearGraph from '@/components/home/graphs/AchievementsPerYearGraph.vue'
+import UsersAverageSemiGauge from '@/components/home/graphs/UsersAverageSemiGauge.vue'
 import RecentGamesTable from '@/components/home/RecentGamesTable.vue'
 
 export default {

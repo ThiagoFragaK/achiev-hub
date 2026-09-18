@@ -1,22 +1,29 @@
 <template>
     <AppShell>
-        <div class="row g-4 mb-4 align-items-start">
+        <p v-if="loadingDetails" class="text-secondary mb-4">Loading game details…</p>
+        <p v-else-if="detailsError" class="text-danger mb-4">{{ detailsError }}</p>
+
+        <div v-else class="row g-4 mb-4 align-items-start">
             <div class="col-md-3 col-lg-2">
-                <ImageComponent :alt="game.name" />
+                <ImageComponent
+                    :src="game.gameImage || ''"
+                    :alt="game.gameName || 'Game'"
+                    ratio="16x9"
+                />
             </div>
 
             <div class="col-md-5 col-lg-4">
                 <h1 class="lastica-h3 mb-3">
-                    {{ game.name }}
+                    {{ game.gameName || 'Unknown game' }}
                 </h1>
                 <div class="row g-3">
                     <div class="col-sm-6">
-                        <p class="text-uppercase text-secondary small mb-1">Total game hours</p>
-                        <p class="fs-4 fw-semibold mb-0">{{ game.hours }}h</p>
+                        <p class="text-uppercase text-secondary small mb-1">Developers</p>
+                        <p class="fs-6 fw-semibold mb-0">{{ game.developers || '—' }}</p>
                     </div>
                     <div class="col-sm-6">
-                        <p class="text-uppercase text-secondary small mb-1">Percentage</p>
-                        <p class="fs-4 fw-semibold mb-0">{{ game.percentage }}%</p>
+                        <p class="text-uppercase text-secondary small mb-1">Publishers</p>
+                        <p class="fs-6 fw-semibold mb-0">{{ game.publishers || '—' }}</p>
                     </div>
                 </div>
             </div>
@@ -36,6 +43,8 @@
                     type="button"
                     class="btn btn-outline-secondary btn-sm"
                     aria-label="Sync game data"
+                    :disabled="loadingDetails || loadingAchievements"
+                    @click="reload"
                 >
                     <LucideIcon icon="RefreshCw" :size="18" />
                 </button>
@@ -63,14 +72,17 @@
                     collapse-id="game-achievement-filters"
                 />
 
+                <p v-if="loadingAchievements" class="text-secondary mb-0">Loading achievements…</p>
+                <p v-else-if="achievementsError" class="text-danger mb-0">{{ achievementsError }}</p>
                 <GamesTable
-                    :achievements="pagedAchievements"
+                    v-else
+                    :achievements="achievements"
                     :columns="achievementColumns"
                     :current-page="currentPage"
                     :total-pages="totalPages"
                     :per-page="perPage"
-                    :total-items="demoAchievements.length"
-                    @change-page="currentPage = $event"
+                    :total-items="totalCount"
+                    @change-page="onPageChange"
                 />
             </div>
         </div>
@@ -84,7 +96,8 @@ import GamesFilters from '@/components/games/GamesFilters.vue'
 import GamesTable from '@/components/games/GamesTable.vue'
 import ImageComponent from '@/components/global/ImageComponent.vue'
 import LucideIcon from '@/components/global/LucideIcon.vue'
-import { demoAchievements, demoGames } from '@/data/demo'
+import { getSessionSteamId } from '@/lib/steam'
+import { getAchievements, getGameDetails } from '@/services/gamesService'
 
 export default {
     name: 'GamesComponent',
@@ -98,16 +111,30 @@ export default {
     },
     data() {
         return {
-            demoAchievements,
+            game: {
+                gameName: '',
+                gameImage: '',
+                developers: '',
+                publishers: ''
+            },
+            achievements: [],
+            loadingDetails: false,
+            loadingAchievements: false,
+            detailsError: '',
+            achievementsError: '',
             currentPage: 1,
-            perPage: 10,
+            perPage: 25,
+            totalPages: 1,
+            totalCount: 0,
             filters: {
                 name: '',
                 status: ''
             },
             achievementColumns: [
+                { key: 'icon', label: '' },
                 { key: 'name', label: 'Achievement' },
-                { key: 'status', label: 'Status' }
+                { key: 'description', label: 'Description' },
+                { key: 'unlocked', label: 'Unlocked' }
             ],
             percentageLabels: ['ITEM 1', 'ITEM 2', 'ITEM 3', 'ITEM 4', 'ITEM 5'],
             percentageData: [
@@ -120,21 +147,92 @@ export default {
         }
     },
     computed: {
-        game() {
-            const id = String(this.$route.params.id)
-            return demoGames.find((g) => g.id === id) ?? demoGames[0]
-        },
-        totalPages() {
-            return Math.max(1, Math.ceil(this.demoAchievements.length / this.perPage))
-        },
-        pagedAchievements() {
-            const start = (this.currentPage - 1) * this.perPage
-            return this.demoAchievements.slice(start, start + this.perPage)
+        appId() {
+            return this.$route.params.id
+        }
+    },
+    watch: {
+        appId: {
+            immediate: true,
+            handler() {
+                this.currentPage = 1
+                this.reload()
+            }
         }
     },
     methods: {
         toggleFilters() {
             this.$refs.filters.toggle()
+        },
+        async onPageChange(page) {
+            this.currentPage = page
+            await this.loadAchievements()
+        },
+        async reload() {
+            await Promise.all([this.loadDetails(), this.loadAchievements()])
+        },
+        async loadDetails() {
+            const appId = this.appId
+            if (!appId) {
+                this.detailsError = 'Game id is missing.'
+                return
+            }
+
+            this.loadingDetails = true
+            this.detailsError = ''
+            try {
+                const details = await getGameDetails(appId)
+                this.game = {
+                    gameName: details?.gameName || '',
+                    gameImage: details?.gameImage || '',
+                    developers: details?.developers || '',
+                    publishers: details?.publishers || ''
+                }
+                await this.loadAchievements();
+            } catch (err) {
+                this.game = {
+                    gameName: '',
+                    gameImage: '',
+                    developers: '',
+                    publishers: ''
+                }
+                this.detailsError = err?.message || 'Failed to load game details.'
+            } finally {
+                this.loadingDetails = false                
+            }
+        },
+        async loadAchievements() {
+            const steamId = getSessionSteamId()
+            const appId = this.appId
+            if (!steamId) {
+                this.achievementsError = 'Steam ID is missing from your session.'
+                this.achievements = []
+                this.totalCount = 0
+                this.totalPages = 1
+                return
+            }
+            if (!appId) {
+                this.achievementsError = 'Game id is missing.'
+                return
+            }
+
+            this.loadingAchievements = true
+            this.achievementsError = ''
+            try {
+                const result = await getAchievements(steamId, appId, this.currentPage, this.perPage)
+                this.achievements = result?.data ?? []
+                this.currentPage = result?.currentPage ?? this.currentPage
+                this.totalPages = Math.max(1, result?.lastPage ?? 1)
+                this.perPage = result?.perPage ?? this.perPage
+                this.totalCount = result?.totalCount ?? this.achievements.length
+            } catch (err) {
+                this.achievements = []
+                this.totalCount = 0
+                this.totalPages = 1
+                this.achievementsError = err?.message || 'Failed to load achievements.'
+            } finally {
+                this.loadingAchievements = false
+            }
         }
     }
 }

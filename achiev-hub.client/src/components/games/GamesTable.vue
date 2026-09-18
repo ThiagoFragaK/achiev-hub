@@ -1,8 +1,18 @@
 <template>
     <div>
         <TableComponent :data="achievements" :columns="columns">
-            <template #cell-status="{ data }">
-                {{ data.row.unlocked ? 'Unlocked' : 'Locked' }}
+            <template #cell-icon="{ data }">
+                <img
+                    v-if="data.row.icon"
+                    :src="data.row.icon"
+                    :alt="data.row.name"
+                    width="32"
+                    height="32"
+                    class="rounded"
+                />
+            </template>
+            <template #cell-unlocked="{ data }">
+                {{ data.row.unlocked || '-' }}
             </template>
         </TableComponent>
         <PaginationComponent
