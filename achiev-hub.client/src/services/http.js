@@ -40,7 +40,7 @@ async function request(url, options = {}) {
         }
 
         throw new HttpError(
-            body?.message || `Request failed with status ${response.status}`,
+            readErrorMessage(body, response.status),
             response.status,
             body
         )
@@ -51,6 +51,18 @@ async function request(url, options = {}) {
     }
 
     return response.json()
+}
+
+function readErrorMessage(body, status) {
+    if (typeof body === 'string' && body.trim()) {
+        return body
+    }
+
+    if (body && typeof body === 'object') {
+        return body.message || body.detail || body.title || `Request failed with status ${status}`
+    }
+
+    return `Request failed with status ${status}`
 }
 
 export async function getJson(url) {

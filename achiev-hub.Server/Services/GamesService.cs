@@ -1,4 +1,5 @@
 using achiev_hub.Server.DTOs;
+using achiev_hub.Server.Exceptions;
 using achiev_hub.Server.Models;
 using achiev_hub.Server.Repositories.Interfaces;
 using achiev_hub.Server.Services.Interfaces;
@@ -89,7 +90,7 @@ public class GamesService : IGamesService
 
         if (playerResult is null || !playerResult.Success)
         {
-            return Paginate<AchievementDto>([], page, pageSize);
+            throw new SteamApiException();
         }
 
         var schemaByName = (schema?.Achievements ?? [])
@@ -100,20 +101,24 @@ public class GamesService : IGamesService
         var mapped = new List<AchievementDto>();
         foreach (var playerAchievement in playerResult.Achievements)
         {
-            if (string.IsNullOrWhiteSpace(playerAchievement.ApiName) ||
-                !schemaByName.TryGetValue(playerAchievement.ApiName, out var schemaAchievement))
+            if (string.IsNullOrWhiteSpace(playerAchievement.ApiName))
             {
                 continue;
             }
 
+            schemaByName.TryGetValue(playerAchievement.ApiName, out var schemaAchievement);
             var unlocked = playerAchievement.Achieved == 1;
             mapped.Add(new AchievementDto
             {
-                Name = schemaAchievement.DisplayName,
-                Description = schemaAchievement.Hidden == 1
-                    ? "Secret achievement: without description"
-                    : schemaAchievement.Description,
-                Icon = unlocked ? schemaAchievement.Icon : schemaAchievement.IconGray,
+                Name = string.IsNullOrWhiteSpace(schemaAchievement?.DisplayName)
+                    ? playerAchievement.ApiName
+                    : schemaAchievement.DisplayName,
+                Description = schemaAchievement is null
+                    ? null
+                    : schemaAchievement.Hidden == 1
+                        ? "Secret achievement: without description"
+                        : schemaAchievement.Description,
+                Icon = unlocked ? schemaAchievement?.Icon : schemaAchievement?.IconGray,
                 Unlocked = unlocked ? FormatDateTime(playerAchievement.UnlockTimeUnix) : "-"
             });
         }
