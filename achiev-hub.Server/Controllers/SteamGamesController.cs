@@ -8,7 +8,7 @@ namespace achiev_hub.Server.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/steam/games")]
-public class SteamGamesController : ControllerBase
+public class SteamGamesController : ApiControllerBase
 {
     private readonly IGamesService _gamesService;
 
@@ -69,7 +69,14 @@ public class SteamGamesController : ControllerBase
             return BadRequest("steamId is required.");
         }
 
-        var result = await _gamesService.GetAchievementsAsync(steamId, appId, page, pageSize, cancellationToken);
-        return Ok(result);
+        try
+        {
+            var result = await _gamesService.GetAchievementsAsync(steamId, appId, page, pageSize, cancellationToken);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
     }
 }

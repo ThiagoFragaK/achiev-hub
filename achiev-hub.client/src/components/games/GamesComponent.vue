@@ -1,7 +1,7 @@
 <template>
     <AppShell>
-        <p v-if="loadingDetails" class="text-secondary mb-4">Loading game details…</p>
-        <p v-else-if="detailsError" class="text-danger mb-4">{{ detailsError }}</p>
+        <p v-if="isLoading" class="text-secondary mb-4">Loading game details…</p>
+        <p v-else-if="error" class="text-danger mb-4">{{ error }}</p>
 
         <div v-else class="row g-4 mb-4 align-items-start">
             <div class="col-md-3 col-lg-2">
@@ -43,7 +43,7 @@
                     type="button"
                     class="btn btn-outline-secondary btn-sm"
                     aria-label="Sync game data"
-                    :disabled="loadingDetails || loadingAchievements"
+                    :disabled="isLoading"
                     @click="reload"
                 >
                     <LucideIcon icon="RefreshCw" :size="18" />
@@ -72,17 +72,9 @@
                     collapse-id="game-achievement-filters"
                 />
 
-                <p v-if="loadingAchievements" class="text-secondary mb-0">Loading achievements…</p>
-                <p v-else-if="achievementsError" class="text-danger mb-0">{{ achievementsError }}</p>
-                <GamesTable
-                    v-else
-                    :achievements="achievements"
-                    :columns="achievementColumns"
-                    :current-page="currentPage"
-                    :total-pages="totalPages"
-                    :per-page="perPage"
-                    :total-items="totalCount"
-                    @change-page="onPageChange"
+                <GamesAchievementsTable
+                    :gameId="gameId"
+                    :key="gameUpdate"
                 />
             </div>
         </div>
@@ -90,14 +82,13 @@
 </template>
 
 <script>
+import { getGameDetails } from '@/services/gamesService';
 import AppShell from '@/components/layout/AppShell.vue'
-import GameAchievementsGraph from '@/components/games/GameAchievementsGraph.vue'
+import GameAchievementsGraph from '@/components/games/graphs/GameAchievementsGraph.vue'
 import GamesFilters from '@/components/games/GamesFilters.vue'
-import GamesTable from '@/components/games/GamesTable.vue'
+import GamesAchievementsTable from '@/components/games/GamesAchievementsTable.vue'
 import ImageComponent from '@/components/global/ImageComponent.vue'
 import LucideIcon from '@/components/global/LucideIcon.vue'
-import { getSessionSteamId } from '@/lib/steam'
-import { getAchievements, getGameDetails } from '@/services/gamesService'
 
 export default {
     name: 'GamesComponent',
@@ -105,27 +96,21 @@ export default {
         AppShell,
         GameAchievementsGraph,
         GamesFilters,
-        GamesTable,
+        GamesAchievementsTable,
         ImageComponent,
         LucideIcon
     },
     data() {
         return {
+            gameId: null,
+            gameUpdate: 0,
+            isLoading: false,
             game: {
                 gameName: '',
                 gameImage: '',
                 developers: '',
                 publishers: ''
             },
-            achievements: [],
-            loadingDetails: false,
-            loadingAchievements: false,
-            detailsError: '',
-            achievementsError: '',
-            currentPage: 1,
-            perPage: 25,
-            totalPages: 1,
-            totalCount: 0,
             filters: {
                 name: '',
                 status: ''
@@ -146,49 +131,29 @@ export default {
             ]
         }
     },
-    computed: {
-        appId() {
-            return this.$route.params.id
-        }
-    },
-    watch: {
-        appId: {
-            immediate: true,
-            handler() {
-                this.currentPage = 1
-                this.reload()
-            }
-        }
-    },
     methods: {
         toggleFilters() {
             this.$refs.filters.toggle()
         },
-        async onPageChange(page) {
-            this.currentPage = page
-            await this.loadAchievements()
-        },
         async reload() {
-            await Promise.all([this.loadDetails(), this.loadAchievements()])
+            this.gameUpdate++;
         },
-        async loadDetails() {
-            const appId = this.appId
-            if (!appId) {
-                this.detailsError = 'Game id is missing.'
+        async getGameDetails() {
+            if (!this.gameId) {
+                this.error = 'Game id is missing.'
                 return
             }
 
-            this.loadingDetails = true
-            this.detailsError = ''
+            this.isLoading = true;
             try {
-                const details = await getGameDetails(appId)
+                const details = await getGameDetails(this.gameId)
                 this.game = {
                     gameName: details?.gameName || '',
                     gameImage: details?.gameImage || '',
                     developers: details?.developers || '',
                     publishers: details?.publishers || ''
                 }
-                await this.loadAchievements();
+                await this.reload();
             } catch (err) {
                 this.game = {
                     gameName: '',
@@ -196,44 +161,15 @@ export default {
                     developers: '',
                     publishers: ''
                 }
-                this.detailsError = err?.message || 'Failed to load game details.'
+                this.error = err?.message || 'Failed to load game details.'
             } finally {
-                this.loadingDetails = false                
+                this.isLoading = false                
             }
         },
-        async loadAchievements() {
-            const steamId = getSessionSteamId()
-            const appId = this.appId
-            if (!steamId) {
-                this.achievementsError = 'Steam ID is missing from your session.'
-                this.achievements = []
-                this.totalCount = 0
-                this.totalPages = 1
-                return
-            }
-            if (!appId) {
-                this.achievementsError = 'Game id is missing.'
-                return
-            }
-
-            this.loadingAchievements = true
-            this.achievementsError = ''
-            try {
-                const result = await getAchievements(steamId, appId, this.currentPage, this.perPage)
-                this.achievements = result?.data ?? []
-                this.currentPage = result?.currentPage ?? this.currentPage
-                this.totalPages = Math.max(1, result?.lastPage ?? 1)
-                this.perPage = result?.perPage ?? this.perPage
-                this.totalCount = result?.totalCount ?? this.achievements.length
-            } catch (err) {
-                this.achievements = []
-                this.totalCount = 0
-                this.totalPages = 1
-                this.achievementsError = err?.message || 'Failed to load achievements.'
-            } finally {
-                this.loadingAchievements = false
-            }
-        }
+    },
+    async created() {
+        this.gameId = this.$route.params.id;
+        await this.getGameDetails();
     }
 }
 </script>
