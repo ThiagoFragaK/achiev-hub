@@ -70,11 +70,15 @@
                     ref="filters"
                     v-model="filters"
                     collapse-id="game-achievement-filters"
+                    @apply-filters="applyFilters"
                 />
+
+                <p v-if="syncError" class="text-danger small mb-3">{{ syncError }}</p>
 
                 <GamesAchievementsTable
                     :gameId="gameId"
-                    :key="gameUpdate"
+                    :filters="appliedFilters"
+                    :key="tableKey"
                 />
             </div>
         </div>
@@ -82,7 +86,8 @@
 </template>
 
 <script>
-import { getGameDetails } from '@/services/gamesService';
+import { getUser } from '@/lib/session'
+import { getGameDetails, syncGameAchievements } from '@/services/gamesService';
 import AppShell from '@/components/layout/AppShell.vue'
 import GameAchievementsGraph from '@/components/games/graphs/GameAchievementsGraph.vue'
 import GamesFilters from '@/components/games/GamesFilters.vue'
@@ -104,6 +109,8 @@ export default {
         return {
             gameId: null,
             gameUpdate: 0,
+            tableKey: 0,
+            syncError: '',
             isLoading: false,
             game: {
                 gameName: '',
@@ -112,6 +119,10 @@ export default {
                 publishers: ''
             },
             filters: {
+                name: '',
+                status: ''
+            },
+            appliedFilters: {
                 name: '',
                 status: ''
             },
@@ -135,8 +146,27 @@ export default {
         toggleFilters() {
             this.$refs.filters.toggle()
         },
+        applyFilters(filters) {
+            this.appliedFilters = {
+                name: filters?.name || '',
+                status: filters?.status || ''
+            }
+            this.tableKey++
+        },
         async reload() {
-            this.gameUpdate++;
+            await this.syncAndReloadAchievements()
+        },
+        async syncAndReloadAchievements() {
+            this.syncError = ''
+            const user = getUser()
+            if (user && user.role !== 'guest' && this.gameId) {
+                try {
+                    await syncGameAchievements(this.gameId)
+                } catch (err) {
+                    this.syncError = err?.message || 'Failed to sync achievements.'
+                }
+            }
+            this.tableKey++
         },
         async getGameDetails() {
             if (!this.gameId) {
@@ -153,7 +183,7 @@ export default {
                     developers: details?.developers || '',
                     publishers: details?.publishers || ''
                 }
-                await this.reload();
+                await this.syncAndReloadAchievements()
             } catch (err) {
                 this.game = {
                     gameName: '',

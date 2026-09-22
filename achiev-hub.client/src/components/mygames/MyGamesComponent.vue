@@ -45,7 +45,7 @@ export default {
             filters: {
                 name: '',
                 minHours: '',
-                minPercentage: ''
+                hasAchievements: ''
             },
             appliedFilters: 0,
         }

@@ -39,7 +39,9 @@ public class UsersGameService : IUsersGameService
         {
             GameId = request.GameId,
             UserId = request.UserId,
-            AchievementsPercentage = request.AchievementsPercentage
+            AchievementsPercentage = request.AchievementsPercentage,
+            PlaytimeMinutes = request.PlaytimeMinutes,
+            LastPlayedUnix = request.LastPlayedUnix
         };
 
         await _usersGames.AddAsync(item, cancellationToken);
@@ -56,6 +58,8 @@ public class UsersGameService : IUsersGameService
         item.GameId = request.GameId;
         item.UserId = request.UserId;
         item.AchievementsPercentage = request.AchievementsPercentage;
+        item.PlaytimeMinutes = request.PlaytimeMinutes;
+        item.LastPlayedUnix = request.LastPlayedUnix;
 
         _usersGames.Update(item);
         await _usersGames.SaveChangesAsync(cancellationToken);
@@ -105,6 +109,8 @@ public class UsersGameService : IUsersGameService
         Id = item.Id,
         GameId = item.GameId,
         UserId = item.UserId,
-        AchievementsPercentage = item.AchievementsPercentage
+        AchievementsPercentage = item.AchievementsPercentage,
+        PlaytimeMinutes = item.PlaytimeMinutes,
+        LastPlayedUnix = item.LastPlayedUnix
     };
 }

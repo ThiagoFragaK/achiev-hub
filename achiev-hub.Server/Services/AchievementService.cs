@@ -35,6 +35,7 @@ public class AchievementService : IAchievementService
         var achievement = new Achievement
         {
             GameId = request.GameId,
+            ApiName = NormalizeApiName(request.ApiName),
             Name = request.Name.Trim(),
             Description = request.Description,
             ImageUrlLock = request.ImageUrlLock,
@@ -53,6 +54,7 @@ public class AchievementService : IAchievementService
         await EnsureGameExistsAsync(request.GameId, cancellationToken);
 
         achievement.GameId = request.GameId;
+        achievement.ApiName = NormalizeApiName(request.ApiName);
         achievement.Name = request.Name.Trim();
         achievement.Description = request.Description;
         achievement.ImageUrlLock = request.ImageUrlLock;
@@ -85,10 +87,16 @@ public class AchievementService : IAchievementService
             ?? throw new NotFoundException($"Achievement {id} was not found.");
     }
 
+    private static string? NormalizeApiName(string? apiName)
+    {
+        return string.IsNullOrWhiteSpace(apiName) ? null : apiName.Trim();
+    }
+
     private static AchievementRecordDto Map(Achievement achievement) => new()
     {
         Id = achievement.Id,
         GameId = achievement.GameId,
+        ApiName = achievement.ApiName,
         Name = achievement.Name,
         Description = achievement.Description,
         ImageUrlLock = achievement.ImageUrlLock,

@@ -30,6 +30,10 @@ namespace achiev_hub.Server.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("ApiName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
@@ -57,7 +61,9 @@ namespace achiev_hub.Server.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("GameId");
+                    b.HasIndex("GameId", "ApiName")
+                        .IsUnique()
+                        .HasFilter("\"ApiName\" IS NOT NULL AND \"ApiName\" <> ''");
 
                     b.ToTable("achievements", (string)null);
                 });
@@ -112,9 +118,16 @@ namespace achiev_hub.Server.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Developers")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("GameSteamId")
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<bool?>("HasCommunityVisibleStats")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("ImageUrl")
                         .HasMaxLength(500)
@@ -125,10 +138,9 @@ namespace achiev_hub.Server.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
-                    b.Property<int>("PlayTime")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
+                    b.Property<string>("Publishers")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.HasKey("Id");
 
@@ -226,6 +238,11 @@ namespace achiev_hub.Server.Data.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
+                    b.Property<int>("Playtime2WeeksMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<string>("Role")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -308,6 +325,14 @@ namespace achiev_hub.Server.Data.Migrations
 
                     b.Property<int>("GameId")
                         .HasColumnType("integer");
+
+                    b.Property<long?>("LastPlayedUnix")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("PlaytimeMinutes")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<int>("UserId")
                         .HasColumnType("integer");

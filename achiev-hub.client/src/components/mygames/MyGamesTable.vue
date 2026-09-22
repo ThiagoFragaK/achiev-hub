@@ -69,7 +69,7 @@ export default {
                 ],
                 pagination:{
                     currentPage: 1,
-                    perPage: 25,
+                    perPage: 15,
                     totalPages: 1,
                     totalCount: 0,
                 },

@@ -2,6 +2,7 @@ using achiev_hub.Server.DTOs.Auth;
 using achiev_hub.Server.Entities;
 using achiev_hub.Server.Enums;
 using achiev_hub.Server.Repositories.Interfaces;
+using achiev_hub.Server.Services;
 using achiev_hub.Server.Services.Interfaces;
 using achiev_hub.Server.Support;
 
@@ -11,11 +12,19 @@ public class AuthenticationService : IAuthenticationService
 {
     private readonly IRepository<User> _users;
     private readonly JwtTokenService _jwtTokenService;
+    private readonly ISteamSyncService _steamSyncService;
+    private readonly ILogger<AuthenticationService> _logger;
 
-    public AuthenticationService(IRepository<User> users, JwtTokenService jwtTokenService)
+    public AuthenticationService(
+        IRepository<User> users,
+        JwtTokenService jwtTokenService,
+        ISteamSyncService steamSyncService,
+        ILogger<AuthenticationService> logger)
     {
         _users = users;
         _jwtTokenService = jwtTokenService;
+        _steamSyncService = steamSyncService;
+        _logger = logger;
     }
 
     public async Task<object> LoginAsync(string steamId, string password, CancellationToken cancellationToken = default)
@@ -38,6 +47,23 @@ public class AuthenticationService : IAuthenticationService
 
         user.LastLogin = DateTime.UtcNow;
         await _users.SaveChangesAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(user.SteamId))
+        {
+            try
+            {
+                await _steamSyncService.SyncLibraryAsync(user.Id, user.SteamId, cancellationToken);
+                await _steamSyncService.SyncAchievementsForUserAsync(
+                    user.Id,
+                    user.SteamId,
+                    AchievementSyncScope.RecentTwoWeeks,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Library sync failed after login for user {UserId}", user.Id);
+            }
+        }
 
         return new LoginResponseDto
         {
