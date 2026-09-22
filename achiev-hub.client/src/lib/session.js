@@ -27,7 +27,7 @@ export function setSession({ accessToken, user }) {
 }
 
 export function mergeUser(partial) {
-    const next = { ...(getUser() || {}), ...partial }
+    const next = { ...getUser(), ...partial }
     localStorage.setItem(USER_KEY, JSON.stringify(next))
     return next
 }

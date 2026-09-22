@@ -30,11 +30,12 @@
 
             <div class="col-md-4 col-lg-5">
                 <GameAchievementsGraph
-                    title="Percentage per year."
-                    :labels="percentageLabels"
-                    :datasets="percentageData"
-                    :max="40"
+                    title="Achievements unlocked (%)"
+                    :labels="progressLabels"
+                    :datasets="progressData"
+                    :max="100"
                     :height="160"
+                    empty-message="No achievements unlocked yet."
                 />
             </div>
 
@@ -88,12 +89,20 @@
 <script>
 import { getUser } from '@/lib/session'
 import { getGameDetails, syncGameAchievements } from '@/services/gamesService';
+import { getGameProgress } from '@/services/statsService';
 import AppShell from '@/components/layout/AppShell.vue'
 import GameAchievementsGraph from '@/components/games/graphs/GameAchievementsGraph.vue'
 import GamesFilters from '@/components/games/GamesFilters.vue'
 import GamesAchievementsTable from '@/components/games/GamesAchievementsTable.vue'
 import ImageComponent from '@/components/global/ImageComponent.vue'
 import LucideIcon from '@/components/global/LucideIcon.vue'
+
+const labelFormatters = {
+    day: new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }),
+    week: new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: '2-digit' }),
+    month: new Intl.DateTimeFormat('en-GB', { month: 'short', year: 'numeric' }),
+    year: new Intl.DateTimeFormat('en-GB', { year: 'numeric' })
+}
 
 export default {
     name: 'GamesComponent',
@@ -132,17 +141,45 @@ export default {
                 { key: 'description', label: 'Description' },
                 { key: 'unlocked', label: 'Unlocked' }
             ],
-            percentageLabels: ['ITEM 1', 'ITEM 2', 'ITEM 3', 'ITEM 4', 'ITEM 5'],
-            percentageData: [
+            progressLabels: [],
+            progressPercentages: []
+        }
+    },
+    computed: {
+        progressData() {
+            return [
                 {
-                    label: 'Percentage',
-                    data: [8, 14, 20, 28, 36],
-                    color: '#0d6efd'
+                    label: 'Unlocked',
+                    data: this.progressPercentages,
+                    color: '#0d6efd',
+                    fill: true
                 }
             ]
         }
     },
     methods: {
+        formatProgressLabel(isoDate, granularity) {
+            // The API sends a plain calendar day, so it is parsed as local time.
+            const formatter = labelFormatters[granularity] || labelFormatters.day
+            return formatter.format(new Date(`${isoDate}T00:00:00`))
+        },
+        async getProgress() {
+            if (!this.gameId) {
+                return
+            }
+
+            try {
+                const progress = await getGameProgress(this.gameId)
+                const points = progress?.points ?? []
+                this.progressLabels = points.map(
+                    (point) => this.formatProgressLabel(point.date, progress?.granularity)
+                )
+                this.progressPercentages = points.map((point) => point.percentage)
+            } catch {
+                this.progressLabels = []
+                this.progressPercentages = []
+            }
+        },
         toggleFilters() {
             this.$refs.filters.toggle()
         },
@@ -167,6 +204,7 @@ export default {
                 }
             }
             this.tableKey++
+            await this.getProgress()
         },
         async getGameDetails() {
             if (!this.gameId) {
