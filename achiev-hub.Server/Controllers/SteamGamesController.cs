@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.IdentityModel.Tokens.Jwt;
 using achiev_hub.Server.DTOs;
 using achiev_hub.Server.Services;
 using achiev_hub.Server.Services.Interfaces;
@@ -124,9 +123,7 @@ public class SteamGamesController : ApiControllerBase
             return StatusCode(StatusCodes.Status403Forbidden, new { message = "Guests cannot sync achievements to the database." });
         }
 
-        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-        if (!int.TryParse(userIdClaim, out var userId) || userId <= 0)
+        if (ResolveUserId() is not int userId)
         {
             return Unauthorized(new { message = "Invalid token" });
         }
@@ -156,9 +153,7 @@ public class SteamGamesController : ApiControllerBase
             return StatusCode(StatusCodes.Status403Forbidden, new { message = "Guests cannot sync library to the database." });
         }
 
-        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-        if (!int.TryParse(userIdClaim, out var userId) || userId <= 0)
+        if (ResolveUserId() is not int userId)
         {
             return Unauthorized(new { message = "Invalid token" });
         }
@@ -183,23 +178,5 @@ public class SteamGamesController : ApiControllerBase
         {
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = ex.Message });
         }
-    }
-
-    private int? ResolveUserIdForDbReads()
-    {
-        if (IsGuest())
-        {
-            return null;
-        }
-
-        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-        return int.TryParse(userIdClaim, out var userId) && userId > 0 ? userId : null;
-    }
-
-    private bool IsGuest()
-    {
-        return User.IsInRole(JwtTokenService.GuestRole)
-            || User.FindFirstValue(JwtTokenService.TokenKindClaim) == JwtTokenService.GuestTokenKind;
     }
 }

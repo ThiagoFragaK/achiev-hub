@@ -220,6 +220,13 @@ namespace achiev_hub.Server.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<decimal>("AvgPercentage")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("avg_percentage");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(256)
