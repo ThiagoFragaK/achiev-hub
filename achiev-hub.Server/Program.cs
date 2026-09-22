@@ -38,6 +38,7 @@ builder.Services.AddScoped<IPlayersService, PlayersService>();
 builder.Services.AddScoped<IGamesService, GamesService>();
 builder.Services.AddScoped<ISteamSyncService, SteamSyncService>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IUserStatsService, UserStatsService>();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IRegistrationService, RegistrationService>();
 builder.Services.AddScoped<IEmailSender, SendGridEmailSender>();

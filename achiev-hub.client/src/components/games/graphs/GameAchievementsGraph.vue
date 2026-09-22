@@ -1,7 +1,14 @@
 <template>
     <div class="card h-100">
         <div class="card-body p-2">
+            <p
+                v-if="isEmpty"
+                class="text-secondary small text-center mb-0 py-4"
+            >
+                {{ emptyMessage }}
+            </p>
             <LineAreaChart
+                v-else
                 :title="title"
                 :labels="labels"
                 :datasets="datasets"
@@ -43,6 +50,16 @@ export default {
             type: Number,
             required: false,
             default: 220
+        },
+        emptyMessage: {
+            type: String,
+            required: false,
+            default: ''
+        }
+    },
+    computed: {
+        isEmpty() {
+            return !!this.emptyMessage && this.labels.length === 0
         }
     }
 }
