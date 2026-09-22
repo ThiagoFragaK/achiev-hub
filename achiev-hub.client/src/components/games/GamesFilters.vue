@@ -1,23 +1,26 @@
 <template>
     <CollapseComponent ref="collapse" :collapse-id="collapseId">
-        <div class="row g-3 mb-3">
-            <div class="col-md-6">
+        <div class="row g-3 mb-3 align-items-end">
+            <div class="col-md-5">
                 <label class="form-label" for="filter-achievement-name">Achievement</label>
                 <input
                     id="filter-achievement-name"
-                    v-model="name"
+                    v-model="draft.name"
                     type="search"
                     class="form-control"
                     placeholder="Search by name"
                 />
             </div>
-            <div class="col-md-6">
+            <div class="col-md-5">
                 <label class="form-label" for="filter-achievement-status">Status</label>
-                <select id="filter-achievement-status" v-model="status" class="form-select">
+                <select id="filter-achievement-status" v-model="draft.status" class="form-select">
                     <option value="">All</option>
                     <option value="unlocked">Unlocked</option>
                     <option value="locked">Locked</option>
                 </select>
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-primary w-100" @click="applyFilters">Apply</button>
             </div>
         </div>
     </CollapseComponent>
@@ -41,26 +44,35 @@ export default {
             required: true
         }
     },
-    emits: ['update:modelValue'],
-    computed: {
-        name: {
-            get() {
-                return this.modelValue.name
-            },
-            set(value) {
-                this.$emit('update:modelValue', { ...this.modelValue, name: value })
+    emits: ['update:modelValue', 'apply-filters'],
+    data() {
+        return {
+            draft: {
+                name: this.modelValue.name || '',
+                status: this.modelValue.status || ''
             }
-        },
-        status: {
-            get() {
-                return this.modelValue.status
-            },
-            set(value) {
-                this.$emit('update:modelValue', { ...this.modelValue, status: value })
+        }
+    },
+    watch: {
+        modelValue: {
+            deep: true,
+            handler(value) {
+                this.draft = {
+                    name: value?.name || '',
+                    status: value?.status || ''
+                }
             }
         }
     },
     methods: {
+        applyFilters() {
+            const filters = {
+                name: this.draft.name || '',
+                status: this.draft.status || ''
+            }
+            this.$emit('update:modelValue', filters)
+            this.$emit('apply-filters', filters)
+        },
         open() {
             this.$refs.collapse.open()
         },

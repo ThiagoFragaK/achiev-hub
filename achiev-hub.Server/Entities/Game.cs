@@ -6,7 +6,9 @@ public class Game : IEntity
     public string Name { get; set; } = string.Empty;
     public string? ImageUrl { get; set; }
     public string? GameSteamId { get; set; }
-    public int PlayTime { get; set; }
+    public string? Developers { get; set; }
+    public string? Publishers { get; set; }
+    public bool? HasCommunityVisibleStats { get; set; }
 
     public ICollection<Achievement> Achievements { get; set; } = [];
     public ICollection<UsersGame> UsersGames { get; set; } = [];

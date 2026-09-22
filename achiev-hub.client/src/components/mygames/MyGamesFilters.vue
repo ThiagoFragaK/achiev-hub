@@ -22,18 +22,19 @@
                 />
             </div>
             <div class="col-md-3">
-                <label class="form-label" for="filter-min-percentage">Min percentage</label>
-                <input
-                    id="filter-min-percentage"
-                    v-model="filters.minPercentage"
-                    type="number"
-                    min="0"
-                    max="100"
-                    class="form-control"
-                />
+                <label class="form-label" for="filter-has-achievements">Has achievements</label>
+                <select
+                    id="filter-has-achievements"
+                    v-model="filters.hasAchievements"
+                    class="form-select"
+                >
+                    <option value="">All</option>
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                </select>
             </div>
-            <div class="col-md-2 mt-4">
-                <button class="btn btn-primary mt-4" @click="applyFilters">Apply</button>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="button" class="btn btn-primary w-100" @click="applyFilters">Apply</button>
             </div>
         </div>
     </CollapseComponent>
@@ -46,12 +47,13 @@ export default {
     components: {
         CollapseComponent
     },
+    emits: ['apply-filters'],
     data() {
         return {
             filters: {
                 name: '',
-                minHours: 0,
-                minPercentage: 0
+                minHours: '',
+                hasAchievements: ''
             }
         }
     },
@@ -60,8 +62,16 @@ export default {
             this.$refs.filters.toggle();
         },
         applyFilters() {
-            console.log(this.filters);
-            this.$emit('apply-filters', this.filters);
+            const payload = {
+                name: this.filters.name?.trim() || '',
+                minHours: this.filters.minHours === '' || this.filters.minHours == null
+                    ? ''
+                    : Number(this.filters.minHours),
+                hasAchievements: this.filters.hasAchievements === ''
+                    ? ''
+                    : this.filters.hasAchievements === 'true'
+            }
+            this.$emit('apply-filters', payload);
         }
     }
 }

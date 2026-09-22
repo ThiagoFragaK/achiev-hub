@@ -1,5 +1,5 @@
 <template>
-    <h2 class="h5 mb-3">Recent Games</h2>
+    <h2 v-if="!hideTitle" class="h5 mb-3">Recent Games</h2>
     <TableComponent 
         :data="table.data" 
         :columns="table.columns" 
@@ -53,6 +53,12 @@ export default {
     components: {
         TableComponent,
         ProgressComponent
+    },
+    props: {
+        hideTitle: {
+            type: Boolean,
+            default: false
+        }
     },
     data() {
         return {

@@ -35,7 +35,8 @@ public class GameService : IGameService
             Name = request.Name.Trim(),
             ImageUrl = request.ImageUrl,
             GameSteamId = NormalizeSteamId(request.GameSteamId),
-            PlayTime = request.PlayTime
+            Developers = request.Developers,
+            Publishers = request.Publishers
         };
 
         await _games.AddAsync(game, cancellationToken);
@@ -51,7 +52,8 @@ public class GameService : IGameService
         game.Name = request.Name.Trim();
         game.ImageUrl = request.ImageUrl;
         game.GameSteamId = NormalizeSteamId(request.GameSteamId);
-        game.PlayTime = request.PlayTime;
+        game.Developers = request.Developers;
+        game.Publishers = request.Publishers;
 
         _games.Update(game);
         await _games.SaveChangesAsync(cancellationToken);
@@ -100,6 +102,7 @@ public class GameService : IGameService
         Name = game.Name,
         ImageUrl = game.ImageUrl,
         GameSteamId = game.GameSteamId,
-        PlayTime = game.PlayTime
+        Developers = game.Developers,
+        Publishers = game.Publishers
     };
 }

@@ -41,6 +41,10 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(e => e.LastLogin);
 
+        builder.Property(e => e.Playtime2WeeksMinutes)
+            .IsRequired()
+            .HasDefaultValue(0);
+
         builder.HasIndex(e => e.Email).IsUnique();
         builder.HasIndex(e => e.SteamId)
             .IsUnique()

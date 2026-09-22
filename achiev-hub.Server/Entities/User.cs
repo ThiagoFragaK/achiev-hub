@@ -19,6 +19,7 @@ public class User : IEntity
     public int TokenVersion { get; set; }
 
     public DateTime? LastLogin { get; set; }
+    public int Playtime2WeeksMinutes { get; set; }
 
     public ICollection<UsersGame> UsersGames { get; set; } = [];
     public ICollection<UsersAchievement> UsersAchievements { get; set; } = [];

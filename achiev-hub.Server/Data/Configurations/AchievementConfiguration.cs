@@ -11,6 +11,9 @@ public class AchievementConfiguration : IEntityTypeConfiguration<Achievement>
         builder.ToTable("achievements");
         builder.HasKey(e => e.Id);
 
+        builder.Property(e => e.ApiName)
+            .HasMaxLength(200);
+
         builder.Property(e => e.Name)
             .IsRequired()
             .HasMaxLength(200);
@@ -27,6 +30,10 @@ public class AchievementConfiguration : IEntityTypeConfiguration<Achievement>
 
         builder.Property(e => e.GlobalPercentage)
             .HasPrecision(5, 2);
+
+        builder.HasIndex(e => new { e.GameId, e.ApiName })
+            .IsUnique()
+            .HasFilter("\"ApiName\" IS NOT NULL AND \"ApiName\" <> ''");
 
         builder.HasMany(e => e.UsersAchievements)
             .WithOne(ua => ua.Achievement)

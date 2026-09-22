@@ -42,6 +42,10 @@ export default {
         gameId: {
             type: [Number, String],
             required: true
+        },
+        filters: {
+            type: Object,
+            default: () => ({ name: '', status: '' })
         }
     },
     data() {
@@ -57,11 +61,20 @@ export default {
                 ],
                 pagination: {
                     currentPage: 1,
-                    perPage: 25,
+                    perPage: 7,
                     totalPages: 1,
                     totalCount: 0
                 }
             },
+        }
+    },
+    watch: {
+        filters: {
+            deep: true,
+            handler() {
+                this.table.pagination.currentPage = 1
+                this.getAchievements()
+            }
         }
     },
     methods: {
@@ -87,8 +100,13 @@ export default {
             this.isLoading = true
             this.error = ''
             try {
-                const result = await fetchAchievements(steamId, gameId, this.table.pagination.currentPage, this.table.pagination.perPage)
-                console.log(result);
+                const result = await fetchAchievements(
+                    steamId,
+                    gameId,
+                    this.table.pagination.currentPage,
+                    this.table.pagination.perPage,
+                    this.filters
+                )
                 this.table.data = result?.data ?? []
                 this.table.pagination.currentPage = result?.currentPage ?? this.table.pagination.currentPage
                 this.table.pagination.totalPages = Math.max(1, result?.lastPage ?? 1)
