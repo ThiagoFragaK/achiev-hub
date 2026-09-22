@@ -1,4 +1,5 @@
 using achiev_hub.Server.Exceptions;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace achiev_hub.Server.Controllers;
@@ -12,6 +13,7 @@ public abstract class ApiControllerBase : ControllerBase
         {
             NotFoundException => NotFound(new { message = exception.Message }),
             ConflictException => Conflict(new { message = exception.Message }),
+            SteamApiException => StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = SteamApiException.UserMessage }),
             _ => throw exception
         };
     }

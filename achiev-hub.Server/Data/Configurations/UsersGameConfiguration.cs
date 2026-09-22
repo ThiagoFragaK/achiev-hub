@@ -15,6 +15,9 @@ public class UsersGameConfiguration : IEntityTypeConfiguration<UsersGame>
             .HasPrecision(5, 2)
             .HasDefaultValue(0);
 
+        builder.Property(e => e.PlaytimeMinutes)
+            .HasDefaultValue(0);
+
         builder.HasIndex(e => new { e.UserId, e.GameId }).IsUnique();
     }
 }

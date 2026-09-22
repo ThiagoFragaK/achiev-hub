@@ -1,5 +1,9 @@
+using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
 using achiev_hub.Server.DTOs;
+using achiev_hub.Server.Services;
 using achiev_hub.Server.Services.Interfaces;
+using achiev_hub.Server.Support;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,13 +12,15 @@ namespace achiev_hub.Server.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/steam/games")]
-public class SteamGamesController : ControllerBase
+public class SteamGamesController : ApiControllerBase
 {
     private readonly IGamesService _gamesService;
+    private readonly ISteamSyncService _steamSyncService;
 
-    public SteamGamesController(IGamesService gamesService)
+    public SteamGamesController(IGamesService gamesService, ISteamSyncService steamSyncService)
     {
         _gamesService = gamesService;
+        _steamSyncService = steamSyncService;
     }
 
     [HttpGet("recent")]
@@ -29,7 +35,11 @@ public class SteamGamesController : ControllerBase
             return BadRequest("steamId is required.");
         }
 
-        var result = await _gamesService.GetRecentGamesAsync(steamId, page, pageSize, cancellationToken);
+        var result = await _gamesService.GetRecentGamesAsync(
+            steamId,
+            page,
+            pageSize,
+            cancellationToken: cancellationToken);
         return Ok(result);
     }
 
@@ -38,6 +48,9 @@ public class SteamGamesController : ControllerBase
         [FromQuery] string steamId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
+        [FromQuery] string? name = null,
+        [FromQuery] double? minHours = null,
+        [FromQuery] bool? hasAchievements = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(steamId))
@@ -45,7 +58,20 @@ public class SteamGamesController : ControllerBase
             return BadRequest("steamId is required.");
         }
 
-        var result = await _gamesService.GetLibraryAsync(steamId, page, pageSize, cancellationToken);
+        var filters = new LibraryGameFilterDto
+        {
+            Name = name,
+            MinHours = minHours,
+            HasAchievements = hasAchievements
+        };
+
+        var result = await _gamesService.GetLibraryAsync(
+            steamId,
+            page,
+            pageSize,
+            ResolveUserIdForDbReads(),
+            filters,
+            cancellationToken);
         return Ok(result);
     }
 
@@ -62,6 +88,8 @@ public class SteamGamesController : ControllerBase
         [FromQuery] string steamId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
+        [FromQuery] string? name = null,
+        [FromQuery] string? status = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(steamId))
@@ -69,7 +97,109 @@ public class SteamGamesController : ControllerBase
             return BadRequest("steamId is required.");
         }
 
-        var result = await _gamesService.GetAchievementsAsync(steamId, appId, page, pageSize, cancellationToken);
-        return Ok(result);
+        try
+        {
+            var result = await _gamesService.GetAchievementsAsync(
+                steamId,
+                appId,
+                page,
+                pageSize,
+                name,
+                status,
+                ResolveUserIdForDbReads(),
+                cancellationToken);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    [HttpPost("{appId:int}/sync-achievements")]
+    public async Task<IActionResult> SyncGameAchievements(int appId, CancellationToken cancellationToken)
+    {
+        if (IsGuest())
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Guests cannot sync achievements to the database." });
+        }
+
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        if (!int.TryParse(userIdClaim, out var userId) || userId <= 0)
+        {
+            return Unauthorized(new { message = "Invalid token" });
+        }
+
+        var steamId = User.FindFirstValue("steam_id");
+        if (string.IsNullOrWhiteSpace(steamId))
+        {
+            return BadRequest(new { message = "Steam ID is missing from the token." });
+        }
+
+        try
+        {
+            await _steamSyncService.SyncGameAchievementsAsync(userId, steamId, appId, cancellationToken);
+            return Ok(new { success = true, message = "Achievements synced." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("sync")]
+    public async Task<IActionResult> SyncLibrary(CancellationToken cancellationToken)
+    {
+        if (IsGuest())
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Guests cannot sync library to the database." });
+        }
+
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        if (!int.TryParse(userIdClaim, out var userId) || userId <= 0)
+        {
+            return Unauthorized(new { message = "Invalid token" });
+        }
+
+        var steamId = User.FindFirstValue("steam_id");
+        if (string.IsNullOrWhiteSpace(steamId))
+        {
+            return BadRequest(new { message = "Steam ID is missing from the token." });
+        }
+
+        try
+        {
+            await _steamSyncService.SyncLibraryAsync(userId, steamId, cancellationToken);
+            await _steamSyncService.SyncAchievementsForUserAsync(
+                userId,
+                steamId,
+                AchievementSyncScope.RecentTwoWeeks,
+                cancellationToken);
+            return Ok(new { success = true, message = "Library synced." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = ex.Message });
+        }
+    }
+
+    private int? ResolveUserIdForDbReads()
+    {
+        if (IsGuest())
+        {
+            return null;
+        }
+
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
+        return int.TryParse(userIdClaim, out var userId) && userId > 0 ? userId : null;
+    }
+
+    private bool IsGuest()
+    {
+        return User.IsInRole(JwtTokenService.GuestRole)
+            || User.FindFirstValue(JwtTokenService.TokenKindClaim) == JwtTokenService.GuestTokenKind;
     }
 }

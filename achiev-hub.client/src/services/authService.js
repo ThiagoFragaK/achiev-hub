@@ -1,5 +1,24 @@
 import { postJson } from '@/services/http'
 import { clearSession, getUser, setSession } from '@/lib/session'
+import { getPlayer } from '@/services/playersService'
+
+async function attachSteamProfile(user) {
+    const steamId = user?.steamId?.trim()
+    if (!steamId) {
+        return user
+    }
+
+    try {
+        const player = await getPlayer(steamId)
+        return {
+            ...user,
+            personaName: player?.personaName || user.personaName,
+            avatar: player?.avatar || user.avatar
+        }
+    } catch {
+        return user
+    }
+}
 
 export async function login(steamId, password) {
     const response = await postJson('/api/login', { steamId, password })
@@ -13,7 +32,13 @@ export async function login(steamId, password) {
         user: data.user
     })
 
-    return data
+    const user = await attachSteamProfile(data.user)
+    setSession({
+        accessToken: data.accessToken,
+        user
+    })
+
+    return { ...data, user }
 }
 
 export async function continueAsGuest(steamId) {
@@ -28,7 +53,13 @@ export async function continueAsGuest(steamId) {
         user: data.user
     })
 
-    return data
+    const user = await attachSteamProfile(data.user)
+    setSession({
+        accessToken: data.accessToken,
+        user
+    })
+
+    return { ...data, user }
 }
 
 export async function sendVerification(email) {

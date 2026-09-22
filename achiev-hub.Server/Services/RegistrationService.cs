@@ -5,6 +5,7 @@ using achiev_hub.Server.DTOs.Persistence;
 using achiev_hub.Server.Entities;
 using achiev_hub.Server.Enums;
 using achiev_hub.Server.Repositories.Interfaces;
+using achiev_hub.Server.Services;
 using achiev_hub.Server.Services.Interfaces;
 using achiev_hub.Server.Support;
 
@@ -20,17 +21,23 @@ public class RegistrationService : IRegistrationService
     private readonly IRepository<EmailVerification> _verifications;
     private readonly IEmailSender _emailSender;
     private readonly IHostEnvironment _environment;
+    private readonly ISteamSyncService _steamSyncService;
+    private readonly ILogger<RegistrationService> _logger;
 
     public RegistrationService(
         IRepository<User> users,
         IRepository<EmailVerification> verifications,
         IEmailSender emailSender,
-        IHostEnvironment environment)
+        IHostEnvironment environment,
+        ISteamSyncService steamSyncService,
+        ILogger<RegistrationService> logger)
     {
         _users = users;
         _verifications = verifications;
         _emailSender = emailSender;
         _environment = environment;
+        _steamSyncService = steamSyncService;
+        _logger = logger;
     }
 
     public async Task<object> SendVerificationAsync(string email, CancellationToken cancellationToken = default)
@@ -193,6 +200,20 @@ public class RegistrationService : IRegistrationService
         }
 
         await _users.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _steamSyncService.SyncLibraryAsync(user.Id, user.SteamId, cancellationToken);
+            await _steamSyncService.SyncAchievementsForUserAsync(
+                user.Id,
+                user.SteamId,
+                AchievementSyncScope.AllOwnedWithStats,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Initial library/achievement sync failed for user {UserId}", user.Id);
+        }
 
         return new UserDto
         {

@@ -21,8 +21,13 @@ public class GameConfiguration : IEntityTypeConfiguration<Game>
         builder.Property(e => e.GameSteamId)
             .HasMaxLength(100);
 
-        builder.Property(e => e.PlayTime)
-            .HasDefaultValue(0);
+        builder.Property(e => e.Developers)
+            .HasMaxLength(500);
+
+        builder.Property(e => e.Publishers)
+            .HasMaxLength(500);
+
+        builder.Property(e => e.HasCommunityVisibleStats);
 
         builder.HasIndex(e => e.GameSteamId)
             .IsUnique()
