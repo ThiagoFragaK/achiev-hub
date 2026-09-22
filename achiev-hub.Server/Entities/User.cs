@@ -20,6 +20,7 @@ public class User : IEntity
 
     public DateTime? LastLogin { get; set; }
     public int Playtime2WeeksMinutes { get; set; }
+    public decimal AvgPercentage { get; set; }
 
     public ICollection<UsersGame> UsersGames { get; set; } = [];
     public ICollection<UsersAchievement> UsersAchievements { get; set; } = [];
