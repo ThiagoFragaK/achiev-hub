@@ -43,10 +43,17 @@
                     >
                         <span class="small fw-medium">{{ displayName }}</span>
                         <span
-                            class="d-inline-block rounded border bg-secondary"
+                            class="d-inline-block rounded border bg-secondary overflow-hidden"
                             style="width: 2.25rem; height: 2.25rem"
                             aria-hidden="true"
-                        />
+                        >
+                            <img
+                                v-if="avatar"
+                                :src="avatar"
+                                alt=""
+                                class="w-100 h-100 object-fit-cover"
+                            />
+                        </span>
                     </button>
                     <!-- data-bs-popper enables Bootstrap's CSS-only placement, used for navbar dropdowns -->
                     <ul
@@ -68,13 +75,15 @@
 
 <script>
 import { logout } from '@/services/authService'
-import { getUser } from '@/lib/session'
+import { getUser, mergeUser } from '@/lib/session'
+import { getPlayer } from '@/services/playersService'
 
 export default {
     name: 'AppHeader',
     data() {
         return {
             isUserMenuOpen: false,
+            user: getUser(),
             links: [
                 { to: '/', label: 'Home', name: 'home' },
                 { to: '/games', label: 'My games', name: 'games' },
@@ -85,10 +94,13 @@ export default {
     },
     computed: {
         displayName() {
-            const user = getUser()
-            if (!user) return 'Guest'
-            if (user.steamId) return user.steamId.slice(-4)
-            return user.email?.split('@')[0] || 'User'
+            if (!this.user) return 'Guest'
+            if (this.user.personaName) return this.user.personaName
+            if (this.user.steamId) return this.user.steamId.slice(-4)
+            return this.user.email?.split('@')[0] || 'User'
+        },
+        avatar() {
+            return this.user?.avatar || ''
         }
     },
     watch: {
@@ -99,6 +111,7 @@ export default {
     mounted() {
         document.addEventListener('click', this.onDocumentClick)
         document.addEventListener('keydown', this.onKeydown)
+        this.loadSteamProfileIfNeeded()
     },
     beforeUnmount() {
         document.removeEventListener('click', this.onDocumentClick)
@@ -122,6 +135,22 @@ export default {
         onKeydown(event) {
             if (event.key === 'Escape') {
                 this.isUserMenuOpen = false
+            }
+        },
+        async loadSteamProfileIfNeeded() {
+            const steamId = this.user?.steamId?.trim()
+            if (!steamId || (this.user.personaName && this.user.avatar)) {
+                return
+            }
+
+            try {
+                const player = await getPlayer(steamId)
+                this.user = mergeUser({
+                    personaName: player?.personaName || this.user.personaName,
+                    avatar: player?.avatar || this.user.avatar
+                })
+            } catch {
+                // Keep session fallbacks if Steam profile is unavailable.
             }
         },
         async logout() {

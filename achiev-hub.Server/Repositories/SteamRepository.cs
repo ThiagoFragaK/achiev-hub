@@ -153,6 +153,7 @@ public class SteamRepository : ISteamRepository
             }
 
             var success = GetBool(playerStats, "success");
+            var error = GetString(playerStats, "error");
             var achievements = new List<PlayerAchievement>();
             if (TryGetProperty(playerStats, "achievements", out var achievementArray) &&
                 achievementArray.ValueKind == JsonValueKind.Array)
@@ -171,6 +172,7 @@ public class SteamRepository : ISteamRepository
             return new PlayerAchievementsResult
             {
                 Success = success,
+                Error = error,
                 GameName = GetString(playerStats, "gameName"),
                 Achievements = achievements
             };
@@ -186,9 +188,15 @@ public class SteamRepository : ISteamRepository
     {
         try
         {
-            var url = $"/ISteamUserStats/GetSchemaForGame/v0001/?key={_apiKey}&appid={appId}";
-            using var document = await GetJsonAsync(url, cancellationToken);
-            if (document is null || !TryGetProperty(document.RootElement, "game", out var game))
+            var url = $"/ISteamUserStats/GetSchemaForGame/v2/?key={_apiKey}&appid={appId}&l=english";
+            using var document = await GetJsonAsync(url, cancellationToken, requireSuccessStatusCode: false);
+            if (document is null)
+            {
+                return null;
+            }
+
+            var root = document.RootElement.Clone();
+            if (!TryGetProperty(root, "game", out var game))
             {
                 return null;
             }
@@ -265,8 +273,13 @@ public class SteamRepository : ISteamRepository
 
         try
         {
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            return await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return null;
+            }
+
+            return JsonDocument.Parse(json);
         }
         catch (JsonException ex)
         {
@@ -277,9 +290,24 @@ public class SteamRepository : ISteamRepository
 
     private static bool TryGetProperty(JsonElement element, string name, out JsonElement value)
     {
-        if (element.ValueKind == JsonValueKind.Object)
+        if (element.ValueKind != JsonValueKind.Object)
         {
-            return element.TryGetProperty(name, out value);
+            value = default;
+            return false;
+        }
+
+        if (element.TryGetProperty(name, out value))
+        {
+            return true;
+        }
+
+        foreach (var property in element.EnumerateObject())
+        {
+            if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
         }
 
         value = default;

@@ -26,6 +26,12 @@ export function setSession({ accessToken, user }) {
     }
 }
 
+export function mergeUser(partial) {
+    const next = { ...(getUser() || {}), ...partial }
+    localStorage.setItem(USER_KEY, JSON.stringify(next))
+    return next
+}
+
 export function clearSession() {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)

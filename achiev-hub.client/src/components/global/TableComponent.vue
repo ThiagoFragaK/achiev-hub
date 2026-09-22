@@ -22,7 +22,7 @@
                         :colspan="columns.length + (hasSelection ? 1 : 0)"
                         class="text-center py-4"
                     >
-                        <LoadingComponent />
+                        <LoadingComponent :color="light" />
                     </td>
                 </tr>
             </tbody>
@@ -55,16 +55,26 @@
                 </tr>
             </tbody>
         </table>
+        <div v-if="pagination" class="d-flex justify-content-center">
+            <PaginationComponent
+                :current-page="pagination.currentPage"
+                :total-pages="pagination.totalPages"
+                :per-page="pagination.perPage"
+                :total-items="pagination.totalCount"
+                @change-page="$emit('change-page', $event)"
+            />
+        </div>
     </div>
 </template>
 
 <script>
-import LoadingComponent from '@/components/global/LoadingComponent.vue'
-
+import LoadingComponent from '@/components/global/LoadingComponent.vue';
+import PaginationComponent from '@/components/global/PaginationComponent.vue';
 export default {
     name: 'TableComponent',
     components: {
-        LoadingComponent
+        LoadingComponent,
+        PaginationComponent
     },
     props: {
         data: {
@@ -82,9 +92,13 @@ export default {
         hasSelection: {
             type: Boolean,
             default: false
+        },
+        pagination: {
+            type: Object,
+            required: false
         }
     },
-    emits: ['selectedRows'],
+    emits: ['selectedRows', 'change-page'],
     data() {
         return {
             selectedRows: []

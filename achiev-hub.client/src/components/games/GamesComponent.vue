@@ -1,22 +1,29 @@
 <template>
     <AppShell>
-        <div class="row g-4 mb-4 align-items-start">
+        <p v-if="isLoading" class="text-secondary mb-4">Loading game details…</p>
+        <p v-else-if="error" class="text-danger mb-4">{{ error }}</p>
+
+        <div v-else class="row g-4 mb-4 align-items-start">
             <div class="col-md-3 col-lg-2">
-                <ImageComponent :alt="game.name" />
+                <ImageComponent
+                    :src="game.gameImage || ''"
+                    :alt="game.gameName || 'Game'"
+                    ratio="16x9"
+                />
             </div>
 
             <div class="col-md-5 col-lg-4">
                 <h1 class="lastica-h3 mb-3">
-                    {{ game.name }}
+                    {{ game.gameName || 'Unknown game' }}
                 </h1>
                 <div class="row g-3">
                     <div class="col-sm-6">
-                        <p class="text-uppercase text-secondary small mb-1">Total game hours</p>
-                        <p class="fs-4 fw-semibold mb-0">{{ game.hours }}h</p>
+                        <p class="text-uppercase text-secondary small mb-1">Developers</p>
+                        <p class="fs-6 fw-semibold mb-0">{{ game.developers || '—' }}</p>
                     </div>
                     <div class="col-sm-6">
-                        <p class="text-uppercase text-secondary small mb-1">Percentage</p>
-                        <p class="fs-4 fw-semibold mb-0">{{ game.percentage }}%</p>
+                        <p class="text-uppercase text-secondary small mb-1">Publishers</p>
+                        <p class="fs-6 fw-semibold mb-0">{{ game.publishers || '—' }}</p>
                     </div>
                 </div>
             </div>
@@ -36,6 +43,8 @@
                     type="button"
                     class="btn btn-outline-secondary btn-sm"
                     aria-label="Sync game data"
+                    :disabled="isLoading"
+                    @click="reload"
                 >
                     <LucideIcon icon="RefreshCw" :size="18" />
                 </button>
@@ -61,16 +70,15 @@
                     ref="filters"
                     v-model="filters"
                     collapse-id="game-achievement-filters"
+                    @apply-filters="applyFilters"
                 />
 
-                <GamesTable
-                    :achievements="pagedAchievements"
-                    :columns="achievementColumns"
-                    :current-page="currentPage"
-                    :total-pages="totalPages"
-                    :per-page="perPage"
-                    :total-items="demoAchievements.length"
-                    @change-page="currentPage = $event"
+                <p v-if="syncError" class="text-danger small mb-3">{{ syncError }}</p>
+
+                <GamesAchievementsTable
+                    :gameId="gameId"
+                    :filters="appliedFilters"
+                    :key="tableKey"
                 />
             </div>
         </div>
@@ -78,13 +86,14 @@
 </template>
 
 <script>
+import { getUser } from '@/lib/session'
+import { getGameDetails, syncGameAchievements } from '@/services/gamesService';
 import AppShell from '@/components/layout/AppShell.vue'
-import GameAchievementsGraph from '@/components/games/GameAchievementsGraph.vue'
+import GameAchievementsGraph from '@/components/games/graphs/GameAchievementsGraph.vue'
 import GamesFilters from '@/components/games/GamesFilters.vue'
-import GamesTable from '@/components/games/GamesTable.vue'
+import GamesAchievementsTable from '@/components/games/GamesAchievementsTable.vue'
 import ImageComponent from '@/components/global/ImageComponent.vue'
 import LucideIcon from '@/components/global/LucideIcon.vue'
-import { demoAchievements, demoGames } from '@/data/demo'
 
 export default {
     name: 'GamesComponent',
@@ -92,22 +101,36 @@ export default {
         AppShell,
         GameAchievementsGraph,
         GamesFilters,
-        GamesTable,
+        GamesAchievementsTable,
         ImageComponent,
         LucideIcon
     },
     data() {
         return {
-            demoAchievements,
-            currentPage: 1,
-            perPage: 10,
+            gameId: null,
+            gameUpdate: 0,
+            tableKey: 0,
+            syncError: '',
+            isLoading: false,
+            game: {
+                gameName: '',
+                gameImage: '',
+                developers: '',
+                publishers: ''
+            },
             filters: {
                 name: '',
                 status: ''
             },
+            appliedFilters: {
+                name: '',
+                status: ''
+            },
             achievementColumns: [
+                { key: 'icon', label: '' },
                 { key: 'name', label: 'Achievement' },
-                { key: 'status', label: 'Status' }
+                { key: 'description', label: 'Description' },
+                { key: 'unlocked', label: 'Unlocked' }
             ],
             percentageLabels: ['ITEM 1', 'ITEM 2', 'ITEM 3', 'ITEM 4', 'ITEM 5'],
             percentageData: [
@@ -119,23 +142,64 @@ export default {
             ]
         }
     },
-    computed: {
-        game() {
-            const id = String(this.$route.params.id)
-            return demoGames.find((g) => g.id === id) ?? demoGames[0]
-        },
-        totalPages() {
-            return Math.max(1, Math.ceil(this.demoAchievements.length / this.perPage))
-        },
-        pagedAchievements() {
-            const start = (this.currentPage - 1) * this.perPage
-            return this.demoAchievements.slice(start, start + this.perPage)
-        }
-    },
     methods: {
         toggleFilters() {
             this.$refs.filters.toggle()
-        }
+        },
+        applyFilters(filters) {
+            this.appliedFilters = {
+                name: filters?.name || '',
+                status: filters?.status || ''
+            }
+            this.tableKey++
+        },
+        async reload() {
+            await this.syncAndReloadAchievements()
+        },
+        async syncAndReloadAchievements() {
+            this.syncError = ''
+            const user = getUser()
+            if (user && user.role !== 'guest' && this.gameId) {
+                try {
+                    await syncGameAchievements(this.gameId)
+                } catch (err) {
+                    this.syncError = err?.message || 'Failed to sync achievements.'
+                }
+            }
+            this.tableKey++
+        },
+        async getGameDetails() {
+            if (!this.gameId) {
+                this.error = 'Game id is missing.'
+                return
+            }
+
+            this.isLoading = true;
+            try {
+                const details = await getGameDetails(this.gameId)
+                this.game = {
+                    gameName: details?.gameName || '',
+                    gameImage: details?.gameImage || '',
+                    developers: details?.developers || '',
+                    publishers: details?.publishers || ''
+                }
+                await this.syncAndReloadAchievements()
+            } catch (err) {
+                this.game = {
+                    gameName: '',
+                    gameImage: '',
+                    developers: '',
+                    publishers: ''
+                }
+                this.error = err?.message || 'Failed to load game details.'
+            } finally {
+                this.isLoading = false                
+            }
+        },
+    },
+    async created() {
+        this.gameId = this.$route.params.id;
+        await this.getGameDetails();
     }
 }
 </script>
