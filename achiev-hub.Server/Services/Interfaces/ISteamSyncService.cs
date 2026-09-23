@@ -4,7 +4,11 @@ namespace achiev_hub.Server.Services.Interfaces;
 
 public interface ISteamSyncService
 {
-    Task SyncLibraryAsync(int userId, string steamId, CancellationToken cancellationToken = default);
+    Task SyncLibraryAsync(
+        int userId,
+        string steamId,
+        LibrarySyncScope scope = LibrarySyncScope.Full,
+        CancellationToken cancellationToken = default);
 
     Task SyncGameAchievementsAsync(int userId, string steamId, int appId, CancellationToken cancellationToken = default);
 

@@ -3,21 +3,26 @@
         <p v-if="statsError" class="text-danger small mb-3">{{ statsError }}</p>
 
         <div class="row g-4 mb-4">
-            <div class="col-lg">
+            <div class="col-12 col-lg">
                 <AchievementsLast14DaysGraph
                     :labels="achievementsLabels"
                     :datasets="achievementsData"
+                    :height="chartHeight"
                 />
             </div>
 
-            <div class="col-lg-3">
-                <UsersAverageSemiGauge :value="averagePercentage" />
+            <div class="col-12 col-lg-3">
+                <UsersAverageSemiGauge
+                    :value="averagePercentage"
+                    :height="chartHeight"
+                />
             </div>
 
-            <div class="col-lg">
+            <div class="col-12 col-lg">
                 <AchievementsPerYearGraph
                     :labels="perYearLabels"
                     :datasets="perYearData"
+                    :height="chartHeight"
                 />
             </div>
         </div>
@@ -54,6 +59,9 @@ import LucideIcon from '@/components/global/LucideIcon.vue'
 
 const dayFormatter = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' })
 
+// The charts follow the viewport width, within a readable range.
+const CHART_HEIGHT = 'clamp(180px, 18vw, 280px)'
+
 export default {
     name: 'HomeComponent',
     components: {
@@ -66,6 +74,7 @@ export default {
     },
     data() {
         return {
+            chartHeight: CHART_HEIGHT,
             recentGamesKey: 0,
             isSyncing: false,
             syncError: '',

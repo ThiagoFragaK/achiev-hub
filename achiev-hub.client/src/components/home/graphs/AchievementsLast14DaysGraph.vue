@@ -4,7 +4,12 @@
             <p class="text-uppercase text-secondary small fw-medium mb-3">
                 Achievements in 14 days
             </p>
-            <LineAreaChart :labels="labels" :datasets="datasets" :max="max" />
+            <LineAreaChart
+                :labels="labels"
+                :datasets="datasets"
+                :max="max"
+                :height="height"
+            />
         </div>
     </div>
 </template>
@@ -30,6 +35,11 @@ export default {
             type: Number,
             required: false,
             default: undefined
+        },
+        height: {
+            type: [Number, String],
+            required: false,
+            default: 220
         }
     }
 }

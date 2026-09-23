@@ -27,7 +27,11 @@ public class SteamSyncService : ISteamSyncService
         _logger = logger;
     }
 
-    public async Task SyncLibraryAsync(int userId, string steamId, CancellationToken cancellationToken = default)
+    public async Task SyncLibraryAsync(
+        int userId,
+        string steamId,
+        LibrarySyncScope scope = LibrarySyncScope.Full,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(steamId))
         {
@@ -37,25 +41,27 @@ public class SteamSyncService : ISteamSyncService
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
             ?? throw new InvalidOperationException($"User {userId} was not found.");
 
-        var ownedGames = await _steamRepository.GetOwnedGamesAsync(steamId, cancellationToken);
         var recentGames = await _steamRepository.GetRecentlyPlayedGamesAsync(steamId, cancellationToken);
-
         var byAppId = new Dictionary<int, SyncGameInput>();
 
-        foreach (var owned in ownedGames)
+        if (scope == LibrarySyncScope.Full)
         {
-            if (owned.AppId <= 0)
+            var ownedGames = await _steamRepository.GetOwnedGamesAsync(steamId, cancellationToken);
+            foreach (var owned in ownedGames)
             {
-                continue;
-            }
+                if (owned.AppId <= 0)
+                {
+                    continue;
+                }
 
-            byAppId[owned.AppId] = new SyncGameInput(
-                owned.AppId,
-                owned.Name,
-                owned.ImgIconUrl,
-                owned.PlaytimeForeverMinutes,
-                owned.LastPlayedUnix,
-                owned.HasCommunityVisibleStats);
+                byAppId[owned.AppId] = new SyncGameInput(
+                    owned.AppId,
+                    owned.Name,
+                    owned.ImgIconUrl,
+                    owned.PlaytimeForeverMinutes,
+                    owned.LastPlayedUnix,
+                    owned.HasCommunityVisibleStats);
+            }
         }
 
         foreach (var recent in recentGames)
@@ -86,6 +92,18 @@ public class SteamSyncService : ISteamSyncService
                     null,
                     null);
             }
+        }
+
+        if (byAppId.Count == 0)
+        {
+            user.Playtime2WeeksMinutes = recentGames.Sum(g => g.Playtime2WeeksMinutes);
+            await _db.SaveChangesAsync(cancellationToken);
+            _cache.Remove(RecentGamesCacheKeys.ForSteamId(steamId));
+            _logger.LogInformation(
+                "Synced library ({Scope}) for user {UserId}: 0 games",
+                scope,
+                userId);
+            return;
         }
 
         var steamIds = byAppId.Keys.Select(id => id.ToString()).ToList();
@@ -171,7 +189,8 @@ public class SteamSyncService : ISteamSyncService
         _cache.Remove(RecentGamesCacheKeys.ForSteamId(steamId));
 
         _logger.LogInformation(
-            "Synced library for user {UserId}: {GameCount} games, Playtime2WeeksMinutes={Playtime2Weeks}",
+            "Synced library ({Scope}) for user {UserId}: {GameCount} games, Playtime2WeeksMinutes={Playtime2Weeks}",
+            scope,
             userId,
             byAppId.Count,
             user.Playtime2WeeksMinutes);

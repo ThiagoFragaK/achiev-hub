@@ -133,7 +133,7 @@ export default {
             this.loading = true
             try {
                 await continueAsGuest(this.steamId.trim())
-                this.$router.push({ name: 'home' })
+                this.redirectAfterLogin()
             } catch (error) {
                 this.loginError = error.body?.message || error.message || 'Guest session failed'
             } finally {

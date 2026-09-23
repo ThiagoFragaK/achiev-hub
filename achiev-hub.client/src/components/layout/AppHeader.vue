@@ -75,7 +75,7 @@
 
 <script>
 import { logout } from '@/services/authService'
-import { getUser, mergeUser } from '@/lib/session'
+import { useSession, mergeUser } from '@/lib/session'
 import { getPlayer } from '@/services/playersService'
 
 export default {
@@ -83,16 +83,19 @@ export default {
     data() {
         return {
             isUserMenuOpen: false,
-            user: getUser(),
+            session: useSession(),
             links: [
                 { to: '/', label: 'Home', name: 'home' },
-                { to: '/games', label: 'My games', name: 'games' },
-                { to: '/stats', label: 'Stats', name: 'stats' },
-                { to: '/steam', label: 'Steam', name: 'steam' }
+                { to: '/games', label: 'My games', name: 'games' }
+                // { to: '/stats', label: 'Stats', name: 'stats' },
+                // { to: '/steam', label: 'Steam', name: 'steam' }
             ]
         }
     },
     computed: {
+        user() {
+            return this.session.user
+        },
         displayName() {
             if (!this.user) return 'Guest'
             if (this.user.personaName) return this.user.personaName
@@ -145,7 +148,7 @@ export default {
 
             try {
                 const player = await getPlayer(steamId)
-                this.user = mergeUser({
+                mergeUser({
                     personaName: player?.personaName || this.user.personaName,
                     avatar: player?.avatar || this.user.avatar
                 })

@@ -1,7 +1,7 @@
 <template>
     <div class="card h-100">
         <div class="card-body d-flex align-items-center justify-content-center">
-            <SemiGauge :value="value" :label="label" />
+            <SemiGauge :value="value" :label="label" :height="height" />
         </div>
     </div>
 </template>
@@ -24,6 +24,11 @@ export default {
             type: String,
             required: false,
             default: 'Users Average'
+        },
+        height: {
+            type: [Number, String],
+            required: false,
+            default: 220
         }
     }
 }

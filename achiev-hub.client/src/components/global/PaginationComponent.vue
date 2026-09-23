@@ -13,18 +13,20 @@
             </li>
 
             <li
-                v-for="page in pages"
-                :key="page"
+                v-for="(item, index) in pages"
+                :key="`${item}-${index}`"
                 class="page-item"
-                :class="{ active: page === current }"
+                :class="{ active: item === current, disabled: item === 'ellipsis' }"
             >
+                <span v-if="item === 'ellipsis'" class="page-link">…</span>
                 <a
+                    v-else
                     class="page-link"
                     href="#"
-                    :aria-current="page === current ? 'page' : undefined"
-                    @click.prevent="changePage(page)"
+                    :aria-current="item === current ? 'page' : undefined"
+                    @click.prevent="changePage(item)"
                 >
-                    {{ page }}
+                    {{ item }}
                 </a>
             </li>
 
@@ -81,28 +83,38 @@ export default {
     },
     computed: {
         pages() {
-            const range = []
-            let start = this.current - 1
-            let end = this.current + 1
+            const total = Math.max(1, this.totalPages)
+            const current = Math.min(Math.max(1, this.current), total)
 
-            if (start < 1) {
-                start = 1
-                end = Math.min(3, this.totalPages)
+            if (total <= 5) {
+                return Array.from({ length: total }, (_, i) => i + 1)
             }
 
-            if (end > this.totalPages) {
-                end = this.totalPages
-                start = Math.max(1, end - 2)
+            const items = [1]
+            const start = Math.max(2, current - 1)
+            const end = Math.min(total - 1, current + 1)
+
+            if (start > 2) {
+                items.push('ellipsis')
             }
 
-            for (let i = start; i <= end; i++) {
-                range.push(i)
+            for (let page = start; page <= end; page += 1) {
+                items.push(page)
             }
-            return range
+
+            if (end < total - 1) {
+                items.push('ellipsis')
+            }
+
+            items.push(total)
+            return items
         }
     },
     methods: {
         changePage(page) {
+            if (page === 'ellipsis') {
+                return
+            }
             if (this.isValidPage(page)) {
                 this.current = page
                 this.$emit('change-page', page)
