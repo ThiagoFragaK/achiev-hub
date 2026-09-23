@@ -203,7 +203,11 @@ public class RegistrationService : IRegistrationService
 
         try
         {
-            await _steamSyncService.SyncLibraryAsync(user.Id, user.SteamId, cancellationToken);
+            await _steamSyncService.SyncLibraryAsync(
+                user.Id,
+                user.SteamId,
+                LibrarySyncScope.Full,
+                cancellationToken);
             await _steamSyncService.SyncAchievementsForUserAsync(
                 user.Id,
                 user.SteamId,
