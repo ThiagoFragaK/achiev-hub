@@ -166,11 +166,15 @@ public class SteamGamesController : ApiControllerBase
 
         try
         {
-            await _steamSyncService.SyncLibraryAsync(userId, steamId, cancellationToken);
+            await _steamSyncService.SyncLibraryAsync(
+                userId,
+                steamId,
+                LibrarySyncScope.Full,
+                cancellationToken);
             await _steamSyncService.SyncAchievementsForUserAsync(
                 userId,
                 steamId,
-                AchievementSyncScope.RecentTwoWeeks,
+                AchievementSyncScope.AllOwnedWithStats,
                 cancellationToken);
             return Ok(new { success = true, message = "Library synced." });
         }

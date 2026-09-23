@@ -1,4 +1,5 @@
 <template>
+    <div v-if="error" class="alert alert-danger" role="alert">{{ error }}</div>
     <TableComponent
         :data="table.data"
         :columns="table.columns"
@@ -51,6 +52,7 @@ export default {
     data() {
         return {
             steamId: null,
+            error: '',
             table: {
                 data: [],
                 columns: [
@@ -96,6 +98,7 @@ export default {
             }
 
             this.table.isLoading = true;
+            this.error = '';
             try {
                 const result = await getLibrary(
                     this.steamId,
@@ -109,6 +112,7 @@ export default {
                 this.table.pagination.totalCount = result?.totalCount ?? 0
             } catch (err) {
                 this.table.data = []
+                this.error = err?.message || 'Failed to load library.'
             } finally {
                 this.table.isLoading = false;
             }
