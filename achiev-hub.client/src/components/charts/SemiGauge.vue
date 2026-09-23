@@ -3,15 +3,22 @@
         <p class="text-uppercase text-secondary small fw-medium mb-0">
             {{ label }}
         </p>
-        <div class="w-100" style="max-width: 320px">
-            <apexchart type="radialBar" height="260" :options="chartOptions" :series="series" />
+        <div
+            ref="chartWrapper"
+            class="w-100"
+            :style="{ height: wrapperHeight, maxWidth: '320px' }"
+        >
+            <apexchart type="radialBar" :height="chartHeight" :options="chartOptions" :series="series" />
         </div>
     </div>
 </template>
 
 <script>
+import { chartHeightMixin } from '@/utils/ChartHeightMixin'
+
 export default {
     name: 'SemiGauge',
+    mixins: [chartHeightMixin],
     props: {
         value: {
             type: Number,

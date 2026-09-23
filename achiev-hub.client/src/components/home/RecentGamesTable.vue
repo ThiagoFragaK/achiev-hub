@@ -1,5 +1,6 @@
 <template>
     <h2 v-if="!hideTitle" class="h5 mb-3">Recent Games</h2>
+    <div v-if="error" class="alert alert-danger" role="alert">{{ error }}</div>
     <TableComponent 
         :data="table.data" 
         :columns="table.columns" 
@@ -63,6 +64,7 @@ export default {
     data() {
         return {
             steamId: null,
+            error: '',
             table: {
                 isLoading: true,
                 data: [],
@@ -110,6 +112,7 @@ export default {
             }
 
             this.table.isLoading = true;
+            this.error = '';
             try {
                 const result = await getRecentGames(this.steamId);
                 this.table.data = result.data ?? [];

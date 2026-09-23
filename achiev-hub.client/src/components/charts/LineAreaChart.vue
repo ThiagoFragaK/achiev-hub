@@ -1,12 +1,15 @@
 <template>
-    <div class="w-100" :style="{ minHeight: `${height}px` }">
-        <apexchart type="area" :height="height" :options="chartOptions" :series="series" />
+    <div ref="chartWrapper" class="w-100" :style="{ height: wrapperHeight }">
+        <apexchart type="area" :height="chartHeight" :options="chartOptions" :series="series" />
     </div>
 </template>
 
 <script>
+import { chartHeightMixin } from '@/utils/ChartHeightMixin'
+
 export default {
     name: 'LineAreaChart',
+    mixins: [chartHeightMixin],
     props: {
         labels: {
             type: Array,
@@ -23,10 +26,6 @@ export default {
         max: {
             type: Number,
             default: undefined
-        },
-        height: {
-            type: Number,
-            default: 220
         }
     },
     computed: {

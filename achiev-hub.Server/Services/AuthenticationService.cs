@@ -52,7 +52,11 @@ public class AuthenticationService : IAuthenticationService
         {
             try
             {
-                await _steamSyncService.SyncLibraryAsync(user.Id, user.SteamId, cancellationToken);
+                await _steamSyncService.SyncLibraryAsync(
+                    user.Id,
+                    user.SteamId,
+                    LibrarySyncScope.Recent,
+                    cancellationToken);
                 await _steamSyncService.SyncAchievementsForUserAsync(
                     user.Id,
                     user.SteamId,
