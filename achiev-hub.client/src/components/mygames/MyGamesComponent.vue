@@ -41,7 +41,6 @@ export default {
     },
     data() {
         return {
-            steamId: null,
             filters: {
                 name: '',
                 minHours: '',

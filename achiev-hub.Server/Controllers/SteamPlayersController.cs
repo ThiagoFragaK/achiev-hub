@@ -2,13 +2,15 @@ using achiev_hub.Server.DTOs;
 using achiev_hub.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace achiev_hub.Server.Controllers;
 
 [Authorize]
+[EnableRateLimiting("steam")]
 [ApiController]
 [Route("api/steam/players")]
-public class SteamPlayersController : ControllerBase
+public class SteamPlayersController : ApiControllerBase
 {
     private readonly IPlayersService _playersService;
 
@@ -17,12 +19,12 @@ public class SteamPlayersController : ControllerBase
         _playersService = playersService;
     }
 
-    [HttpGet("{steamId}")]
-    public async Task<ActionResult<PlayerDto>> GetPlayer(string steamId, CancellationToken cancellationToken)
+    [HttpGet]
+    public async Task<ActionResult<PlayerDto>> GetPlayer(CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(steamId))
+        if (RequireSteamId(out var steamId) is { } error)
         {
-            return BadRequest("steamId is required.");
+            return error;
         }
 
         var player = await _playersService.GetPlayerAsync(steamId, cancellationToken);

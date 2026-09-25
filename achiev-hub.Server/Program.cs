@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 using achiev_hub.Server.Data;
 using achiev_hub.Server.Entities;
 using achiev_hub.Server.Options;
@@ -10,6 +11,7 @@ using achiev_hub.Server.Services;
 using achiev_hub.Server.Services.Interfaces;
 using achiev_hub.Server.Support;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -21,6 +23,24 @@ if (builder.Environment.IsDevelopment())
         "appsettings.Development.local.json",
         optional: true,
         reloadOnChange: true);
+}
+
+var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>() ?? new JwtSettings();
+var steamApiKey = builder.Configuration.GetSection(SteamApiOptions.SectionName).Get<SteamApiOptions>()?.ApiKey
+    ?? string.Empty;
+
+if (string.IsNullOrWhiteSpace(jwtSettings.Key) || jwtSettings.Key.Length < 32)
+{
+    throw new InvalidOperationException(
+        "Jwt:Key must be configured and at least 32 characters. " +
+        "Set it via user-secrets, environment variable Jwt__Key, or appsettings.Development.local.json.");
+}
+
+if (string.IsNullOrWhiteSpace(steamApiKey))
+{
+    throw new InvalidOperationException(
+        "SteamApi:ApiKey must be configured. " +
+        "Set it via user-secrets, environment variable SteamApi__ApiKey, or appsettings.Development.local.json.");
 }
 
 builder.Services.Configure<SteamApiOptions>(builder.Configuration.GetSection(SteamApiOptions.SectionName));
@@ -37,19 +57,39 @@ builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<IPlayersService, PlayersService>();
 builder.Services.AddScoped<IGamesService, GamesService>();
 builder.Services.AddScoped<ISteamSyncService, SteamSyncService>();
-builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IUserStatsService, UserStatsService>();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IRegistrationService, RegistrationService>();
 builder.Services.AddScoped<IEmailSender, SendGridEmailSender>();
-builder.Services.AddScoped<IGameService, GameService>();
-builder.Services.AddScoped<IAchievementService, AchievementService>();
-builder.Services.AddScoped<IGoalService, GoalService>();
-builder.Services.AddScoped<IUsersGameService, UsersGameService>();
-builder.Services.AddScoped<IUsersAchievementService, UsersAchievementService>();
-builder.Services.AddScoped<IGoalAchievementService, GoalAchievementService>();
 
-var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>() ?? new JwtSettings();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("auth", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+    options.AddPolicy("steam", httpContext =>
+    {
+        var userKey = httpContext.User.FindFirstValue("steam_id")
+            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            userKey,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            });
+    });
+});
+
 var key = Encoding.UTF8.GetBytes(jwtSettings.Key);
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -108,7 +148,7 @@ try
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await DbSeeder.SeedAsync(db);
+    await DbSeeder.SeedAsync(db, app.Environment);
 }
 catch (Exception ex) when (ex is Npgsql.NpgsqlException or InvalidOperationException)
 {
@@ -131,6 +171,7 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 

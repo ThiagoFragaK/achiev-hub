@@ -25,3 +25,10 @@ public class LoginResponseDto
     public string TokenType { get; set; } = "Bearer";
     public AuthUserDto User { get; set; } = null!;
 }
+
+public class RegisterResponseDto
+{
+    public int Id { get; set; }
+    public string Email { get; set; } = string.Empty;
+    public string? SteamId { get; set; }
+}

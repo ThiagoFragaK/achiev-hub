@@ -141,13 +141,12 @@ export default {
             }
         },
         async loadSteamProfileIfNeeded() {
-            const steamId = this.user?.steamId?.trim()
-            if (!steamId || (this.user.personaName && this.user.avatar)) {
+            if (!this.user?.steamId?.trim() || (this.user.personaName && this.user.avatar)) {
                 return
             }
 
             try {
-                const player = await getPlayer(steamId)
+                const player = await getPlayer()
                 mergeUser({
                     personaName: player?.personaName || this.user.personaName,
                     avatar: player?.avatar || this.user.avatar
