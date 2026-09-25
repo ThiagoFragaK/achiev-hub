@@ -44,10 +44,10 @@
 </template>
 
 <script>
-import { getSessionSteamId, steamAppIconUrl } from '@/lib/steam';
-import { getRecentGames } from '@/services/gamesService';
-import TableComponent from '@/components/global/TableComponent.vue';
-import ProgressComponent from '@/components/global/ProgressComponent.vue';
+import { steamAppIconUrl } from '@/lib/steam'
+import { getRecentGames } from '@/services/gamesService'
+import TableComponent from '@/components/global/TableComponent.vue'
+import ProgressComponent from '@/components/global/ProgressComponent.vue'
 
 export default {
     name: 'RecentGamesTable',
@@ -63,7 +63,6 @@ export default {
     },
     data() {
         return {
-            steamId: null,
             error: '',
             table: {
                 isLoading: true,
@@ -101,20 +100,11 @@ export default {
             }
             return percentage > 50 ? 'info' : 'danger';
         },
-        async setSteamId() {
-            this.steamId = await getSessionSteamId();
-        },
         async getUsersRecentGames() {
-            if (!this.steamId) {
-                this.error = 'Steam ID is missing from your session.'
-                this.table.data = []
-                return
-            }
-
             this.table.isLoading = true;
             this.error = '';
             try {
-                const result = await getRecentGames(this.steamId);
+                const result = await getRecentGames();
                 this.table.data = result.data ?? [];
             } catch (err) {
                 this.table.data = [];
@@ -125,7 +115,6 @@ export default {
         }
     },
     async created() {
-        await this.setSteamId();
         await this.getUsersRecentGames();
     }
 }

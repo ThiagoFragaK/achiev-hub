@@ -147,6 +147,8 @@ public class SteamSyncService : ISteamSyncService
                     game.HasCommunityVisibleStats = input.HasCommunityVisibleStats;
                 }
             }
+
+            await EnrichGameFromStoreIfNeededAsync(game, input.AppId, cancellationToken);
         }
 
         await _db.SaveChangesAsync(cancellationToken);
@@ -403,6 +405,58 @@ public class SteamSyncService : ISteamSyncService
             .Select(g => g.AppId)
             .Distinct()
             .ToList();
+    }
+
+    private async Task EnrichGameFromStoreIfNeededAsync(
+        Game game,
+        int appId,
+        CancellationToken cancellationToken)
+    {
+        var needsHeader = string.IsNullOrWhiteSpace(game.HeaderImageUrl);
+        var needsDevelopers = string.IsNullOrWhiteSpace(game.Developers);
+        var needsPublishers = string.IsNullOrWhiteSpace(game.Publishers);
+        if (!needsHeader && !needsDevelopers && !needsPublishers)
+        {
+            return;
+        }
+
+        try
+        {
+            var store = await _steamRepository.GetStoreGameDetailsAsync(appId, cancellationToken);
+            if (store is null)
+            {
+                _logger.LogWarning(
+                    "Store enrichment skipped for app {AppId}: appdetails returned null",
+                    appId);
+                return;
+            }
+
+            if (needsHeader && !string.IsNullOrWhiteSpace(store.HeaderImage))
+            {
+                game.HeaderImageUrl = store.HeaderImage;
+            }
+
+            if (needsDevelopers && store.Developers.Count > 0)
+            {
+                game.Developers = string.Join(", ", store.Developers.Where(s => !string.IsNullOrWhiteSpace(s)));
+            }
+
+            if (needsPublishers && store.Publishers.Count > 0)
+            {
+                game.Publishers = string.Join(", ", store.Publishers.Where(s => !string.IsNullOrWhiteSpace(s)));
+            }
+
+            var nameIsPlaceholder = string.IsNullOrWhiteSpace(game.Name)
+                || string.Equals(game.Name, game.GameSteamId, StringComparison.Ordinal);
+            if (nameIsPlaceholder && !string.IsNullOrWhiteSpace(store.Name))
+            {
+                game.Name = store.Name.Trim();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Store enrichment failed for app {AppId}", appId);
+        }
     }
 
     private sealed record SyncGameInput(

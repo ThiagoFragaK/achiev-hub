@@ -1,5 +1,4 @@
 using achiev_hub.Server.DTOs.Auth;
-using achiev_hub.Server.DTOs.Persistence;
 
 namespace achiev_hub.Server.Services.Interfaces;
 

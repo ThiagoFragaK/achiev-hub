@@ -1,14 +1,14 @@
-using System.Security.Claims;
 using achiev_hub.Server.DTOs;
 using achiev_hub.Server.Services;
 using achiev_hub.Server.Services.Interfaces;
-using achiev_hub.Server.Support;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace achiev_hub.Server.Controllers;
 
 [Authorize]
+[EnableRateLimiting("steam")]
 [ApiController]
 [Route("api/steam/games")]
 public class SteamGamesController : ApiControllerBase
@@ -24,14 +24,13 @@ public class SteamGamesController : ApiControllerBase
 
     [HttpGet("recent")]
     public async Task<ActionResult<PagedResultDto<RecentGameDto>>> GetRecentGames(
-        [FromQuery] string steamId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 7,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(steamId))
+        if (RequireSteamId(out var steamId) is { } error)
         {
-            return BadRequest("steamId is required.");
+            return error;
         }
 
         var result = await _gamesService.GetRecentGamesAsync(
@@ -44,7 +43,6 @@ public class SteamGamesController : ApiControllerBase
 
     [HttpGet]
     public async Task<ActionResult<PagedResultDto<LibraryGameDto>>> GetLibrary(
-        [FromQuery] string steamId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
         [FromQuery] string? name = null,
@@ -52,9 +50,9 @@ public class SteamGamesController : ApiControllerBase
         [FromQuery] bool? hasAchievements = null,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(steamId))
+        if (RequireSteamId(out var steamId) is { } error)
         {
-            return BadRequest("steamId is required.");
+            return error;
         }
 
         var filters = new LibraryGameFilterDto
@@ -77,23 +75,25 @@ public class SteamGamesController : ApiControllerBase
     [HttpGet("{appId:int}")]
     public async Task<ActionResult<GameDetailsDto>> GetGameDetails(int appId, CancellationToken cancellationToken)
     {
-        var details = await _gamesService.GetGameDetailsAsync(appId, cancellationToken);
+        var details = await _gamesService.GetGameDetailsAsync(
+            appId,
+            ResolveUserIdForDbReads(),
+            cancellationToken);
         return details is null ? NotFound() : Ok(details);
     }
 
     [HttpGet("{appId:int}/achievements")]
     public async Task<ActionResult<PagedResultDto<AchievementDto>>> GetAchievements(
         int appId,
-        [FromQuery] string steamId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
         [FromQuery] string? name = null,
         [FromQuery] string? status = null,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(steamId))
+        if (RequireSteamId(out var steamId) is { } error)
         {
-            return BadRequest("steamId is required.");
+            return error;
         }
 
         try
@@ -128,10 +128,9 @@ public class SteamGamesController : ApiControllerBase
             return Unauthorized(new { message = "Invalid token" });
         }
 
-        var steamId = User.FindFirstValue("steam_id");
-        if (string.IsNullOrWhiteSpace(steamId))
+        if (RequireSteamId(out var steamId) is { } error)
         {
-            return BadRequest(new { message = "Steam ID is missing from the token." });
+            return error;
         }
 
         try
@@ -158,10 +157,9 @@ public class SteamGamesController : ApiControllerBase
             return Unauthorized(new { message = "Invalid token" });
         }
 
-        var steamId = User.FindFirstValue("steam_id");
-        if (string.IsNullOrWhiteSpace(steamId))
+        if (RequireSteamId(out var steamId) is { } error)
         {
-            return BadRequest(new { message = "Steam ID is missing from the token." });
+            return error;
         }
 
         try

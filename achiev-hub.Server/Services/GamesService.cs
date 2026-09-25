@@ -53,7 +53,46 @@ public class GamesService : IGamesService
         return await GetLibraryFromSteamAsync(steamId, page, pageSize, filters, cancellationToken);
     }
 
-    public async Task<GameDetailsDto?> GetGameDetailsAsync(int appId, CancellationToken cancellationToken = default)
+    public async Task<GameDetailsDto?> GetGameDetailsAsync(
+        int appId,
+        int? userId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (appId <= 0)
+        {
+            return null;
+        }
+
+        if (userId is int)
+        {
+            return await GetGameDetailsFromDbAsync(appId, cancellationToken);
+        }
+
+        return await GetGameDetailsFromStoreAsync(appId, cancellationToken);
+    }
+
+    private async Task<GameDetailsDto?> GetGameDetailsFromDbAsync(int appId, CancellationToken cancellationToken)
+    {
+        var steamAppId = appId.ToString();
+        var game = await _db.Games
+            .AsNoTracking()
+            .FirstOrDefaultAsync(g => g.GameSteamId == steamAppId, cancellationToken);
+
+        if (game is null)
+        {
+            return null;
+        }
+
+        return new GameDetailsDto
+        {
+            GameName = game.Name,
+            GameImage = FirstNonEmpty(game.HeaderImageUrl, ResolveGameIconUrl(appId, game.ImageUrl)),
+            Developers = game.Developers ?? string.Empty,
+            Publishers = game.Publishers ?? string.Empty
+        };
+    }
+
+    private async Task<GameDetailsDto?> GetGameDetailsFromStoreAsync(int appId, CancellationToken cancellationToken)
     {
         var storeGame = await _steamRepository.GetStoreGameDetailsAsync(appId, cancellationToken);
         if (storeGame is null)
@@ -65,10 +104,29 @@ public class GamesService : IGamesService
         {
             GameName = storeGame.Name,
             GameImage = storeGame.HeaderImage,
-            Developers = string.Join(",", storeGame.Developers),
-            Publishers = string.Join(",", storeGame.Publishers)
+            Developers = string.Join(", ", storeGame.Developers.Where(s => !string.IsNullOrWhiteSpace(s))),
+            Publishers = string.Join(", ", storeGame.Publishers.Where(s => !string.IsNullOrWhiteSpace(s)))
         };
     }
+
+    private static string? ResolveGameIconUrl(int appId, string? imageUrlOrHash)
+    {
+        if (string.IsNullOrWhiteSpace(imageUrlOrHash))
+        {
+            return null;
+        }
+
+        if (imageUrlOrHash.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || imageUrlOrHash.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return imageUrlOrHash;
+        }
+
+        return $"https://media.steampowered.com/steamcommunity/public/images/apps/{appId}/{imageUrlOrHash}.jpg";
+    }
+
+    private static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
 
     public async Task<PagedResultDto<AchievementDto>> GetAchievementsAsync(
         string steamId,

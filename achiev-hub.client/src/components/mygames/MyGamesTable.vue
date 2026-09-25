@@ -34,9 +34,9 @@
     </TableComponent>
 </template>
 <script>
-import { getSessionSteamId, steamAppIconUrl } from '@/lib/steam'
-import { getLibrary } from '@/services/gamesService';
-import TableComponent from '@/components/global/TableComponent.vue';
+import { steamAppIconUrl } from '@/lib/steam'
+import { getLibrary } from '@/services/gamesService'
+import TableComponent from '@/components/global/TableComponent.vue'
 
 export default {
     name: 'MyGamesTable',
@@ -51,7 +51,6 @@ export default {
     },
     data() {
         return {
-            steamId: null,
             error: '',
             table: {
                 data: [],
@@ -83,25 +82,15 @@ export default {
         iconUrl(game) {
             return steamAppIconUrl(game.appId, game.icon)
         },
-        async setSteamId() {
-            this.steamId = await getSessionSteamId();
-        },
         async onPageChange(page) {
             this.table.pagination.currentPage = page
             await this.getUsersLibrary()
         },
         async getUsersLibrary() {
-            if (!this.steamId) {
-                this.error = 'Steam ID is missing from your session.'
-                this.table.data = []
-                return
-            }
-
             this.table.isLoading = true;
             this.error = '';
             try {
                 const result = await getLibrary(
-                    this.steamId,
                     this.table.pagination.currentPage,
                     this.table.pagination.perPage,
                     this.filters
@@ -119,7 +108,6 @@ export default {
         }
     },
     async created() {
-        await this.setSteamId();
         await this.getUsersLibrary()
     }
 }

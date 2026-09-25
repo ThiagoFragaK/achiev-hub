@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using achiev_hub.Server.DTOs.Auth;
-using achiev_hub.Server.DTOs.Persistence;
 using achiev_hub.Server.Entities;
 using achiev_hub.Server.Enums;
 using achiev_hub.Server.Repositories.Interfaces;
@@ -148,6 +147,11 @@ public class RegistrationService : IRegistrationService
                 422);
         }
 
+        if (!SteamIdValidator.IsValidSteamId64(steamId))
+        {
+            return AuthResult.Fail("Steam ID must be a 17-digit SteamID64", 422);
+        }
+
         if (!PasswordValidator.IsValid(request.Password, out var passwordError))
         {
             return AuthResult.Fail(passwordError, 422);
@@ -219,7 +223,7 @@ public class RegistrationService : IRegistrationService
             _logger.LogWarning(ex, "Initial library/achievement sync failed for user {UserId}", user.Id);
         }
 
-        return new UserDto
+        return new RegisterResponseDto
         {
             Id = user.Id,
             Email = user.Email,

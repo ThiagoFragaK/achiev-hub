@@ -5,6 +5,7 @@ using achiev_hub.Server.Services.Interfaces;
 using achiev_hub.Server.Support;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace achiev_hub.Server.Controllers;
 
@@ -20,12 +21,18 @@ public class AuthenticationController : ControllerBase
     }
 
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.SteamId) || string.IsNullOrWhiteSpace(request.Password))
         {
             return UnprocessableEntity(new { message = "Steam ID and password are required" });
+        }
+
+        if (!SteamIdValidator.IsValidSteamId64(request.SteamId))
+        {
+            return UnprocessableEntity(new { message = "Steam ID must be a 17-digit SteamID64" });
         }
 
         var response = await _service.LoginAsync(request.SteamId, request.Password, cancellationToken);
@@ -43,12 +50,18 @@ public class AuthenticationController : ControllerBase
     }
 
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     [HttpPost("guest")]
     public IActionResult ContinueAsGuest([FromBody] GuestRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.SteamId))
         {
             return UnprocessableEntity(new { message = "Steam ID is required" });
+        }
+
+        if (!SteamIdValidator.IsValidSteamId64(request.SteamId))
+        {
+            return UnprocessableEntity(new { message = "Steam ID must be a 17-digit SteamID64" });
         }
 
         var response = _service.ContinueAsGuest(request.SteamId);

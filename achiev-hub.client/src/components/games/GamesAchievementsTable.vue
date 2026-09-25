@@ -29,9 +29,8 @@
 </template>
 
 <script>
-import { getSessionSteamId } from '@/lib/steam';
-import { getAchievements as fetchAchievements } from '@/services/gamesService';
-import TableComponent from '@/components/global/TableComponent.vue';
+import { getAchievements as fetchAchievements } from '@/services/gamesService'
+import TableComponent from '@/components/global/TableComponent.vue'
 
 export default {
     name: 'GamesAchievementsTable',
@@ -83,15 +82,7 @@ export default {
             await this.getAchievements();
         },
         async getAchievements() {
-            const steamId = getSessionSteamId();
             const gameId = this.gameId;
-            if (!steamId) {
-                this.error = 'Steam ID is missing from your session.'
-                this.table.data = []
-                this.table.pagination.totalCount = 0
-                this.table.pagination.totalPages = 1
-                return
-            }
             if (!gameId) {
                 this.error = 'Game id is missing.'
                 return
@@ -101,7 +92,6 @@ export default {
             this.error = ''
             try {
                 const result = await fetchAchievements(
-                    steamId,
                     gameId,
                     this.table.pagination.currentPage,
                     this.table.pagination.perPage,

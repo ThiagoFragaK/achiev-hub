@@ -129,6 +129,10 @@ namespace achiev_hub.Server.Data.Migrations
                     b.Property<bool?>("HasCommunityVisibleStats")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("HeaderImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("ImageUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
