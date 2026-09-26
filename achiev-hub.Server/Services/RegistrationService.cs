@@ -4,7 +4,6 @@ using achiev_hub.Server.DTOs.Auth;
 using achiev_hub.Server.Entities;
 using achiev_hub.Server.Enums;
 using achiev_hub.Server.Repositories.Interfaces;
-using achiev_hub.Server.Services;
 using achiev_hub.Server.Services.Interfaces;
 using achiev_hub.Server.Support;
 
@@ -20,7 +19,8 @@ public class RegistrationService : IRegistrationService
     private readonly IRepository<EmailVerification> _verifications;
     private readonly IEmailSender _emailSender;
     private readonly IHostEnvironment _environment;
-    private readonly ISteamSyncService _steamSyncService;
+    private readonly ISteamRepository _steamRepository;
+    private readonly ISyncJobEnqueueService _syncJobEnqueueService;
     private readonly ILogger<RegistrationService> _logger;
 
     public RegistrationService(
@@ -28,19 +28,62 @@ public class RegistrationService : IRegistrationService
         IRepository<EmailVerification> verifications,
         IEmailSender emailSender,
         IHostEnvironment environment,
-        ISteamSyncService steamSyncService,
+        ISteamRepository steamRepository,
+        ISyncJobEnqueueService syncJobEnqueueService,
         ILogger<RegistrationService> logger)
     {
         _users = users;
         _verifications = verifications;
         _emailSender = emailSender;
         _environment = environment;
-        _steamSyncService = steamSyncService;
+        _steamRepository = steamRepository;
+        _syncJobEnqueueService = syncJobEnqueueService;
         _logger = logger;
     }
 
-    public async Task<object> SendVerificationAsync(string email, CancellationToken cancellationToken = default)
+    public async Task<object> ValidateSteamAsync(string steamId, CancellationToken cancellationToken = default)
     {
+        var normalized = NormalizeSteamId(steamId);
+        if (!SteamIdValidator.IsValidSteamId64(normalized))
+        {
+            return AuthResult.Fail("Steam ID must be a 17-digit SteamID64", 422);
+        }
+
+        if (await _users.AnyAsync(u => u.SteamId == normalized, cancellationToken))
+        {
+            return AuthResult.Fail("Steam ID is already registered", 409);
+        }
+
+        var player = await _steamRepository.GetPlayerBySteamIdAsync(normalized!, cancellationToken);
+        if (player is null || string.IsNullOrWhiteSpace(player.SteamId))
+        {
+            return AuthResult.Fail("Steam profile was not found. Check the Steam ID and profile visibility.", 404);
+        }
+
+        return new
+        {
+            success = true,
+            message = "Steam ID is valid",
+            data = new
+            {
+                steamId = player.SteamId,
+                personaName = player.PersonaName,
+                avatar = player.AvatarFull ?? player.Avatar
+            }
+        };
+    }
+
+    public async Task<object> SendVerificationAsync(
+        string email,
+        string steamId,
+        CancellationToken cancellationToken = default)
+    {
+        var steamValidation = await ValidateSteamAsync(steamId, cancellationToken);
+        if (AuthResult.IsError(steamValidation, out var steamError))
+        {
+            return steamError;
+        }
+
         var normalizedEmail = NormalizeEmail(email);
         if (string.IsNullOrWhiteSpace(normalizedEmail))
         {
@@ -147,9 +190,10 @@ public class RegistrationService : IRegistrationService
                 422);
         }
 
-        if (!SteamIdValidator.IsValidSteamId64(steamId))
+        var steamValidation = await ValidateSteamAsync(steamId, cancellationToken);
+        if (AuthResult.IsError(steamValidation, out var steamError))
         {
-            return AuthResult.Fail("Steam ID must be a 17-digit SteamID64", 422);
+            return steamError;
         }
 
         if (!PasswordValidator.IsValid(request.Password, out var passwordError))
@@ -160,11 +204,6 @@ public class RegistrationService : IRegistrationService
         if (await _users.AnyAsync(u => u.Email == normalizedEmail, cancellationToken))
         {
             return AuthResult.Fail("Email is already registered", 409);
-        }
-
-        if (await _users.AnyAsync(u => u.SteamId == steamId, cancellationToken))
-        {
-            return AuthResult.Fail("Steam ID is already registered", 409);
         }
 
         EmailVerification? verification = null;
@@ -192,7 +231,7 @@ public class RegistrationService : IRegistrationService
             SteamId = steamId,
             Password = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Role = "user",
-            Status = (int)StatusEnum.Active,
+            Status = (int)StatusEnum.Provisioning,
             IsEmailVerified = !bypassEmailVerification,
             TokenVersion = 0
         };
@@ -205,29 +244,25 @@ public class RegistrationService : IRegistrationService
 
         await _users.SaveChangesAsync(cancellationToken);
 
+        IReadOnlyList<int> jobIds = [];
         try
         {
-            await _steamSyncService.SyncLibraryAsync(
-                user.Id,
-                user.SteamId,
-                LibrarySyncScope.Full,
-                cancellationToken);
-            await _steamSyncService.SyncAchievementsForUserAsync(
-                user.Id,
-                user.SteamId,
-                AchievementSyncScope.AllOwnedWithStats,
-                cancellationToken);
+            jobIds = await _syncJobEnqueueService.EnqueueRegisterSyncAsync(user.Id, user.SteamId!, cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Initial library/achievement sync failed for user {UserId}", user.Id);
+            _logger.LogWarning(ex, "Failed to enqueue initial sync for user {UserId}", user.Id);
         }
 
         return new RegisterResponseDto
         {
             Id = user.Id,
             Email = user.Email,
-            SteamId = user.SteamId
+            SteamId = user.SteamId,
+            Status = user.Status,
+            StatusLabel = StatusEnum.Provisioning.ToString(),
+            JobIds = jobIds,
+            Message = "Registration successful. Preparing your library…"
         };
     }
 

@@ -12,7 +12,22 @@
 
             <hr class="mb-4 text-primary opacity-100" />
 
-            <form @submit.prevent>
+            <div v-if="preparing" class="text-center">
+                <div class="alert alert-info" role="status">
+                    <div class="fw-semibold mb-1">Preparing your library…</div>
+                    <div class="small">
+                        We’re importing your Steam games. You’ll be able to log in when this finishes.
+                    </div>
+                    <div v-if="prepareProgress" class="small mt-2 text-secondary">
+                        {{ prepareProgress }}
+                    </div>
+                </div>
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading…</span>
+                </div>
+            </div>
+
+            <form v-else @submit.prevent>
                 <div class="mb-3">
                     <label class="form-label fw-semibold" for="regSteamId">Steam ID</label>
                     <input
@@ -21,10 +36,13 @@
                         type="text"
                         class="form-control"
                         :class="{ 'is-invalid': fieldErrors.steamId }"
-                        :disabled="loading || fieldsLocked"
+                        :disabled="loading || fieldsLocked || steamValidated"
                         autocomplete="username"
                     />
                     <div v-if="fieldErrors.steamId" class="invalid-feedback d-block">Required</div>
+                    <div v-if="steamPersona" class="form-text text-success">
+                        Steam profile: {{ steamPersona }}
+                    </div>
                 </div>
 
                 <div class="mb-3">
@@ -35,7 +53,7 @@
                         type="email"
                         class="form-control"
                         :class="{ 'is-invalid': fieldErrors.email }"
-                        :disabled="loading || fieldsLocked"
+                        :disabled="loading || fieldsLocked || !steamValidated"
                         autocomplete="email"
                     />
                     <div v-if="fieldErrors.email" class="invalid-feedback d-block">Required</div>
@@ -50,13 +68,13 @@
                             :type="showPassword ? 'text' : 'password'"
                             class="form-control pe-5"
                             :class="{ 'is-invalid': fieldErrors.password }"
-                            :disabled="loading || fieldsLocked"
+                            :disabled="loading || fieldsLocked || !steamValidated"
                             autocomplete="new-password"
                         />
                         <button
                             type="button"
                             class="btn btn-link text-secondary position-absolute top-50 end-0 translate-middle-y px-3 py-0 border-0"
-                            :disabled="loading || fieldsLocked"
+                            :disabled="loading || fieldsLocked || !steamValidated"
                             :aria-label="showPassword ? 'Hide password' : 'Show password'"
                             :aria-pressed="showPassword"
                             @click="showPassword = !showPassword"
@@ -83,13 +101,13 @@
                             :type="showConfirmPassword ? 'text' : 'password'"
                             class="form-control pe-5"
                             :class="{ 'is-invalid': fieldErrors.confirmPassword }"
-                            :disabled="loading || fieldsLocked"
+                            :disabled="loading || fieldsLocked || !steamValidated"
                             autocomplete="new-password"
                         />
                         <button
                             type="button"
                             class="btn btn-link text-secondary position-absolute top-50 end-0 translate-middle-y px-3 py-0 border-0"
-                            :disabled="loading || fieldsLocked"
+                            :disabled="loading || fieldsLocked || !steamValidated"
                             :aria-label="
                                 showConfirmPassword
                                     ? 'Hide confirm password'
@@ -147,7 +165,17 @@
                     </button>
 
                     <button
-                        v-if="!bypassEmailVerification"
+                        v-if="!steamValidated"
+                        type="button"
+                        class="btn btn-primary"
+                        :disabled="loading"
+                        @click="onValidateSteam"
+                    >
+                        {{ loading ? 'Checking Steam…' : 'Validate Steam ID' }}
+                    </button>
+
+                    <button
+                        v-if="steamValidated && !bypassEmailVerification"
                         type="button"
                         class="btn btn-primary"
                         :disabled="
@@ -169,6 +197,7 @@
                     </button>
 
                     <button
+                        v-if="steamValidated"
                         type="button"
                         class="btn btn-success"
                         :disabled="loading || (!bypassEmailVerification && !emailVerified)"
@@ -183,7 +212,13 @@
 </template>
 
 <script>
-import { confirmCode, register, sendVerification } from '@/services/authService'
+import {
+    confirmCode,
+    getProvisioningStatus,
+    register,
+    sendVerification,
+    validateSteam
+} from '@/services/authService'
 import LucideIcon from '@/components/global/LucideIcon.vue'
 import { validatePassword } from '@/utils/PasswordHelper'
 
@@ -196,6 +231,8 @@ export default {
         return {
             bypassEmailVerification: import.meta.env.DEV,
             steamId: '',
+            steamValidated: false,
+            steamPersona: '',
             email: '',
             password: '',
             confirmPassword: '',
@@ -207,6 +244,9 @@ export default {
             emailVerifiedToken: '',
             cooldownSeconds: 0,
             cooldownTimer: null,
+            prepareTimer: null,
+            preparing: false,
+            prepareProgress: '',
             loading: false,
             formError: '',
             formSuccess: '',
@@ -225,12 +265,19 @@ export default {
     },
     beforeUnmount() {
         this.clearCooldown()
+        this.clearPrepareTimer()
     },
     methods: {
         clearCooldown() {
             if (this.cooldownTimer) {
                 clearInterval(this.cooldownTimer)
                 this.cooldownTimer = null
+            }
+        },
+        clearPrepareTimer() {
+            if (this.prepareTimer) {
+                clearInterval(this.prepareTimer)
+                this.prepareTimer = null
             }
         },
         startCooldown(seconds = 60) {
@@ -268,6 +315,26 @@ export default {
         onCancel() {
             this.$router.push({ name: 'login' })
         },
+        async onValidateSteam() {
+            this.formError = ''
+            this.formSuccess = ''
+            this.fieldErrors.steamId = !this.steamId.trim()
+            if (this.fieldErrors.steamId) return
+
+            this.loading = true
+            try {
+                const response = await validateSteam(this.steamId.trim())
+                this.steamValidated = true
+                this.steamPersona = response?.data?.personaName || ''
+                this.formSuccess = 'Steam ID looks good. Continue with email and password.'
+            } catch (error) {
+                this.steamValidated = false
+                this.steamPersona = ''
+                this.formError = error.body?.message || error.message || 'Steam validation failed'
+            } finally {
+                this.loading = false
+            }
+        },
         async onVerifyEmail() {
             this.formError = ''
             this.formSuccess = ''
@@ -280,13 +347,18 @@ export default {
             }
 
             if (this.cooldownSeconds > 0) return
+            if (!this.steamValidated) {
+                this.formError = 'Validate your Steam ID first.'
+                return
+            }
             if (!this.validateBaseFields()) return
 
             this.loading = true
             try {
-                await sendVerification(this.email.trim())
+                await sendVerification(this.email.trim(), this.steamId.trim())
                 this.codeSent = true
-                this.formSuccess = 'Verification code sent. Check your email, then enter the code and click Verify Email again.'
+                this.formSuccess =
+                    'Verification code sent. Check your email, then enter the code and confirm.'
                 this.startCooldown(60)
             } catch (error) {
                 this.formError = error.body?.message || error.message || 'Failed to send verification'
@@ -324,6 +396,10 @@ export default {
             }
         },
         async onRegister() {
+            if (!this.steamValidated) {
+                this.formError = 'Validate your Steam ID first.'
+                return
+            }
             if (!this.bypassEmailVerification && (!this.emailVerified || !this.emailVerifiedToken)) {
                 return
             }
@@ -341,12 +417,40 @@ export default {
                         ? ''
                         : this.emailVerifiedToken
                 })
-                this.$router.push({ name: 'login' })
+                this.preparing = true
+                this.formSuccess = ''
+                this.startProvisioningPoll()
             } catch (error) {
                 this.formError = error.body?.message || error.message || 'Registration failed'
             } finally {
                 this.loading = false
             }
+        },
+        startProvisioningPoll() {
+            this.clearPrepareTimer()
+            const poll = async () => {
+                try {
+                    const status = await getProvisioningStatus(this.steamId.trim())
+                    const synced = status?.syncedWithStats ?? 0
+                    const owned = status?.ownedWithStats ?? 0
+                    this.prepareProgress =
+                        owned > 0
+                            ? `Achievement coverage: ${synced} of ${owned} games`
+                            : 'Importing your Steam library…'
+
+                    if (status?.statusLabel === 'Active' || status?.isReady) {
+                        this.clearPrepareTimer()
+                        this.$router.push({
+                            name: 'login',
+                            query: { steamId: this.steamId.trim(), ready: '1' }
+                        })
+                    }
+                } catch {
+                    // Keep polling; worker may still be starting.
+                }
+            }
+            poll()
+            this.prepareTimer = setInterval(poll, 3000)
         }
     }
 }

@@ -29,17 +29,29 @@ public class UserStatsService : IUserStatsService
 
         var localDays = unlockDates.Select(ToLocalDate).ToList();
 
-        var averagePercentage = await _db.Users
+        var userStats = await _db.Users
             .AsNoTracking()
             .Where(u => u.Id == userId)
-            .Select(u => (decimal?)u.AvgPercentage)
+            .Select(u => new { u.AvgPercentage, u.AchievementSyncCoverage })
             .FirstOrDefaultAsync(cancellationToken);
+
+        var ownedWithStats = await _db.UsersGames.AsNoTracking()
+            .CountAsync(ug => ug.UserId == userId && ug.Game.HasCommunityVisibleStats == true, cancellationToken);
+        var syncedWithStats = await _db.UsersGames.AsNoTracking()
+            .CountAsync(
+                ug => ug.UserId == userId
+                    && ug.Game.HasCommunityVisibleStats == true
+                    && ug.AchievementsSyncedAt != null,
+                cancellationToken);
 
         return new UserStatsDto
         {
             AchievementsLast14Days = BuildLastDays(localDays),
             AchievementsPerYear = BuildPerYear(localDays),
-            AveragePercentage = averagePercentage ?? 0
+            AveragePercentage = userStats?.AvgPercentage ?? 0,
+            AchievementSyncCoverage = userStats?.AchievementSyncCoverage ?? 0,
+            OwnedWithStats = ownedWithStats,
+            SyncedWithStats = syncedWithStats
         };
     }
 
@@ -49,7 +61,10 @@ public class UserStatsService : IUserStatsService
         {
             AchievementsLast14Days = BuildLastDays([]),
             AchievementsPerYear = [],
-            AveragePercentage = 0
+            AveragePercentage = 0,
+            AchievementSyncCoverage = 0,
+            OwnedWithStats = 0,
+            SyncedWithStats = 0
         };
     }
 

@@ -49,6 +49,10 @@
                     />
                 </div>
 
+                <div v-if="readyMessage" class="alert alert-success py-2" role="status">
+                    {{ readyMessage }}
+                </div>
+
                 <div v-if="loginError" class="alert alert-danger py-2" role="alert">
                     {{ loginError }}
                 </div>
@@ -98,7 +102,16 @@ export default {
             password: '',
             steamIdError: false,
             loginError: '',
+            readyMessage: '',
             loading: false
+        }
+    },
+    created() {
+        if (typeof this.$route.query.steamId === 'string') {
+            this.steamId = this.$route.query.steamId
+        }
+        if (this.$route.query.ready === '1') {
+            this.readyMessage = 'Your library is ready. You can log in now.'
         }
     },
     methods: {
@@ -113,6 +126,7 @@ export default {
         async onLogin() {
             this.steamIdError = !this.steamId.trim()
             this.loginError = ''
+            this.readyMessage = ''
             if (this.steamIdError) return
 
             this.loading = true

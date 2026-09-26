@@ -51,6 +51,12 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasDefaultValue(0);
 
+        builder.Property(e => e.AchievementSyncCoverage)
+            .HasColumnName("achievement_sync_coverage")
+            .HasPrecision(5, 2)
+            .IsRequired()
+            .HasDefaultValue(0);
+
         builder.HasIndex(e => e.Email).IsUnique();
         builder.HasIndex(e => e.SteamId)
             .IsUnique()

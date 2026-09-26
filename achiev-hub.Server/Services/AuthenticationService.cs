@@ -2,7 +2,6 @@ using achiev_hub.Server.DTOs.Auth;
 using achiev_hub.Server.Entities;
 using achiev_hub.Server.Enums;
 using achiev_hub.Server.Repositories.Interfaces;
-using achiev_hub.Server.Services;
 using achiev_hub.Server.Services.Interfaces;
 using achiev_hub.Server.Support;
 
@@ -12,18 +11,18 @@ public class AuthenticationService : IAuthenticationService
 {
     private readonly IRepository<User> _users;
     private readonly JwtTokenService _jwtTokenService;
-    private readonly ISteamSyncService _steamSyncService;
+    private readonly ISyncJobEnqueueService _syncJobEnqueueService;
     private readonly ILogger<AuthenticationService> _logger;
 
     public AuthenticationService(
         IRepository<User> users,
         JwtTokenService jwtTokenService,
-        ISteamSyncService steamSyncService,
+        ISyncJobEnqueueService syncJobEnqueueService,
         ILogger<AuthenticationService> logger)
     {
         _users = users;
         _jwtTokenService = jwtTokenService;
-        _steamSyncService = steamSyncService;
+        _syncJobEnqueueService = syncJobEnqueueService;
         _logger = logger;
     }
 
@@ -45,6 +44,13 @@ public class AuthenticationService : IAuthenticationService
             return AuthResult.Fail("Account is inactive", 403);
         }
 
+        if (user.Status == (int)StatusEnum.Provisioning)
+        {
+            return AuthResult.Fail(
+                "Account is still preparing your Steam library. Please wait a moment and try again.",
+                403);
+        }
+
         user.LastLogin = DateTime.UtcNow;
         await _users.SaveChangesAsync(cancellationToken);
 
@@ -52,20 +58,11 @@ public class AuthenticationService : IAuthenticationService
         {
             try
             {
-                await _steamSyncService.SyncLibraryAsync(
-                    user.Id,
-                    user.SteamId,
-                    LibrarySyncScope.Recent,
-                    cancellationToken);
-                await _steamSyncService.SyncAchievementsForUserAsync(
-                    user.Id,
-                    user.SteamId,
-                    AchievementSyncScope.RecentTwoWeeks,
-                    cancellationToken);
+                await _syncJobEnqueueService.EnqueueLoginSyncAsync(user.Id, user.SteamId, cancellationToken);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Library sync failed after login for user {UserId}", user.Id);
+                _logger.LogWarning(ex, "Failed to enqueue login sync for user {UserId}", user.Id);
             }
         }
 

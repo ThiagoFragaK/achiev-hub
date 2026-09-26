@@ -3,6 +3,7 @@ namespace achiev_hub.Server.DTOs.Auth;
 public class SendVerificationRequest
 {
     public string Email { get; set; } = string.Empty;
+    public string SteamId { get; set; } = string.Empty;
 }
 
 public class ConfirmCodeRequest
@@ -14,6 +15,11 @@ public class ConfirmCodeRequest
 public class ConfirmCodeResponseDto
 {
     public string EmailVerifiedToken { get; set; } = string.Empty;
+}
+
+public class ValidateSteamRequest
+{
+    public string SteamId { get; set; } = string.Empty;
 }
 
 public class RegisterRequest
