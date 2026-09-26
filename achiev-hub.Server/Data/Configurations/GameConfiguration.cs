@@ -32,6 +32,8 @@ public class GameConfiguration : IEntityTypeConfiguration<Game>
 
         builder.Property(e => e.HasCommunityVisibleStats);
 
+        builder.Property(e => e.SchemaSyncedAt);
+
         builder.HasIndex(e => e.GameSteamId)
             .IsUnique()
             .HasFilter("\"GameSteamId\" IS NOT NULL");

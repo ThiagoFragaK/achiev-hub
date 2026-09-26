@@ -18,6 +18,13 @@ public class UsersGameConfiguration : IEntityTypeConfiguration<UsersGame>
         builder.Property(e => e.PlaytimeMinutes)
             .HasDefaultValue(0);
 
+        builder.Property(e => e.NeedsAchievementRefresh)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(e => e.AchievementsSyncedAt);
+
         builder.HasIndex(e => new { e.UserId, e.GameId }).IsUnique();
+        builder.HasIndex(e => new { e.UserId, e.NeedsAchievementRefresh });
     }
 }

@@ -14,6 +14,7 @@
             <div class="col-12 col-lg-3">
                 <UsersAverageSemiGauge
                     :value="averagePercentage"
+                    :label="averageLabel"
                     :height="chartHeight"
                 />
             </div>
@@ -83,7 +84,8 @@ export default {
             achievementsCounts: [],
             perYearLabels: [],
             perYearCounts: [],
-            averagePercentage: 0
+            averagePercentage: 0,
+            averageLabel: 'Completion average'
         }
     },
     computed: {
@@ -128,6 +130,12 @@ export default {
                 this.perYearLabels = years.map((year) => String(year.year))
                 this.perYearCounts = years.map((year) => year.count)
                 this.averagePercentage = Math.round(stats?.averagePercentage ?? 0)
+                const synced = stats?.syncedWithStats ?? 0
+                const owned = stats?.ownedWithStats ?? 0
+                this.averageLabel =
+                    owned > 0
+                        ? `Avg · ${synced}/${owned} games`
+                        : 'Completion average'
             } catch (err) {
                 this.statsError = err?.message || 'Failed to load your statistics.'
             }
@@ -137,8 +145,9 @@ export default {
             this.syncError = ''
             try {
                 await syncLibrary()
+                // Sync is queued; banner in AppShell shows progress. Refresh soon.
                 this.recentGamesKey++
-                await this.getStats()
+                setTimeout(() => this.getStats(), 4000)
             } catch (err) {
                 this.syncError = err?.message || 'Failed to sync library.'
             } finally {

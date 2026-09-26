@@ -10,5 +10,8 @@
   },
   "SteamApi": {
     "ApiKey": "YOUR_STEAM_API_KEY"
+  },
+  "SyncWorker": {
+    "AppRole": "All"
   }
 }

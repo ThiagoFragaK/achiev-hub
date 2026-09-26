@@ -25,11 +25,28 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_HTTP_PORTS: "8080"
+      SyncWorker__AppRole: Api
       ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=achievhub;Username=postgres;Password=${POSTGRES_PASSWORD:-postgres};SSL Mode=Disable"
       Jwt__Key: ${JWT_KEY}
       Jwt__Issuer: "achiev-hub.Server"
       Jwt__Audience: "achiev-hub.Client"
       Jwt__ExpiryMinutes: "30"
+      SteamApi__ApiKey: ${STEAM_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: achiev-hub.Server/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      SyncWorker__AppRole: Worker
+      SyncWorker__NightlyCron: "0 0 * * *"
+      ConnectionStrings__DefaultConnection: "Host=postgres;Port=5432;Database=achievhub;Username=postgres;Password=${POSTGRES_PASSWORD:-postgres};SSL Mode=Disable"
+      Jwt__Key: ${JWT_KEY}
       SteamApi__ApiKey: ${STEAM_API_KEY}
     depends_on:
       postgres:
