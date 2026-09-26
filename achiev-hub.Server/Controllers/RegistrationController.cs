@@ -1,13 +1,16 @@
 using achiev_hub.Server.DTOs.Auth;
 using achiev_hub.Server.Services;
 using achiev_hub.Server.Services.Interfaces;
+using achiev_hub.Server.Support;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace achiev_hub.Server.Controllers;
 
 [ApiController]
 [AllowAnonymous]
+[EnableRateLimiting("auth")]
 [Route("api/register")]
 public class RegistrationController : ControllerBase
 {
@@ -63,6 +66,11 @@ public class RegistrationController : ControllerBase
         [FromBody] RegisterRequest request,
         CancellationToken cancellationToken)
     {
+        if (!SteamIdValidator.IsValidSteamId64(request.SteamId))
+        {
+            return UnprocessableEntity(new { message = "Steam ID must be a 17-digit SteamID64" });
+        }
+
         var result = await _service.RegisterAsync(request, cancellationToken);
         if (AuthResult.IsError(result, out var error))
         {

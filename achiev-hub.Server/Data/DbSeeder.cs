@@ -8,9 +8,14 @@ public static class DbSeeder
 {
     public const string SeedPassword = "achiev456";
 
-    public static async Task SeedAsync(ApplicationDbContext db)
+    public static async Task SeedAsync(ApplicationDbContext db, IHostEnvironment environment)
     {
         await db.Database.MigrateAsync();
+
+        if (!environment.IsDevelopment())
+        {
+            return;
+        }
 
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(SeedPassword);
         var seedUsers = new[]
@@ -21,31 +26,23 @@ public static class DbSeeder
 
         foreach (var seed in seedUsers)
         {
-            var user = await db.Users.FirstOrDefaultAsync(u =>
+            var exists = await db.Users.AnyAsync(u =>
                 u.Email == seed.Email || u.SteamId == seed.SteamId);
+            if (exists)
+            {
+                continue;
+            }
 
-            if (user is null)
+            db.Users.Add(new User
             {
-                db.Users.Add(new User
-                {
-                    Email = seed.Email,
-                    SteamId = seed.SteamId,
-                    Password = passwordHash,
-                    Role = seed.Role,
-                    Status = (int)StatusEnum.Active,
-                    IsEmailVerified = true,
-                    TokenVersion = 0
-                });
-            }
-            else
-            {
-                user.Email = seed.Email;
-                user.SteamId = seed.SteamId;
-                user.Role = seed.Role;
-                user.Status = (int)StatusEnum.Active;
-                user.IsEmailVerified = true;
-                user.Password = passwordHash;
-            }
+                Email = seed.Email,
+                SteamId = seed.SteamId,
+                Password = passwordHash,
+                Role = seed.Role,
+                Status = (int)StatusEnum.Active,
+                IsEmailVerified = true,
+                TokenVersion = 0
+            });
         }
 
         await db.SaveChangesAsync();

@@ -38,4 +38,21 @@ public abstract class ApiControllerBase : ControllerBase
     {
         return IsGuest() ? null : ResolveUserId();
     }
+
+    protected string? ResolveSteamId()
+    {
+        var steamId = User.FindFirstValue("steam_id");
+        return string.IsNullOrWhiteSpace(steamId) ? null : steamId.Trim();
+    }
+
+    protected ActionResult? RequireSteamId(out string steamId)
+    {
+        steamId = ResolveSteamId() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(steamId))
+        {
+            return BadRequest(new { message = "Steam ID is missing from the token." });
+        }
+
+        return null;
+    }
 }

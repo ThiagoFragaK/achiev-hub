@@ -19,7 +19,10 @@ public interface IGamesService
         LibraryGameFilterDto? filters = null,
         CancellationToken cancellationToken = default);
 
-    Task<GameDetailsDto?> GetGameDetailsAsync(int appId, CancellationToken cancellationToken = default);
+    Task<GameDetailsDto?> GetGameDetailsAsync(
+        int appId,
+        int? userId = null,
+        CancellationToken cancellationToken = default);
 
     Task<PagedResultDto<AchievementDto>> GetAchievementsAsync(
         string steamId,

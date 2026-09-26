@@ -1,12 +1,11 @@
 import { getJson, postJson, toQuery } from './http'
 
-export function getRecentGames(steamId, page = 1, pageSize = 7) {
-    return getJson(`/api/steam/games/recent${toQuery({ steamId, page, pageSize })}`)
+export function getRecentGames(page = 1, pageSize = 7) {
+    return getJson(`/api/steam/games/recent${toQuery({ page, pageSize })}`)
 }
 
-export function getLibrary(steamId, page = 1, pageSize = 15, filters = {}) {
+export function getLibrary(page = 1, pageSize = 15, filters = {}) {
     return getJson(`/api/steam/games${toQuery({
-        steamId,
         page,
         pageSize,
         name: filters.name,
@@ -19,10 +18,9 @@ export function getGameDetails(appId) {
     return getJson(`/api/steam/games/${encodeURIComponent(String(appId))}`)
 }
 
-export function getAchievements(steamId, appId, page = 1, pageSize = 7, filters = {}) {
+export function getAchievements(appId, page = 1, pageSize = 7, filters = {}) {
     return getJson(
         `/api/steam/games/${encodeURIComponent(String(appId))}/achievements${toQuery({
-            steamId,
             page,
             pageSize,
             name: filters.name,

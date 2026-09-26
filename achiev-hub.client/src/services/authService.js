@@ -3,13 +3,12 @@ import { clearSession, getUser, setSession } from '@/lib/session'
 import { getPlayer } from '@/services/playersService'
 
 async function attachSteamProfile(user) {
-    const steamId = user?.steamId?.trim()
-    if (!steamId) {
+    if (!user?.steamId?.trim()) {
         return user
     }
 
     try {
-        const player = await getPlayer(steamId)
+        const player = await getPlayer()
         return {
             ...user,
             personaName: player?.personaName || user.personaName,
