@@ -101,8 +101,11 @@ Steam (identity from JWT `steam_id`):
 | `GET` | `/api/steam/games/recent` | Recently played (paged) |
 | `GET` | `/api/steam/games/{appId}` | Store / game details |
 | `GET` | `/api/steam/games/{appId}/achievements` | Schema + player unlocks (paged) |
-| `POST` | `/api/steam/games/sync` | Sync full library (registered users) |
-| `POST` | `/api/steam/games/{appId}/sync-achievements` | Sync achievements for one game |
+| `POST` | `/api/steam/games/sync` | Enqueue full library sync (**202**) |
+| `POST` | `/api/steam/games/{appId}/sync-achievements` | Enqueue per-game achievement sync (**202**) |
+| `GET` | `/api/steam/sync/status` | Sync jobs, avg %, coverage, updating flag |
+| `POST` | `/api/register/validate-steam` | Validate Steam ID before OTP |
+| `GET` | `/api/register/status?steamId=` | Provisioning readiness (anonymous) |
 
 Stats:
 
@@ -123,7 +126,15 @@ Server layout in short: `Controllers` → `Services` → `Repositories` / `Appli
 
 ## Docker
 
-`achiev-hub.Server/Dockerfile` builds the API (and the SPA as part of publish). Use Compose to run Postgres and the API together.
+`achiev-hub.Server/Dockerfile` builds one image used for both API and worker. Role is selected with `SyncWorker__AppRole`:
+
+| Value | Behavior |
+| --- | --- |
+| `Api` | HTTP API only (enqueues sync jobs) |
+| `Worker` | Background job processor + nightly maintenance; `/health` only |
+| `All` | API + worker in one process (**Railway default**) |
+
+Compose runs `postgres`, `api` (`AppRole=Api`), and `worker` (`AppRole=Worker`).
 
 1. Copy the env template and set secrets:
 
@@ -144,10 +155,15 @@ Server layout in short: `Controllers` → `Services` → `Repositories` / `Appli
    ```
 
 - App: `http://localhost:8080` (`ASPNETCORE_ENVIRONMENT=Production`)
+- Worker: same image, processes `sync_jobs` (no public UI port required)
 - Postgres: `localhost:6110` (user/db: `postgres` / `achievhub`; password from `POSTGRES_PASSWORD`)
 
-EF Core migrations run automatically on API startup. Seed users are Development-only and are not created under Compose Production. For local development without the API container, you can run only the database:
+EF Core migrations run automatically on startup. Seed users are Development-only and are not created under Compose Production. For local development without the API container, you can run only the database:
 
 ```bash
 docker compose up postgres
 ```
+
+### Railway
+
+Deploy **one** service with `SyncWorker__AppRole=All` (API + worker in-process) plus your Postgres plugin and `SteamApi__ApiKey` / `Jwt__Key`. To scale later, add a second service with the same image and `SyncWorker__AppRole=Worker`, and set the web service to `Api`.

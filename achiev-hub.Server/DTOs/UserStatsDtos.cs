@@ -5,6 +5,9 @@ public class UserStatsDto
     public IReadOnlyList<DailyAchievementCountDto> AchievementsLast14Days { get; set; } = [];
     public IReadOnlyList<YearlyAchievementCountDto> AchievementsPerYear { get; set; } = [];
     public decimal AveragePercentage { get; set; }
+    public decimal AchievementSyncCoverage { get; set; }
+    public int OwnedWithStats { get; set; }
+    public int SyncedWithStats { get; set; }
 }
 
 public class DailyAchievementCountDto

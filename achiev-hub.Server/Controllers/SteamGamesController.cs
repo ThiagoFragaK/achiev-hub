@@ -1,5 +1,5 @@
 using achiev_hub.Server.DTOs;
-using achiev_hub.Server.Services;
+using achiev_hub.Server.Enums;
 using achiev_hub.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,12 +14,12 @@ namespace achiev_hub.Server.Controllers;
 public class SteamGamesController : ApiControllerBase
 {
     private readonly IGamesService _gamesService;
-    private readonly ISteamSyncService _steamSyncService;
+    private readonly ISyncJobEnqueueService _enqueueService;
 
-    public SteamGamesController(IGamesService gamesService, ISteamSyncService steamSyncService)
+    public SteamGamesController(IGamesService gamesService, ISyncJobEnqueueService enqueueService)
     {
         _gamesService = gamesService;
-        _steamSyncService = steamSyncService;
+        _enqueueService = enqueueService;
     }
 
     [HttpGet("recent")]
@@ -116,7 +116,9 @@ public class SteamGamesController : ApiControllerBase
     }
 
     [HttpPost("{appId:int}/sync-achievements")]
-    public async Task<IActionResult> SyncGameAchievements(int appId, CancellationToken cancellationToken)
+    public async Task<ActionResult<EnqueueSyncResponseDto>> SyncGameAchievements(
+        int appId,
+        CancellationToken cancellationToken)
     {
         if (IsGuest())
         {
@@ -133,19 +135,22 @@ public class SteamGamesController : ApiControllerBase
             return error;
         }
 
-        try
+        var jobId = await _enqueueService.EnqueueAsync(
+            SyncJobType.AchievementGame,
+            userId,
+            steamId,
+            appId,
+            cancellationToken);
+
+        return Accepted(new EnqueueSyncResponseDto
         {
-            await _steamSyncService.SyncGameAchievementsAsync(userId, steamId, appId, cancellationToken);
-            return Ok(new { success = true, message = "Achievements synced." });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = ex.Message });
-        }
+            Message = "Achievement sync enqueued.",
+            JobIds = [jobId]
+        });
     }
 
     [HttpPost("sync")]
-    public async Task<IActionResult> SyncLibrary(CancellationToken cancellationToken)
+    public async Task<ActionResult<EnqueueSyncResponseDto>> SyncLibrary(CancellationToken cancellationToken)
     {
         if (IsGuest())
         {
@@ -162,23 +167,11 @@ public class SteamGamesController : ApiControllerBase
             return error;
         }
 
-        try
+        var jobIds = await _enqueueService.EnqueueManualLibrarySyncAsync(userId, steamId, cancellationToken);
+        return Accepted(new EnqueueSyncResponseDto
         {
-            await _steamSyncService.SyncLibraryAsync(
-                userId,
-                steamId,
-                LibrarySyncScope.Full,
-                cancellationToken);
-            await _steamSyncService.SyncAchievementsForUserAsync(
-                userId,
-                steamId,
-                AchievementSyncScope.AllOwnedWithStats,
-                cancellationToken);
-            return Ok(new { success = true, message = "Library synced." });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = ex.Message });
-        }
+            Message = "Library sync enqueued.",
+            JobIds = jobIds
+        });
     }
 }

@@ -31,4 +31,8 @@ public class RegisterResponseDto
     public int Id { get; set; }
     public string Email { get; set; } = string.Empty;
     public string? SteamId { get; set; }
+    public int Status { get; set; }
+    public string StatusLabel { get; set; } = string.Empty;
+    public IReadOnlyList<int> JobIds { get; set; } = [];
+    public string Message { get; set; } = "Registration successful. Preparing your library…";
 }
