@@ -253,7 +253,7 @@ public class RegistrationService : IRegistrationService
 
         await _users.SaveChangesAsync(cancellationToken);
 
-        IReadOnlyList<int> jobIds = [];
+        IReadOnlyList<Guid> jobIds = [];
         string message;
         if (isLibraryPublic)
         {

@@ -2,15 +2,17 @@
 
 Track Steam games and achievements, store a personal library, and set completion goals.
 
-The backend talks to the Steam Web API and persists users, games, achievements, and goals in PostgreSQL. The Vue client is a SPA served through the ASP.NET Core host.
+The backend talks to the Steam Web API and persists users, games, achievements, and goals in PostgreSQL. The Vue client is a SPA served through the ASP.NET Core host. Heavy Steam sync runs in the separate **steam-sync** microservice via RabbitMQ.
 
 ## Stack
 
 | Layer | Tech |
 | --- | --- |
 | API | ASP.NET Core 10 |
+| Sync worker | steam-sync (.NET 10 + MassTransit) |
 | UI | Vue 3 + Vite |
 | Database | PostgreSQL + EF Core |
+| Queue | RabbitMQ |
 | Steam | Web API + Store app details |
 
 ## Prerequisites
@@ -18,6 +20,7 @@ The backend talks to the Steam Web API and persists users, games, achievements, 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - [Node.js](https://nodejs.org/) 20.19+ or 22.12+
 - PostgreSQL (default local database name: `achievhub`)
+- RabbitMQ (for sync job publishing)
 - A [Steam Web API key](https://steamcommunity.com/dev/apikey)
 
 ## Setup
@@ -29,7 +32,7 @@ The backend talks to the Steam Web API and persists users, games, achievements, 
    npm install
    ```
 
-2. Ensure PostgreSQL is running (or `docker compose up postgres`). Migrations and seed users apply automatically when the API starts. To apply migrations manually from `achiev-hub.Server`:
+2. Ensure PostgreSQL is running (or `docker compose up postgres rabbitmq`). Migrations and seed users apply automatically when the API starts. To apply migrations manually from `achiev-hub.Server`:
 
    ```bash
    cd achiev-hub.Server
@@ -77,7 +80,7 @@ Protected APIs require `Authorization: Bearer <token>`. Steam library/profile re
 
 ## Run
 
-From Visual Studio, start the **achiev-hub.Server** project (HTTPS profile). The SPA proxy starts Vite automatically.
+From Visual Studio, start the **achiev-hub.Server** project (HTTPS profile). The SPA proxy starts Vite automatically. Also run **steam-sync** worker so queued jobs process.
 
 From the CLI:
 
@@ -101,9 +104,10 @@ Steam (identity from JWT `steam_id`):
 | `GET` | `/api/steam/games/recent` | Recently played (paged) |
 | `GET` | `/api/steam/games/{appId}` | Store / game details |
 | `GET` | `/api/steam/games/{appId}/achievements` | Schema + player unlocks (paged) |
-| `POST` | `/api/steam/games/sync` | Enqueue full library sync (**202**) |
-| `POST` | `/api/steam/games/{appId}/sync-achievements` | Enqueue per-game achievement sync (**202**) |
-| `GET` | `/api/steam/sync/status` | Sync jobs, avg %, coverage, updating flag |
+| `POST` | `/api/steam/games/sync` | Publish full library sync to RabbitMQ (**202**) |
+| `POST` | `/api/steam/games/{appId}/sync-achievements` | Publish per-game achievement sync (**202**) |
+| `GET` | `/api/steam/sync/status` | Sync progress, avg %, coverage, updating flag |
+| `GET` | `/api/users/{id}/sync-status` | Dedicated sync status DTO (`user_sync_status`) |
 | `POST` | `/api/register/validate-steam` | Validate Steam ID before OTP |
 | `GET` | `/api/register/status?steamId=` | Provisioning readiness (anonymous) |
 
@@ -117,24 +121,17 @@ Stats:
 ## Project layout
 
 ```
-achiev-hub.Server/     ASP.NET Core API, EF Core, Steam integration
+achiev-hub.Server/     ASP.NET Core API, EF Core, Steam reads + sync enqueue
 achiev-hub.client/     Vue 3 + Vite SPA
+../steam-sync/         Sync worker (MassTransit consumer)
 achiev-hub.slnx        Solution
 ```
 
-Server layout in short: `Controllers` → `Services` → `Repositories` / `ApplicationDbContext`. Steam HTTP calls live in `SteamRepository`. Domain types are in `Entities`.
+Server layout in short: `Controllers` → `Services` → `Repositories` / `ApplicationDbContext`. Live Steam HTTP for guests/validation stays in `SteamRepository`. Bulk sync lives in steam-sync.
 
 ## Docker
 
-`achiev-hub.Server/Dockerfile` builds one image used for both API and worker. Role is selected with `SyncWorker__AppRole`:
-
-| Value | Behavior |
-| --- | --- |
-| `Api` | HTTP API only (enqueues sync jobs) |
-| `Worker` | Background job processor + nightly maintenance; `/health` only |
-| `All` | API + worker in one process (**Railway default**) |
-
-Compose runs `postgres`, `api` (`AppRole=Api`), and `worker` (`AppRole=Worker`).
+Compose runs `postgres`, `rabbitmq`, `api`, and `steam-sync-worker` (2 replicas). Sync jobs go to RabbitMQ (`steam_sync_jobs`). Build context is the parent `MyApps` folder (API references `SteamSync.Shared`).
 
 1. Copy the env template and set secrets:
 
@@ -148,22 +145,22 @@ Compose runs `postgres`, `api` (`AppRole=Api`), and `worker` (`AppRole=Worker`).
    - `JWT_KEY` — signing key, at least 32 characters
    - `POSTGRES_PASSWORD` — Postgres password (defaults to `postgres` if omitted)
 
-2. Start the stack:
+2. Start the stack (from `achiev-hub`):
 
    ```bash
    docker compose up --build
    ```
 
-- App: `http://localhost:8080` (`ASPNETCORE_ENVIRONMENT=Production`)
-- Worker: same image, processes `sync_jobs` (no public UI port required)
-- Postgres: `localhost:6110` (user/db: `postgres` / `achievhub`; password from `POSTGRES_PASSWORD`)
+- App: `http://localhost:8080`
+- RabbitMQ Management UI: `http://localhost:15672` (guest/guest)
+- Postgres: `localhost:6110`
 
-EF Core migrations run automatically on startup. Seed users are Development-only and are not created under Compose Production. For local development without the API container, you can run only the database:
+EF Core migrations run automatically on startup. Seed users are Development-only and are not created under Compose Production.
 
 ```bash
-docker compose up postgres
+docker compose up postgres rabbitmq
 ```
 
 ### Railway
 
-Deploy **one** service with `SyncWorker__AppRole=All` (API + worker in-process) plus your Postgres plugin and `SteamApi__ApiKey` / `Jwt__Key`. To scale later, add a second service with the same image and `SyncWorker__AppRole=Worker`, and set the web service to `Api`.
+Deploy the **API** plus a separate **steam-sync** worker, Postgres, and RabbitMQ. Configure `RabbitMQ__*`, connection strings, `SteamApi__ApiKey`, and `Jwt__Key`. See [steam-sync/README.md](../steam-sync/README.md).
