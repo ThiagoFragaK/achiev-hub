@@ -45,7 +45,7 @@ public class GamesService : IGamesService
         LibraryGameFilterDto? filters = null,
         CancellationToken cancellationToken = default)
     {
-        if (userId is int authUserId)
+        if (userId is int authUserId && await IsSteamLibraryPublicAsync(authUserId, cancellationToken))
         {
             return await GetLibraryFromDbAsync(authUserId, page, pageSize, filters, cancellationToken);
         }
@@ -63,7 +63,7 @@ public class GamesService : IGamesService
             return null;
         }
 
-        if (userId is int)
+        if (userId is int authUserId && await IsSteamLibraryPublicAsync(authUserId, cancellationToken))
         {
             return await GetGameDetailsFromDbAsync(appId, cancellationToken);
         }
@@ -128,6 +128,14 @@ public class GamesService : IGamesService
     private static string? FirstNonEmpty(params string?[] values) =>
         values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
 
+    private async Task<bool> IsSteamLibraryPublicAsync(int userId, CancellationToken cancellationToken)
+    {
+        return await _db.Users.AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.SteamLibraryPublic)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<PagedResultDto<AchievementDto>> GetAchievementsAsync(
         string steamId,
         int appId,
@@ -138,7 +146,7 @@ public class GamesService : IGamesService
         int? userId = null,
         CancellationToken cancellationToken = default)
     {
-        if (userId is int authUserId)
+        if (userId is int authUserId && await IsSteamLibraryPublicAsync(authUserId, cancellationToken))
         {
             return await GetAchievementsFromDbAsync(authUserId, appId, page, pageSize, name, status, cancellationToken);
         }

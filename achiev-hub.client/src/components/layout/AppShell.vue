@@ -2,7 +2,15 @@
     <div class="min-vh-100">
         <AppHeader />
         <div
-            v-if="showSyncBanner"
+            v-if="showPrivateBanner"
+            class="alert alert-warning border-0 rounded-0 mb-0 py-2 text-center"
+            role="status"
+        >
+            Your Steam profile is private, so we can’t sync your library.
+            Make game details public on Steam, then sync or log in again.
+        </div>
+        <div
+            v-else-if="showSyncBanner"
             class="alert alert-info border-0 rounded-0 mb-0 py-2 text-center"
             role="status"
         >
@@ -29,14 +37,19 @@ export default {
     data() {
         return {
             isUpdating: false,
+            steamLibraryPublic: true,
             coverageText: '',
             pollTimer: null
         }
     },
     computed: {
+        showPrivateBanner() {
+            const user = getUser()
+            return !!user && user.role !== 'guest' && this.steamLibraryPublic === false
+        },
         showSyncBanner() {
             const user = getUser()
-            return !!user && user.role !== 'guest' && this.isUpdating
+            return !!user && user.role !== 'guest' && this.steamLibraryPublic !== false && this.isUpdating
         }
     },
     mounted() {
@@ -61,6 +74,7 @@ export default {
             const poll = async () => {
                 try {
                     const status = await getSyncStatus()
+                    this.steamLibraryPublic = status?.steamLibraryPublic !== false
                     this.isUpdating = !!status?.isUpdating
                     const synced = status?.syncedWithStats ?? 0
                     const owned = status?.ownedWithStats ?? 0

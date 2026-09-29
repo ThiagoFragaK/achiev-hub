@@ -346,6 +346,12 @@ namespace achiev_hub.Server.Data.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<bool>("SteamLibraryPublic")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("steam_library_public");
+
                     b.Property<int>("TokenVersion")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -404,6 +410,11 @@ namespace achiev_hub.Server.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("AchievementSyncUnavailable")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<decimal>("AchievementsPercentage")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(5, 2)
@@ -435,6 +446,8 @@ namespace achiev_hub.Server.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("GameId");
+
+                    b.HasIndex("UserId", "AchievementSyncUnavailable");
 
                     b.HasIndex("UserId", "GameId")
                         .IsUnique();

@@ -12,17 +12,20 @@ public class AuthenticationService : IAuthenticationService
     private readonly IRepository<User> _users;
     private readonly JwtTokenService _jwtTokenService;
     private readonly ISyncJobEnqueueService _syncJobEnqueueService;
+    private readonly ISteamVisibilityService _steamVisibilityService;
     private readonly ILogger<AuthenticationService> _logger;
 
     public AuthenticationService(
         IRepository<User> users,
         JwtTokenService jwtTokenService,
         ISyncJobEnqueueService syncJobEnqueueService,
+        ISteamVisibilityService steamVisibilityService,
         ILogger<AuthenticationService> logger)
     {
         _users = users;
         _jwtTokenService = jwtTokenService;
         _syncJobEnqueueService = syncJobEnqueueService;
+        _steamVisibilityService = steamVisibilityService;
         _logger = logger;
     }
 
@@ -54,15 +57,33 @@ public class AuthenticationService : IAuthenticationService
         user.LastLogin = DateTime.UtcNow;
         await _users.SaveChangesAsync(cancellationToken);
 
+        var syncEnqueued = false;
+        string? syncMessage = null;
+
         if (!string.IsNullOrWhiteSpace(user.SteamId))
         {
             try
             {
-                await _syncJobEnqueueService.EnqueueLoginSyncAsync(user.Id, user.SteamId, cancellationToken);
+                var isPublic = await _steamVisibilityService.RefreshUserSteamVisibilityAsync(
+                    user.Id,
+                    user.SteamId,
+                    cancellationToken);
+
+                // Reload flag after refresh (tracked entity may already be updated).
+                if (isPublic)
+                {
+                    await _syncJobEnqueueService.EnqueueLoginSyncAsync(user.Id, user.SteamId, cancellationToken);
+                    syncEnqueued = true;
+                }
+                else
+                {
+                    syncMessage =
+                        "Your Steam profile is private. Library sync is paused until game details are public.";
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to enqueue login sync for user {UserId}", user.Id);
+                _logger.LogWarning(ex, "Failed to refresh visibility / enqueue login sync for user {UserId}", user.Id);
             }
         }
 
@@ -70,12 +91,15 @@ public class AuthenticationService : IAuthenticationService
         {
             AccessToken = _jwtTokenService.GenerateToken(user),
             TokenType = "Bearer",
+            SyncEnqueued = syncEnqueued,
+            SyncMessage = syncMessage,
             User = new AuthUserDto
             {
                 Id = user.Id,
                 Email = user.Email,
                 SteamId = user.SteamId,
-                Role = user.Role
+                Role = user.Role,
+                SteamLibraryPublic = user.SteamLibraryPublic
             }
         };
     }
@@ -92,7 +116,8 @@ public class AuthenticationService : IAuthenticationService
                 Id = 0,
                 Email = string.Empty,
                 SteamId = normalizedSteamId,
-                Role = JwtTokenService.GuestRole
+                Role = JwtTokenService.GuestRole,
+                SteamLibraryPublic = true
             }
         };
     }

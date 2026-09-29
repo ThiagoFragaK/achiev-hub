@@ -201,16 +201,23 @@ public class SyncJobProcessor
 
         job.ProgressTotal = batch.Count;
         job.ProgressDone = 0;
+        var successCount = 0;
 
         foreach (var appId in batch)
         {
-            await _steamSyncService.SyncGameCompletionPercentageAsync(userId, job.SteamId, appId, cancellationToken);
+            if (await _steamSyncService.SyncGameCompletionPercentageAsync(userId, job.SteamId, appId, cancellationToken))
+            {
+                successCount++;
+            }
+
             job.ProgressDone++;
             job.UpdatedAt = DateTimeOffset.UtcNow;
             await _db.SaveChangesAsync(cancellationToken);
         }
 
-        return batch.Count >= _options.BatchSize;
+        var remaining = await _steamSyncService.CountEligibleCrawlGamesAsync(userId, cancellationToken);
+        // Continue only when work remains and this batch made progress (or still has eligible rows after skips).
+        return remaining > 0 && (successCount > 0 || batch.Count >= _options.BatchSize);
     }
 
     private async Task ProcessAchievementGameAsync(SyncJob job, CancellationToken cancellationToken)

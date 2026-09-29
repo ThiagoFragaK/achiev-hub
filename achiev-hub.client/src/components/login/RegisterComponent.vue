@@ -326,7 +326,10 @@ export default {
                 const response = await validateSteam(this.steamId.trim())
                 this.steamValidated = true
                 this.steamPersona = response?.data?.personaName || ''
-                this.formSuccess = 'Steam ID looks good. Continue with email and password.'
+                const isPublic = response?.data?.isLibraryPublic !== false
+                this.formSuccess = isPublic
+                    ? 'Steam ID looks good. Continue with email and password.'
+                    : 'Steam ID is valid, but the profile is private. You can register; library sync stays off until game details are public.'
             } catch (error) {
                 this.steamValidated = false
                 this.steamPersona = ''
@@ -409,7 +412,7 @@ export default {
             this.formSuccess = ''
             this.loading = true
             try {
-                await register({
+                const response = await register({
                     steamId: this.steamId.trim(),
                     email: this.email.trim(),
                     password: this.password,
@@ -417,6 +420,21 @@ export default {
                         ? ''
                         : this.emailVerifiedToken
                 })
+                const data = response?.data ?? response
+                const isPublic = data?.steamLibraryPublic !== false
+                const alreadyActive = data?.statusLabel === 'Active' || data?.status === 1
+
+                if (!isPublic || (alreadyActive && !(data?.jobIds?.length > 0))) {
+                    this.$router.push({
+                        name: 'login',
+                        query: {
+                            steamId: this.steamId.trim(),
+                            ready: isPublic ? '1' : 'private'
+                        }
+                    })
+                    return
+                }
+
                 this.preparing = true
                 this.formSuccess = ''
                 this.startProvisioningPoll()

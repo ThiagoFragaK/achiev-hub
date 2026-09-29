@@ -15,11 +15,16 @@ public class SteamSyncController : ApiControllerBase
 {
     private readonly ISyncStatusService _syncStatusService;
     private readonly ISyncJobEnqueueService _enqueueService;
+    private readonly ISteamVisibilityService _steamVisibilityService;
 
-    public SteamSyncController(ISyncStatusService syncStatusService, ISyncJobEnqueueService enqueueService)
+    public SteamSyncController(
+        ISyncStatusService syncStatusService,
+        ISyncJobEnqueueService enqueueService,
+        ISteamVisibilityService steamVisibilityService)
     {
         _syncStatusService = syncStatusService;
         _enqueueService = enqueueService;
+        _steamVisibilityService = steamVisibilityService;
     }
 
     [HttpGet("status")]
@@ -57,6 +62,15 @@ public class SteamSyncController : ApiControllerBase
         if (RequireSteamId(out var steamId) is { } error)
         {
             return error;
+        }
+
+        var isPublic = await _steamVisibilityService.RefreshUserSteamVisibilityAsync(userId, steamId, cancellationToken);
+        if (!isPublic)
+        {
+            return Conflict(new
+            {
+                message = "Your Steam profile is private. Make game details public, then try syncing again."
+            });
         }
 
         var jobId = await _enqueueService.EnqueueAsync(

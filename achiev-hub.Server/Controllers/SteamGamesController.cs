@@ -15,11 +15,16 @@ public class SteamGamesController : ApiControllerBase
 {
     private readonly IGamesService _gamesService;
     private readonly ISyncJobEnqueueService _enqueueService;
+    private readonly ISteamVisibilityService _steamVisibilityService;
 
-    public SteamGamesController(IGamesService gamesService, ISyncJobEnqueueService enqueueService)
+    public SteamGamesController(
+        IGamesService gamesService,
+        ISyncJobEnqueueService enqueueService,
+        ISteamVisibilityService steamVisibilityService)
     {
         _gamesService = gamesService;
         _enqueueService = enqueueService;
+        _steamVisibilityService = steamVisibilityService;
     }
 
     [HttpGet("recent")]
@@ -135,6 +140,15 @@ public class SteamGamesController : ApiControllerBase
             return error;
         }
 
+        var isPublic = await _steamVisibilityService.RefreshUserSteamVisibilityAsync(userId, steamId, cancellationToken);
+        if (!isPublic)
+        {
+            return Conflict(new
+            {
+                message = "Your Steam profile is private. Make game details public, then try syncing again."
+            });
+        }
+
         var jobId = await _enqueueService.EnqueueAsync(
             SyncJobType.AchievementGame,
             userId,
@@ -165,6 +179,15 @@ public class SteamGamesController : ApiControllerBase
         if (RequireSteamId(out var steamId) is { } error)
         {
             return error;
+        }
+
+        var isPublic = await _steamVisibilityService.RefreshUserSteamVisibilityAsync(userId, steamId, cancellationToken);
+        if (!isPublic)
+        {
+            return Conflict(new
+            {
+                message = "Your Steam profile is private. Make game details public, then try syncing again."
+            });
         }
 
         var jobIds = await _enqueueService.EnqueueManualLibrarySyncAsync(userId, steamId, cancellationToken);
