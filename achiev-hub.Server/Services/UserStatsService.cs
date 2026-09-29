@@ -41,7 +41,8 @@ public class UserStatsService : IUserStatsService
             .CountAsync(
                 ug => ug.UserId == userId
                     && ug.Game.HasCommunityVisibleStats == true
-                    && ug.AchievementsSyncedAt != null,
+                    && ug.AchievementsSyncedAt != null
+                    && !ug.AchievementSyncUnavailable,
                 cancellationToken);
 
         return new UserStatsDto

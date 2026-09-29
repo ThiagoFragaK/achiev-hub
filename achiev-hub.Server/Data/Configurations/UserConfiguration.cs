@@ -57,6 +57,11 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasDefaultValue(0);
 
+        builder.Property(e => e.SteamLibraryPublic)
+            .HasColumnName("steam_library_public")
+            .IsRequired()
+            .HasDefaultValue(true);
+
         builder.HasIndex(e => e.Email).IsUnique();
         builder.HasIndex(e => e.SteamId)
             .IsUnique()

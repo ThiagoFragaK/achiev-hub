@@ -17,6 +17,7 @@ public class AuthUserDto
     public string Email { get; set; } = string.Empty;
     public string? SteamId { get; set; }
     public string Role { get; set; } = string.Empty;
+    public bool SteamLibraryPublic { get; set; } = true;
 }
 
 public class LoginResponseDto
@@ -24,6 +25,8 @@ public class LoginResponseDto
     public string AccessToken { get; set; } = string.Empty;
     public string TokenType { get; set; } = "Bearer";
     public AuthUserDto User { get; set; } = null!;
+    public bool SyncEnqueued { get; set; }
+    public string? SyncMessage { get; set; }
 }
 
 public class RegisterResponseDto
@@ -33,6 +36,7 @@ public class RegisterResponseDto
     public string? SteamId { get; set; }
     public int Status { get; set; }
     public string StatusLabel { get; set; } = string.Empty;
+    public bool SteamLibraryPublic { get; set; } = true;
     public IReadOnlyList<int> JobIds { get; set; } = [];
     public string Message { get; set; } = "Registration successful. Preparing your library…";
 }

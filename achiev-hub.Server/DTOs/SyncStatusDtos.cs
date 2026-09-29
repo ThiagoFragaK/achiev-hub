@@ -8,6 +8,7 @@ public class SyncStatusDto
     public int SyncedWithStats { get; set; }
     public bool IsUpdating { get; set; }
     public bool IsReady { get; set; }
+    public bool SteamLibraryPublic { get; set; } = true;
     public int Status { get; set; }
     public string? StatusLabel { get; set; }
     public IReadOnlyList<SyncJobStatusDto> Jobs { get; set; } = [];

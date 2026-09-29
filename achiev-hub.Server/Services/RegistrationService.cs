@@ -60,15 +60,20 @@ public class RegistrationService : IRegistrationService
             return AuthResult.Fail("Steam profile was not found. Check the Steam ID and profile visibility.", 404);
         }
 
+        var isLibraryPublic = SteamVisibility.IsLibraryPublic(player);
         return new
         {
             success = true,
-            message = "Steam ID is valid",
+            message = isLibraryPublic
+                ? "Steam ID is valid"
+                : "Steam ID is valid, but the profile is private. You can register; library sync stays off until game details are public.",
             data = new
             {
                 steamId = player.SteamId,
                 personaName = player.PersonaName,
-                avatar = player.AvatarFull ?? player.Avatar
+                avatar = player.AvatarFull ?? player.Avatar,
+                isLibraryPublic,
+                communityVisibilityState = player.CommunityVisibilityState
             }
         };
     }
@@ -225,14 +230,18 @@ public class RegistrationService : IRegistrationService
             }
         }
 
+        var player = await _steamRepository.GetPlayerBySteamIdAsync(steamId, cancellationToken);
+        var isLibraryPublic = SteamVisibility.IsLibraryPublic(player);
+
         var user = new User
         {
             Email = normalizedEmail,
             SteamId = steamId,
             Password = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Role = "user",
-            Status = (int)StatusEnum.Provisioning,
+            Status = isLibraryPublic ? (int)StatusEnum.Provisioning : (int)StatusEnum.Active,
             IsEmailVerified = !bypassEmailVerification,
+            SteamLibraryPublic = isLibraryPublic,
             TokenVersion = 0
         };
 
@@ -245,13 +254,25 @@ public class RegistrationService : IRegistrationService
         await _users.SaveChangesAsync(cancellationToken);
 
         IReadOnlyList<int> jobIds = [];
-        try
+        string message;
+        if (isLibraryPublic)
         {
-            jobIds = await _syncJobEnqueueService.EnqueueRegisterSyncAsync(user.Id, user.SteamId!, cancellationToken);
+            try
+            {
+                jobIds = await _syncJobEnqueueService.EnqueueRegisterSyncAsync(user.Id, user.SteamId!, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to enqueue initial sync for user {UserId}", user.Id);
+            }
+
+            message = "Registration successful. Preparing your library…";
         }
-        catch (Exception ex)
+        else
         {
-            _logger.LogWarning(ex, "Failed to enqueue initial sync for user {UserId}", user.Id);
+            message =
+                "Registration successful. Your Steam profile is private, so nothing was synced. " +
+                "Make game details public, then sync or log in again.";
         }
 
         return new RegisterResponseDto
@@ -260,9 +281,10 @@ public class RegistrationService : IRegistrationService
             Email = user.Email,
             SteamId = user.SteamId,
             Status = user.Status,
-            StatusLabel = StatusEnum.Provisioning.ToString(),
+            StatusLabel = ((StatusEnum)user.Status).ToString(),
+            SteamLibraryPublic = isLibraryPublic,
             JobIds = jobIds,
-            Message = "Registration successful. Preparing your library…"
+            Message = message
         };
     }
 

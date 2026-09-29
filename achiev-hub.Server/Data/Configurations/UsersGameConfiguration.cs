@@ -22,9 +22,14 @@ public class UsersGameConfiguration : IEntityTypeConfiguration<UsersGame>
             .IsRequired()
             .HasDefaultValue(false);
 
+        builder.Property(e => e.AchievementSyncUnavailable)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(e => e.AchievementsSyncedAt);
 
         builder.HasIndex(e => new { e.UserId, e.GameId }).IsUnique();
         builder.HasIndex(e => new { e.UserId, e.NeedsAchievementRefresh });
+        builder.HasIndex(e => new { e.UserId, e.AchievementSyncUnavailable });
     }
 }

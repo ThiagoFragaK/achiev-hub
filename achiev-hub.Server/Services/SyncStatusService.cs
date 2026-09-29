@@ -23,7 +23,13 @@ public class SyncStatusService : ISyncStatusService
             return null;
         }
 
-        return await BuildStatusAsync(user.Id, user.Status, user.AvgPercentage, user.AchievementSyncCoverage, cancellationToken);
+        return await BuildStatusAsync(
+            user.Id,
+            user.Status,
+            user.AvgPercentage,
+            user.AchievementSyncCoverage,
+            user.SteamLibraryPublic,
+            cancellationToken);
     }
 
     public async Task<SyncStatusDto?> GetProvisioningStatusBySteamIdAsync(
@@ -38,7 +44,13 @@ public class SyncStatusService : ISyncStatusService
             return null;
         }
 
-        return await BuildStatusAsync(user.Id, user.Status, user.AvgPercentage, user.AchievementSyncCoverage, cancellationToken);
+        return await BuildStatusAsync(
+            user.Id,
+            user.Status,
+            user.AvgPercentage,
+            user.AchievementSyncCoverage,
+            user.SteamLibraryPublic,
+            cancellationToken);
     }
 
     private async Task<SyncStatusDto> BuildStatusAsync(
@@ -46,6 +58,7 @@ public class SyncStatusService : ISyncStatusService
         int status,
         decimal avgPercentage,
         decimal coverage,
+        bool steamLibraryPublic,
         CancellationToken cancellationToken)
     {
         var ownedWithStats = await _db.UsersGames.AsNoTracking()
@@ -54,7 +67,8 @@ public class SyncStatusService : ISyncStatusService
             .CountAsync(
                 ug => ug.UserId == userId
                     && ug.Game.HasCommunityVisibleStats == true
-                    && ug.AchievementsSyncedAt != null,
+                    && ug.AchievementsSyncedAt != null
+                    && !ug.AchievementSyncUnavailable,
                 cancellationToken);
 
         var jobs = await _db.SyncJobs.AsNoTracking()
@@ -73,12 +87,17 @@ public class SyncStatusService : ISyncStatusService
             })
             .ToListAsync(cancellationToken);
 
-        var isUpdating = await _db.SyncJobs.AsNoTracking().AnyAsync(
+        var isUpdating = steamLibraryPublic && await _db.SyncJobs.AsNoTracking().AnyAsync(
             j => j.UserId == userId
                 && (j.Status == SyncJobStatus.Pending || j.Status == SyncJobStatus.Running)
                 && j.Type != SyncJobType.AchievementCrawl
                 && j.Type != SyncJobType.MaintenanceNightly,
             cancellationToken);
+
+        if (steamLibraryPublic && status == (int)StatusEnum.Provisioning)
+        {
+            isUpdating = true;
+        }
 
         var libraryDone = await _db.SyncJobs.AsNoTracking().AnyAsync(
             j => j.UserId == userId && j.Type == SyncJobType.LibraryFull && j.Status == SyncJobStatus.Succeeded,
@@ -96,8 +115,9 @@ public class SyncStatusService : ISyncStatusService
             AchievementSyncCoverage = coverage,
             OwnedWithStats = ownedWithStats,
             SyncedWithStats = syncedWithStats,
-            IsUpdating = isUpdating || status == (int)StatusEnum.Provisioning,
+            IsUpdating = isUpdating,
             IsReady = isReady && status == (int)StatusEnum.Active,
+            SteamLibraryPublic = steamLibraryPublic,
             Status = status,
             StatusLabel = ((StatusEnum)status).ToString(),
             Jobs = jobs

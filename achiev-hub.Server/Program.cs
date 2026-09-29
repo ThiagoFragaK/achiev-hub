@@ -74,6 +74,7 @@ builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<IPlayersService, PlayersService>();
 builder.Services.AddScoped<IGamesService, GamesService>();
 builder.Services.AddScoped<ISteamSyncService, SteamSyncService>();
+builder.Services.AddScoped<ISteamVisibilityService, SteamVisibilityService>();
 builder.Services.AddScoped<ISyncJobEnqueueService, SyncJobEnqueueService>();
 builder.Services.AddScoped<ISyncStatusService, SyncStatusService>();
 builder.Services.AddScoped<SyncJobProcessor>();

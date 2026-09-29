@@ -13,11 +13,14 @@ public interface ISteamSyncService
 
     Task SyncGameAchievementsAsync(int userId, string steamId, int appId, CancellationToken cancellationToken = default);
 
-    Task SyncGameCompletionPercentageAsync(
+    /// <returns>True when Steam returned usable achievement data for the game.</returns>
+    Task<bool> SyncGameCompletionPercentageAsync(
         int userId,
         string steamId,
         int appId,
         CancellationToken cancellationToken = default);
+
+    Task<int> CountEligibleCrawlGamesAsync(int userId, CancellationToken cancellationToken = default);
 
     Task SyncAchievementsForUserAsync(
         int userId,

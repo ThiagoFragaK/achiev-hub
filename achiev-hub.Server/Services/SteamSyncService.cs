@@ -222,7 +222,7 @@ public class SteamSyncService : ISteamSyncService
             user.Playtime2WeeksMinutes);
     }
 
-    public async Task SyncGameCompletionPercentageAsync(
+    public async Task<bool> SyncGameCompletionPercentageAsync(
         int userId,
         string steamId,
         int appId,
@@ -230,7 +230,7 @@ public class SteamSyncService : ISteamSyncService
     {
         if (appId <= 0)
         {
-            return;
+            return false;
         }
 
         var steamAppId = appId.ToString();
@@ -239,7 +239,7 @@ public class SteamSyncService : ISteamSyncService
 
         if (game is null || game.HasCommunityVisibleStats != true)
         {
-            return;
+            return false;
         }
 
         var usersGame = await _db.UsersGames
@@ -247,7 +247,7 @@ public class SteamSyncService : ISteamSyncService
 
         if (usersGame is null)
         {
-            return;
+            return false;
         }
 
         var playerResult = await _steamRepository.GetPlayerAchievementsAsync(steamId, appId, cancellationToken);
@@ -258,7 +258,12 @@ public class SteamSyncService : ISteamSyncService
                 userId,
                 appId,
                 playerResult?.Error);
-            return;
+            usersGame.AchievementSyncUnavailable = true;
+            usersGame.NeedsAchievementRefresh = false;
+            usersGame.AchievementsSyncedAt = DateTimeOffset.UtcNow;
+            await _db.SaveChangesAsync(cancellationToken);
+            await RecomputeUserAchievementStatsAsync(userId, cancellationToken);
+            return false;
         }
 
         var total = playerResult.Achievements.Count;
@@ -268,9 +273,11 @@ public class SteamSyncService : ISteamSyncService
             : (decimal)Math.Round(unlocked / (double)total * 100, 2);
         usersGame.AchievementsSyncedAt = DateTimeOffset.UtcNow;
         usersGame.NeedsAchievementRefresh = false;
+        usersGame.AchievementSyncUnavailable = false;
 
         await _db.SaveChangesAsync(cancellationToken);
         await RecomputeUserAchievementStatsAsync(userId, cancellationToken);
+        return true;
     }
 
     public async Task SyncGameAchievementsAsync(
@@ -366,6 +373,11 @@ public class SteamSyncService : ISteamSyncService
                 userId,
                 appId,
                 playerResult?.Error);
+            usersGame.AchievementSyncUnavailable = true;
+            usersGame.NeedsAchievementRefresh = false;
+            usersGame.AchievementsSyncedAt = DateTimeOffset.UtcNow;
+            await _db.SaveChangesAsync(cancellationToken);
+            await RecomputeUserAchievementStatsAsync(userId, cancellationToken);
             return;
         }
 
@@ -430,6 +442,7 @@ public class SteamSyncService : ISteamSyncService
             : (decimal)Math.Round(unlockedCount / (double)totalAchievements * 100, 2);
         usersGame.AchievementsSyncedAt = DateTimeOffset.UtcNow;
         usersGame.NeedsAchievementRefresh = false;
+        usersGame.AchievementSyncUnavailable = false;
 
         await _db.SaveChangesAsync(cancellationToken);
         await RecomputeUserAchievementStatsAsync(userId, cancellationToken);
@@ -479,11 +492,16 @@ public class SteamSyncService : ISteamSyncService
         var statsRows = await _db.UsersGames
             .AsNoTracking()
             .Where(ug => ug.UserId == userId && ug.Game.HasCommunityVisibleStats == true)
-            .Select(ug => new { ug.AchievementsSyncedAt, ug.AchievementsPercentage })
+            .Select(ug => new
+            {
+                ug.AchievementsSyncedAt,
+                ug.AchievementsPercentage,
+                ug.AchievementSyncUnavailable
+            })
             .ToListAsync(cancellationToken);
 
         var ownedWithStats = statsRows.Count;
-        var synced = statsRows.Count(r => r.AchievementsSyncedAt != null);
+        var synced = statsRows.Count(r => r.AchievementsSyncedAt != null && !r.AchievementSyncUnavailable);
 
         user.AchievementSyncCoverage = ownedWithStats == 0
             ? 0
@@ -491,7 +509,11 @@ public class SteamSyncService : ISteamSyncService
 
         user.AvgPercentage = synced == 0
             ? 0
-            : Math.Round(statsRows.Where(r => r.AchievementsSyncedAt != null).Average(r => r.AchievementsPercentage), 2);
+            : Math.Round(
+                statsRows
+                    .Where(r => r.AchievementsSyncedAt != null && !r.AchievementSyncUnavailable)
+                    .Average(r => r.AchievementsPercentage),
+                2);
 
         await _db.SaveChangesAsync(cancellationToken);
     }
@@ -528,6 +550,7 @@ public class SteamSyncService : ISteamSyncService
             .AsNoTracking()
             .Where(ug => ug.UserId == userId
                 && ug.NeedsAchievementRefresh
+                && !ug.AchievementSyncUnavailable
                 && ug.Game.HasCommunityVisibleStats == true
                 && ug.Game.GameSteamId != null)
             .Select(ug => ug.Game.GameSteamId!)
@@ -538,6 +561,7 @@ public class SteamSyncService : ISteamSyncService
             .AsNoTracking()
             .Where(ug => ug.UserId == userId
                 && ug.AchievementsSyncedAt == null
+                && !ug.AchievementSyncUnavailable
                 && ug.PlaytimeMinutes > 0
                 && ug.Game.HasCommunityVisibleStats == true
                 && ug.Game.GameSteamId != null)
@@ -559,6 +583,7 @@ public class SteamSyncService : ISteamSyncService
             .AsNoTracking()
             .Where(ug => ug.UserId == userId
                 && ug.AchievementsSyncedAt == null
+                && !ug.AchievementSyncUnavailable
                 && ug.Game.HasCommunityVisibleStats == true
                 && ug.Game.GameSteamId != null)
             .OrderByDescending(ug => ug.PlaytimeMinutes)
@@ -570,6 +595,15 @@ public class SteamSyncService : ISteamSyncService
 
         return ParseAppIds(steamIds);
     }
+
+    public Task<int> CountEligibleCrawlGamesAsync(int userId, CancellationToken cancellationToken = default) =>
+        _db.UsersGames.AsNoTracking()
+            .CountAsync(
+                ug => ug.UserId == userId
+                    && ug.AchievementsSyncedAt == null
+                    && !ug.AchievementSyncUnavailable
+                    && ug.Game.HasCommunityVisibleStats == true,
+                cancellationToken);
 
     private async Task<List<int>> GetAllOwnedWithStatsAppIdsAsync(int userId, CancellationToken cancellationToken)
     {
