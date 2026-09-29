@@ -12,6 +12,8 @@ public class SyncStatusDto
     public int Status { get; set; }
     public string? StatusLabel { get; set; }
     public IReadOnlyList<SyncJobStatusDto> Jobs { get; set; } = [];
+    public decimal SyncProgressPercent { get; set; }
+    public Guid? LastJobId { get; set; }
 }
 
 public class SyncJobStatusDto
@@ -29,5 +31,5 @@ public class EnqueueSyncResponseDto
 {
     public bool Success { get; set; } = true;
     public string Message { get; set; } = "Sync enqueued.";
-    public IReadOnlyList<int> JobIds { get; set; } = [];
+    public IReadOnlyList<Guid> JobIds { get; set; } = [];
 }

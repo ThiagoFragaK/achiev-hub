@@ -1,5 +1,4 @@
 using achiev_hub.Server.DTOs;
-using achiev_hub.Server.Enums;
 using achiev_hub.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -149,8 +148,7 @@ public class SteamGamesController : ApiControllerBase
             });
         }
 
-        var jobId = await _enqueueService.EnqueueAsync(
-            SyncJobType.AchievementGame,
+        var jobId = await _enqueueService.EnqueueGameAchievementSyncAsync(
             userId,
             steamId,
             appId,

@@ -14,7 +14,7 @@
 
   <ItemGroup>
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
-    <PackageReference Include="Cronos" Version="0.11.1" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="9.2.2" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy">
@@ -33,6 +33,7 @@
     <ProjectReference Include="..\achiev-hub.client\achiev-hub.client.esproj">
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
+    <ProjectReference Include="..\..\steam-sync\src\SteamSync.Shared\SteamSync.Shared.csproj" />
   </ItemGroup>
 
 </Project>

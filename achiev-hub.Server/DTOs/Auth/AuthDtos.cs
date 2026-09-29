@@ -37,6 +37,6 @@ public class RegisterResponseDto
     public int Status { get; set; }
     public string StatusLabel { get; set; } = string.Empty;
     public bool SteamLibraryPublic { get; set; } = true;
-    public IReadOnlyList<int> JobIds { get; set; } = [];
+    public IReadOnlyList<Guid> JobIds { get; set; } = [];
     public string Message { get; set; } = "Registration successful. Preparing your library…";
 }

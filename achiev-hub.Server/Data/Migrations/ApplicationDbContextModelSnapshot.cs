@@ -369,6 +369,63 @@ namespace achiev_hub.Server.Data.Migrations
                     b.ToTable("users", (string)null);
                 });
 
+            modelBuilder.Entity("achiev_hub.Server.Entities.UserSyncStatus", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("GamesSyncedCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("games_synced_count");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTime?>("LastFullSync")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_full_sync");
+
+                    b.Property<Guid?>("LastJobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_job_id");
+
+                    b.Property<DateTime?>("LastPartialSync")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_partial_sync");
+
+                    b.Property<int>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("status");
+
+                    b.Property<decimal>("SyncProgressPercent")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("sync_progress_percent");
+
+                    b.Property<int>("TotalGamesCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("total_games_count");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("user_sync_status", (string)null);
+                });
+
             modelBuilder.Entity("achiev_hub.Server.Entities.UsersAchievement", b =>
                 {
                     b.Property<int>("Id")
@@ -512,6 +569,17 @@ namespace achiev_hub.Server.Data.Migrations
                         .WithMany("SyncJobs")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("achiev_hub.Server.Entities.UserSyncStatus", b =>
+                {
+                    b.HasOne("achiev_hub.Server.Entities.User", "User")
+                        .WithOne()
+                        .HasForeignKey("achiev_hub.Server.Entities.UserSyncStatus", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("User");
                 });
