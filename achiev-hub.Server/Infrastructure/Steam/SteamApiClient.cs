@@ -9,16 +9,16 @@ using Microsoft.Extensions.Options;
 
 namespace achiev_hub.Server.Infrastructure.Steam;
 
-public class SteamRepository : ISteamRepository
+public class SteamApiClient : ISteamApiClient
 {
     private const string SteamApiBaseUrl = "https://api.steampowered.com";
     private const string StoreApiBaseUrl = "https://store.steampowered.com/api";
 
     private readonly HttpClient _httpClient;
-    private readonly ILogger<SteamRepository> _logger;
+    private readonly ILogger<SteamApiClient> _logger;
     private readonly string _apiKey;
 
-    public SteamRepository(HttpClient httpClient, IOptions<SteamApiOptions> options, ILogger<SteamRepository> logger)
+    public SteamApiClient(HttpClient httpClient, IOptions<SteamApiOptions> options, ILogger<SteamApiClient> logger)
     {
         _httpClient = httpClient;
         _logger = logger;

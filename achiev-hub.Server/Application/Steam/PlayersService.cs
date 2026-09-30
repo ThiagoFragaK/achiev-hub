@@ -19,16 +19,16 @@ namespace achiev_hub.Server.Application.Steam;
 
 public class PlayersService : IPlayersService
 {
-    private readonly ISteamRepository _steamRepository;
+    private readonly ISteamApiClient _steamApiClient;
 
-    public PlayersService(ISteamRepository steamRepository)
+    public PlayersService(ISteamApiClient steamApiClient)
     {
-        _steamRepository = steamRepository;
+        _steamApiClient = steamApiClient;
     }
 
     public async Task<PlayerDto?> GetPlayerAsync(string steamId, CancellationToken cancellationToken = default)
     {
-        var player = await _steamRepository.GetPlayerBySteamIdAsync(steamId, cancellationToken);
+        var player = await _steamApiClient.GetPlayerBySteamIdAsync(steamId, cancellationToken);
         if (player is null)
         {
             return null;

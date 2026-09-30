@@ -42,7 +42,8 @@ builder.Services.Configure<SteamApiOptions>(builder.Configuration.GetSection(Ste
 builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection(SendGridOptions.SectionName));
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddSingleton<JwtTokenService>();
-builder.Services.AddHttpClient<ISteamRepository, SteamRepository>();
+builder.Services.AddHttpClient<ISteamApiClient, SteamApiClient>();
+builder.Services.AddScoped<ISteamSyncClient, SteamSyncClient>();
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));

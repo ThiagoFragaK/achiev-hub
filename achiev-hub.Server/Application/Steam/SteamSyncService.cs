@@ -26,18 +26,18 @@ namespace achiev_hub.Server.Application.Steam;
 public class SteamSyncService : ISteamSyncService
 {
     private readonly ApplicationDbContext _db;
-    private readonly ISteamRepository _steamRepository;
+    private readonly ISteamApiClient _steamApiClient;
     private readonly IMemoryCache _cache;
     private readonly ILogger<SteamSyncService> _logger;
 
     public SteamSyncService(
         ApplicationDbContext db,
-        ISteamRepository steamRepository,
+        ISteamApiClient steamApiClient,
         IMemoryCache cache,
         ILogger<SteamSyncService> logger)
     {
         _db = db;
-        _steamRepository = steamRepository;
+        _steamApiClient = steamApiClient;
         _cache = cache;
         _logger = logger;
     }
@@ -56,12 +56,12 @@ public class SteamSyncService : ISteamSyncService
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
             ?? throw new InvalidOperationException($"User {userId} was not found.");
 
-        var recentGames = await _steamRepository.GetRecentlyPlayedGamesAsync(steamId, cancellationToken);
+        var recentGames = await _steamApiClient.GetRecentlyPlayedGamesAsync(steamId, cancellationToken);
         var byAppId = new Dictionary<int, SyncGameInput>();
 
         if (scope == LibrarySyncScope.Full)
         {
-            var ownedGames = await _steamRepository.GetOwnedGamesAsync(steamId, cancellationToken);
+            var ownedGames = await _steamApiClient.GetOwnedGamesAsync(steamId, cancellationToken);
             foreach (var owned in ownedGames)
             {
                 if (owned.AppId <= 0)
@@ -246,7 +246,7 @@ public class SteamSyncService : ISteamSyncService
             return;
         }
 
-        var schema = await _steamRepository.GetGameSchemaAsync(appId, cancellationToken);
+        var schema = await _steamApiClient.GetGameSchemaAsync(appId, cancellationToken);
         var schemaAchievements = (schema?.Achievements ?? [])
             .Where(a => !string.IsNullOrWhiteSpace(a.Name))
             .GroupBy(a => a.Name!, StringComparer.OrdinalIgnoreCase)
@@ -287,7 +287,7 @@ public class SteamSyncService : ISteamSyncService
 
         await _db.SaveChangesAsync(cancellationToken);
 
-        var playerResult = await _steamRepository.GetPlayerAchievementsAsync(steamId, appId, cancellationToken);
+        var playerResult = await _steamApiClient.GetPlayerAchievementsAsync(steamId, appId, cancellationToken);
         if (playerResult is null || !playerResult.Success)
         {
             _logger.LogWarning(
@@ -412,7 +412,7 @@ public class SteamSyncService : ISteamSyncService
 
     private async Task<List<int>> GetRecentTwoWeeksAppIdsAsync(string steamId, CancellationToken cancellationToken)
     {
-        var recent = await _steamRepository.GetRecentlyPlayedGamesAsync(steamId, cancellationToken);
+        var recent = await _steamApiClient.GetRecentlyPlayedGamesAsync(steamId, cancellationToken);
         return recent
             .Where(g => g.AppId > 0 && g.Playtime2WeeksMinutes > 0)
             .Select(g => g.AppId)
