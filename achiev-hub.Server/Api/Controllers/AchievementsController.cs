@@ -1,0 +1,93 @@
+using achiev_hub.Server.Application.Users;
+using achiev_hub.Server.Application.Users.Interfaces;
+using achiev_hub.Server.Application.Games;
+using achiev_hub.Server.Application.Games.Interfaces;
+using achiev_hub.Server.Application.Achievements;
+using achiev_hub.Server.Application.Achievements.Interfaces;
+using achiev_hub.Server.Application.Goals;
+using achiev_hub.Server.Application.Goals.Interfaces;
+using achiev_hub.Server.Application.Auth;
+using achiev_hub.Server.Application.Auth.Interfaces;
+using achiev_hub.Server.Application.Steam;
+using achiev_hub.Server.Application.Steam.Interfaces;
+using achiev_hub.Server.Application.Stats;
+using achiev_hub.Server.Application.Stats.Interfaces;
+using achiev_hub.Server.Application.Common;
+using achiev_hub.Server.Application.Common.Interfaces;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace achiev_hub.Server.Api.Controllers;
+
+[Authorize]
+[ApiController]
+[Route("api/achievements")]
+public class AchievementsController : ApiControllerBase
+{
+    private readonly IAchievementService _achievements;
+
+    public AchievementsController(IAchievementService achievements)
+    {
+        _achievements = achievements;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<AchievementRecordDto>>> GetAll(CancellationToken cancellationToken)
+    {
+        return Ok(await _achievements.GetAllAsync(cancellationToken));
+    }
+
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<AchievementRecordDto>> GetById(int id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await _achievements.GetByIdAsync(id, cancellationToken));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<AchievementRecordDto>> Create(CreateAchievementRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var created = await _achievements.CreateAsync(request, cancellationToken);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<AchievementRecordDto>> Update(int id, UpdateAchievementRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await _achievements.UpdateAsync(id, request, cancellationToken));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _achievements.DeleteAsync(id, cancellationToken);
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+}
