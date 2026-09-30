@@ -4,11 +4,13 @@ using achiev_hub.Server.Enums;
 using achiev_hub.Server.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using SteamSync.Shared;
+using System.Collections.Concurrent;
 
 namespace achiev_hub.Server.Services;
 
 public class SyncStatusService : ISyncStatusService
 {
+    private static readonly ConcurrentDictionary<int, long> DebugLastLogMs = new();
     private readonly ApplicationDbContext _db;
 
     public SyncStatusService(ApplicationDbContext db)
@@ -126,29 +128,49 @@ public class SyncStatusService : ISyncStatusService
         var isUpdating = steamLibraryPublic && syncRow is not null
             && (syncRow.Status == SyncStatus.Pending || syncRow.Status == SyncStatus.Syncing);
 
-        if (steamLibraryPublic && status == (int)StatusEnum.Provisioning)
-        {
-            isUpdating = true;
-        }
+        var isPartial = syncRow?.Status == SyncStatus.Partial;
+        var isReady = status == (int)StatusEnum.Active;
 
-        var fullDone = syncRow?.LastFullSync is not null && syncRow.Status == SyncStatus.Complete;
-        var isReady = status == (int)StatusEnum.Active
-            || (status == (int)StatusEnum.Provisioning && fullDone);
+        var syncSummary = syncRow is null
+            ? SyncSummaryDto.Empty
+            : SyncSummaryDto.From(
+                syncRow.Status,
+                syncRow.LastFullSync,
+                syncRow.LastPartialSync,
+                syncRow.GamesSyncedCount > 0 ? syncRow.GamesSyncedCount : syncedWithStats,
+                syncRow.TotalGamesCount > 0 ? syncRow.TotalGamesCount : ownedWithStats,
+                syncRow.SyncProgressPercent);
 
-        return new SyncStatusDto
+        var dto = new SyncStatusDto
         {
             AvgPercentage = avgPercentage,
             AchievementSyncCoverage = coverage,
             OwnedWithStats = ownedWithStats,
             SyncedWithStats = syncedWithStats,
             IsUpdating = isUpdating,
-            IsReady = isReady && status == (int)StatusEnum.Active,
+            IsReady = isReady,
+            IsPartial = isPartial,
             SteamLibraryPublic = steamLibraryPublic,
             Status = status,
             StatusLabel = ((StatusEnum)status).ToString(),
             Jobs = jobs,
             SyncProgressPercent = syncRow?.SyncProgressPercent ?? 0,
-            LastJobId = syncRow?.LastJobId
+            LastJobId = syncRow?.LastJobId,
+            Sync = syncSummary
         };
+        // #region agent log
+        try
+        {
+            var nowMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            var prev = DebugLastLogMs.GetOrAdd(userId, 0);
+            if (nowMs - prev >= 10000)
+            {
+                DebugLastLogMs[userId] = nowMs;
+                System.IO.File.AppendAllText(@"K:\Projekten\MyApps\achiev-hub\debug-321fb6.log", System.Text.Json.JsonSerializer.Serialize(new { sessionId = "321fb6", runId = "pre-fix", hypothesisId = "E", location = "SyncStatusService.cs:BuildStatus", message = "Sync status snapshot", data = new { userId, syncStatus = syncRow?.Status.ToString(), syncRow?.SyncProgressPercent, syncRow?.GamesSyncedCount, syncRow?.TotalGamesCount, ownedWithStats, syncedWithStats, avgPercentage, coverage, isUpdating, isPartial, steamLibraryPublic, syncRow?.LastError, syncRow?.LastJobId, syncRow?.LockedUntil, syncRow?.UpdatedAt }, timestamp = nowMs }) + "\n");
+            }
+        }
+        catch { }
+        // #endregion
+        return dto;
     }
 }

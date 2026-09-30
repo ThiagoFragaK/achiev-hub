@@ -8,6 +8,9 @@ public class UserStatsDto
     public decimal AchievementSyncCoverage { get; set; }
     public int OwnedWithStats { get; set; }
     public int SyncedWithStats { get; set; }
+    public SteamSync.Shared.SyncSummaryDto? Sync { get; set; }
+    public string? Source { get; set; }
+    public bool Fallback { get; set; }
 }
 
 public class DailyAchievementCountDto

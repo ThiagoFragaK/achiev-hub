@@ -64,6 +64,8 @@ builder.Services.AddScoped<ISyncStatusService, SyncStatusService>();
 builder.Services.AddScoped<IUserStatsService, UserStatsService>();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IRegistrationService, RegistrationService>();
+builder.Services.AddScoped<ISteamSnapshotService, SteamSnapshotService>();
+builder.Services.AddScoped<ILoginPostAuthSyncService, LoginPostAuthSyncService>();
 builder.Services.AddScoped<IEmailSender, SendGridEmailSender>();
 
 var rabbit = builder.Configuration.GetSection(RabbitMqOptions.SectionName).Get<RabbitMqOptions>() ?? new RabbitMqOptions();

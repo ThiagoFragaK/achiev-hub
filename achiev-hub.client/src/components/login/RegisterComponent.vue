@@ -422,22 +422,16 @@ export default {
                 })
                 const data = response?.data ?? response
                 const isPublic = data?.steamLibraryPublic !== false
-                const alreadyActive = data?.statusLabel === 'Active' || data?.status === 1
 
-                if (!isPublic || (alreadyActive && !(data?.jobIds?.length > 0))) {
-                    this.$router.push({
-                        name: 'login',
-                        query: {
-                            steamId: this.steamId.trim(),
-                            ready: isPublic ? '1' : 'private'
-                        }
-                    })
-                    return
-                }
-
-                this.preparing = true
-                this.formSuccess = ''
-                this.startProvisioningPoll()
+                // Registration is instant (Active). Background sync continues in-app.
+                this.$router.push({
+                    name: 'login',
+                    query: {
+                        steamId: this.steamId.trim(),
+                        ready: isPublic ? '1' : 'private',
+                        sync: data?.sync?.status || (isPublic ? 'pending' : undefined)
+                    }
+                })
             } catch (error) {
                 this.formError = error.body?.message || error.message || 'Registration failed'
             } finally {
@@ -449,14 +443,22 @@ export default {
             const poll = async () => {
                 try {
                     const status = await getProvisioningStatus(this.steamId.trim())
-                    const synced = status?.syncedWithStats ?? 0
-                    const owned = status?.ownedWithStats ?? 0
+                    const sync = status?.sync
+                    const synced = sync?.gamesSynced ?? status?.syncedWithStats ?? 0
+                    const owned = sync?.gamesTotal ?? status?.ownedWithStats ?? 0
                     this.prepareProgress =
                         owned > 0
-                            ? `Achievement coverage: ${synced} of ${owned} games`
+                            ? `Importing: ${synced} of ${owned} games`
                             : 'Importing your Steam library…'
 
-                    if (status?.statusLabel === 'Active' || status?.isReady) {
+                    // Ready as soon as account is Active (always now) or sync is partial/complete.
+                    if (
+                        status?.statusLabel === 'Active' ||
+                        status?.isReady ||
+                        status?.isPartial ||
+                        sync?.status === 'partial' ||
+                        sync?.status === 'complete'
+                    ) {
                         this.clearPrepareTimer()
                         this.$router.push({
                             name: 'login',

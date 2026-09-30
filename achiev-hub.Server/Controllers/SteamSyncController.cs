@@ -72,11 +72,21 @@ public class SteamSyncController : ApiControllerBase
             });
         }
 
-        var jobId = await _enqueueService.EnqueueGameAchievementSyncAsync(
+        var jobResult = await _enqueueService.EnqueueGameAchievementSyncAsync(
             userId,
             steamId,
             appId,
             cancellationToken);
+
+        if (jobResult.RateLimited)
+        {
+            return StatusCode(StatusCodes.Status429TooManyRequests, new { message = jobResult.SkipReason });
+        }
+
+        if (!jobResult.Enqueued || jobResult.JobId is not Guid jobId)
+        {
+            return Conflict(new { message = jobResult.SkipReason ?? "Sync could not be enqueued." });
+        }
 
         return Accepted(new EnqueueSyncResponseDto
         {

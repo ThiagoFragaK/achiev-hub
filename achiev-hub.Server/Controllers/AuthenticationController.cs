@@ -14,10 +14,17 @@ namespace achiev_hub.Server.Controllers;
 public class AuthenticationController : ControllerBase
 {
     private readonly IAuthenticationService _service;
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<AuthenticationController> _logger;
 
-    public AuthenticationController(IAuthenticationService service)
+    public AuthenticationController(
+        IAuthenticationService service,
+        IServiceScopeFactory scopeFactory,
+        ILogger<AuthenticationController> logger)
     {
         _service = service;
+        _scopeFactory = scopeFactory;
+        _logger = logger;
     }
 
     [AllowAnonymous]
@@ -39,6 +46,28 @@ public class AuthenticationController : ControllerBase
         if (AuthResult.IsError(response, out var error))
         {
             return StatusCode(error.HttpStatus, new { message = error.Message });
+        }
+
+        if (response is LoginResponseDto login
+            && login.User.Id > 0
+            && !string.IsNullOrWhiteSpace(login.User.SteamId)
+            && login.User.SteamLibraryPublic)
+        {
+            var userId = login.User.Id;
+            var steamId = login.User.SteamId!;
+            HttpContext.Response.OnCompleted(async () =>
+            {
+                try
+                {
+                    await using var scope = _scopeFactory.CreateAsyncScope();
+                    var postAuth = scope.ServiceProvider.GetRequiredService<ILoginPostAuthSyncService>();
+                    await postAuth.RunAsync(userId, steamId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Post-login sync scheduling failed for user {UserId}", userId);
+                }
+            });
         }
 
         return Ok(new

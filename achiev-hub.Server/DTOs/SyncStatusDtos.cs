@@ -8,12 +8,14 @@ public class SyncStatusDto
     public int SyncedWithStats { get; set; }
     public bool IsUpdating { get; set; }
     public bool IsReady { get; set; }
+    public bool IsPartial { get; set; }
     public bool SteamLibraryPublic { get; set; } = true;
     public int Status { get; set; }
     public string? StatusLabel { get; set; }
     public IReadOnlyList<SyncJobStatusDto> Jobs { get; set; } = [];
     public decimal SyncProgressPercent { get; set; }
     public Guid? LastJobId { get; set; }
+    public SteamSync.Shared.SyncSummaryDto Sync { get; set; } = SteamSync.Shared.SyncSummaryDto.Empty;
 }
 
 public class SyncJobStatusDto
