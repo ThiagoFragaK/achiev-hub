@@ -27,6 +27,7 @@ public class LoginResponseDto
     public AuthUserDto User { get; set; } = null!;
     public bool SyncEnqueued { get; set; }
     public string? SyncMessage { get; set; }
+    public SteamSync.Shared.SyncSummaryDto Sync { get; set; } = SteamSync.Shared.SyncSummaryDto.Empty;
 }
 
 public class RegisterResponseDto
@@ -39,4 +40,5 @@ public class RegisterResponseDto
     public bool SteamLibraryPublic { get; set; } = true;
     public IReadOnlyList<Guid> JobIds { get; set; } = [];
     public string Message { get; set; } = "Registration successful. Preparing your library…";
+    public SteamSync.Shared.SyncSummaryDto Sync { get; set; } = SteamSync.Shared.SyncSummaryDto.Empty;
 }

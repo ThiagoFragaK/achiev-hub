@@ -8,4 +8,6 @@ public class LibraryGameDto
     public double Playtime { get; set; }
     public string? NotPlayedSince { get; set; }
     public bool HasAchievements { get; set; }
+    /// <summary>True when achievements have not been imported yet.</summary>
+    public bool ImportPending { get; set; }
 }

@@ -1,11 +1,14 @@
 using System.Security.Cryptography;
 using System.Text;
+using achiev_hub.Server.Data;
 using achiev_hub.Server.DTOs.Auth;
 using achiev_hub.Server.Entities;
 using achiev_hub.Server.Enums;
 using achiev_hub.Server.Repositories.Interfaces;
 using achiev_hub.Server.Services.Interfaces;
 using achiev_hub.Server.Support;
+using Microsoft.EntityFrameworkCore;
+using SteamSync.Shared;
 
 namespace achiev_hub.Server.Services;
 
@@ -21,6 +24,8 @@ public class RegistrationService : IRegistrationService
     private readonly IHostEnvironment _environment;
     private readonly ISteamRepository _steamRepository;
     private readonly ISyncJobEnqueueService _syncJobEnqueueService;
+    private readonly ISteamSnapshotService _steamSnapshotService;
+    private readonly ApplicationDbContext _db;
     private readonly ILogger<RegistrationService> _logger;
 
     public RegistrationService(
@@ -30,6 +35,8 @@ public class RegistrationService : IRegistrationService
         IHostEnvironment environment,
         ISteamRepository steamRepository,
         ISyncJobEnqueueService syncJobEnqueueService,
+        ISteamSnapshotService steamSnapshotService,
+        ApplicationDbContext db,
         ILogger<RegistrationService> logger)
     {
         _users = users;
@@ -38,6 +45,8 @@ public class RegistrationService : IRegistrationService
         _environment = environment;
         _steamRepository = steamRepository;
         _syncJobEnqueueService = syncJobEnqueueService;
+        _steamSnapshotService = steamSnapshotService;
+        _db = db;
         _logger = logger;
     }
 
@@ -239,7 +248,7 @@ public class RegistrationService : IRegistrationService
             SteamId = steamId,
             Password = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Role = "user",
-            Status = isLibraryPublic ? (int)StatusEnum.Provisioning : (int)StatusEnum.Active,
+            Status = (int)StatusEnum.Active,
             IsEmailVerified = !bypassEmailVerification,
             SteamLibraryPublic = isLibraryPublic,
             TokenVersion = 0
@@ -254,19 +263,36 @@ public class RegistrationService : IRegistrationService
         await _users.SaveChangesAsync(cancellationToken);
 
         IReadOnlyList<Guid> jobIds = [];
+        var sync = SyncSummaryDto.Empty;
         string message;
         if (isLibraryPublic)
         {
             try
             {
-                jobIds = await _syncJobEnqueueService.EnqueueRegisterSyncAsync(user.Id, user.SteamId!, cancellationToken);
+                await _steamSnapshotService.PersistRegistrationSnapshotAsync(
+                    user.Id,
+                    user.SteamId!,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to persist registration snapshot for user {UserId}", user.Id);
+            }
+
+            try
+            {
+                jobIds = await _syncJobEnqueueService.EnqueueRegisterSyncAsync(
+                    user.Id,
+                    user.SteamId!,
+                    cancellationToken);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to enqueue initial sync for user {UserId}", user.Id);
             }
 
-            message = "Registration successful. Preparing your library…";
+            sync = await BuildSyncSummaryAsync(user.Id, cancellationToken);
+            message = "Registration successful. Importing your library in the background…";
         }
         else
         {
@@ -284,8 +310,27 @@ public class RegistrationService : IRegistrationService
             StatusLabel = ((StatusEnum)user.Status).ToString(),
             SteamLibraryPublic = isLibraryPublic,
             JobIds = jobIds,
-            Message = message
+            Message = message,
+            Sync = sync
         };
+    }
+
+    private async Task<SyncSummaryDto> BuildSyncSummaryAsync(int userId, CancellationToken cancellationToken)
+    {
+        var row = await _db.UserSyncStatuses.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.UserId == userId, cancellationToken);
+        if (row is null)
+        {
+            return SyncSummaryDto.From(SyncStatus.Pending, null, null, 0, 0, 0);
+        }
+
+        return SyncSummaryDto.From(
+            row.Status,
+            row.LastFullSync,
+            row.LastPartialSync,
+            row.GamesSyncedCount,
+            row.TotalGamesCount,
+            row.SyncProgressPercent);
     }
 
     private static string NormalizeEmail(string? email) =>

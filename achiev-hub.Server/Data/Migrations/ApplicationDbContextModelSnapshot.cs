@@ -31,8 +31,8 @@ namespace achiev_hub.Server.Data.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ApiName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
@@ -56,8 +56,8 @@ namespace achiev_hub.Server.Data.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.HasKey("Id");
 
@@ -139,8 +139,8 @@ namespace achiev_hub.Server.Data.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("Publishers")
                         .HasMaxLength(500)
@@ -381,6 +381,10 @@ namespace achiev_hub.Server.Data.Migrations
                         .HasDefaultValue(0)
                         .HasColumnName("games_synced_count");
 
+                    b.Property<DateTimeOffset?>("LastAutoEnqueueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_auto_enqueue_at");
+
                     b.Property<string>("LastError")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
@@ -397,6 +401,20 @@ namespace achiev_hub.Server.Data.Migrations
                     b.Property<DateTime?>("LastPartialSync")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_partial_sync");
+
+                    b.Property<DateTimeOffset?>("LockedUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("locked_until");
+
+                    b.Property<int>("ManualEnqueueCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("manual_enqueue_count");
+
+                    b.Property<DateOnly?>("ManualEnqueueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("manual_enqueue_date");
 
                     b.Property<int>("Status")
                         .ValueGeneratedOnAdd()

@@ -4,6 +4,9 @@ using achiev_hub.Server.Enums;
 using achiev_hub.Server.Repositories.Interfaces;
 using achiev_hub.Server.Services.Interfaces;
 using achiev_hub.Server.Support;
+using Microsoft.EntityFrameworkCore;
+using SteamSync.Shared;
+using achiev_hub.Server.Data;
 
 namespace achiev_hub.Server.Services;
 
@@ -11,22 +14,16 @@ public class AuthenticationService : IAuthenticationService
 {
     private readonly IRepository<User> _users;
     private readonly JwtTokenService _jwtTokenService;
-    private readonly ISyncJobEnqueueService _syncJobEnqueueService;
-    private readonly ISteamVisibilityService _steamVisibilityService;
-    private readonly ILogger<AuthenticationService> _logger;
+    private readonly ApplicationDbContext _db;
 
     public AuthenticationService(
         IRepository<User> users,
         JwtTokenService jwtTokenService,
-        ISyncJobEnqueueService syncJobEnqueueService,
-        ISteamVisibilityService steamVisibilityService,
-        ILogger<AuthenticationService> logger)
+        ApplicationDbContext db)
     {
         _users = users;
         _jwtTokenService = jwtTokenService;
-        _syncJobEnqueueService = syncJobEnqueueService;
-        _steamVisibilityService = steamVisibilityService;
-        _logger = logger;
+        _db = db;
     }
 
     public async Task<object> LoginAsync(string steamId, string password, CancellationToken cancellationToken = default)
@@ -47,52 +44,26 @@ public class AuthenticationService : IAuthenticationService
             return AuthResult.Fail("Account is inactive", 403);
         }
 
+        // Provisioning no longer blocks login — sync runs in the background.
         if (user.Status == (int)StatusEnum.Provisioning)
         {
-            return AuthResult.Fail(
-                "Account is still preparing your Steam library. Please wait a moment and try again.",
-                403);
+            user.Status = (int)StatusEnum.Active;
         }
 
         user.LastLogin = DateTime.UtcNow;
         await _users.SaveChangesAsync(cancellationToken);
 
-        var syncEnqueued = false;
-        string? syncMessage = null;
-
-        if (!string.IsNullOrWhiteSpace(user.SteamId))
-        {
-            try
-            {
-                var isPublic = await _steamVisibilityService.RefreshUserSteamVisibilityAsync(
-                    user.Id,
-                    user.SteamId,
-                    cancellationToken);
-
-                // Reload flag after refresh (tracked entity may already be updated).
-                if (isPublic)
-                {
-                    await _syncJobEnqueueService.EnqueueLoginSyncAsync(user.Id, user.SteamId, cancellationToken);
-                    syncEnqueued = true;
-                }
-                else
-                {
-                    syncMessage =
-                        "Your Steam profile is private. Library sync is paused until game details are public.";
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to refresh visibility / enqueue login sync for user {UserId}", user.Id);
-            }
-        }
+        var sync = await BuildSyncSummaryAsync(user.Id, cancellationToken);
 
         return new LoginResponseDto
         {
             AccessToken = _jwtTokenService.GenerateToken(user),
             TokenType = "Bearer",
-            SyncEnqueued = syncEnqueued,
-            SyncMessage = syncMessage,
+            SyncEnqueued = user.SteamLibraryPublic,
+            SyncMessage = user.SteamLibraryPublic
+                ? null
+                : "Your Steam profile is private. Library sync is paused until game details are public.",
+            Sync = sync,
             User = new AuthUserDto
             {
                 Id = user.Id,
@@ -111,6 +82,7 @@ public class AuthenticationService : IAuthenticationService
         {
             AccessToken = _jwtTokenService.GenerateGuestToken(normalizedSteamId),
             TokenType = "Bearer",
+            Sync = SyncSummaryDto.Empty,
             User = new AuthUserDto
             {
                 Id = 0,
@@ -130,6 +102,24 @@ public class AuthenticationService : IAuthenticationService
             user.TokenVersion++;
             await _users.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    private async Task<SyncSummaryDto> BuildSyncSummaryAsync(int userId, CancellationToken cancellationToken)
+    {
+        var row = await _db.UserSyncStatuses.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.UserId == userId, cancellationToken);
+        if (row is null)
+        {
+            return SyncSummaryDto.Empty;
+        }
+
+        return SyncSummaryDto.From(
+            row.Status,
+            row.LastFullSync,
+            row.LastPartialSync,
+            row.GamesSyncedCount,
+            row.TotalGamesCount,
+            row.SyncProgressPercent);
     }
 }
 

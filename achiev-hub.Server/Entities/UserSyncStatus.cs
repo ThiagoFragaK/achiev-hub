@@ -16,5 +16,17 @@ public class UserSyncStatus
     public Guid? LastJobId { get; set; }
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
+    /// <summary>In-flight claim; skip enqueue while UtcNow &lt; LockedUntil.</summary>
+    public DateTimeOffset? LockedUntil { get; set; }
+
+    /// <summary>Last auto-triggered enqueue (login / lazy refresh); max 1 per day.</summary>
+    public DateTimeOffset? LastAutoEnqueueAt { get; set; }
+
+    /// <summary>UTC date of the manual enqueue counter window.</summary>
+    public DateOnly? ManualEnqueueDate { get; set; }
+
+    /// <summary>Manual sync publishes on <see cref="ManualEnqueueDate"/> (max 2).</summary>
+    public int ManualEnqueueCount { get; set; }
+
     public User User { get; set; } = null!;
 }

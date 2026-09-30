@@ -106,17 +106,61 @@ Steam (identity from JWT `steam_id`):
 | `GET` | `/api/steam/games/{appId}/achievements` | Schema + player unlocks (paged) |
 | `POST` | `/api/steam/games/sync` | Publish full library sync to RabbitMQ (**202**) |
 | `POST` | `/api/steam/games/{appId}/sync-achievements` | Publish per-game achievement sync (**202**) |
-| `GET` | `/api/steam/sync/status` | Sync progress, avg %, coverage, updating flag |
+| `GET` | `/api/steam/sync/status` | Sync progress, avg %, coverage, updating / partial flags + `sync` block |
 | `GET` | `/api/users/{id}/sync-status` | Dedicated sync status DTO (`user_sync_status`) |
 | `POST` | `/api/register/validate-steam` | Validate Steam ID before OTP |
-| `GET` | `/api/register/status?steamId=` | Provisioning readiness (anonymous) |
+| `GET` | `/api/register/status?steamId=` | Registration / sync readiness (anonymous) |
 
 Stats:
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/api/users/stats` | Current user stats |
+| `GET` | `/api/users/stats` | Current user stats (`sync` block; Steam live fallback while pending) |
 | `GET` | `/api/users/stats/games/{appId}` | Per-game stats |
+
+## Progressive sync (login & library)
+
+Login and registration **never wait** for achievement crawls. The API stores a lightweight Steam snapshot (owned + recent games) at register, then publishes RabbitMQ jobs to **steam-sync**.
+
+### Job types
+
+| Trigger | Job | Priority |
+| --- | --- | --- |
+| Register | `user_sync` + `scope=initial` (recent + top 50 by playtime) | high |
+| Login (never fully synced) | `user_sync` + `scope=initial` | high |
+| Login (`last_full_sync` &gt; 14 days) | `full_library_resync` | low |
+| Login (play since last partial) | `recent_activity_only` | high |
+| Games page if stale (&gt; 14 days) | `recent_activity_only` (max 1 auto/day) | medium |
+| Manual “Sync now” | `full_library_resync` (max 2/day) | high |
+
+Duplicate publishes are blocked while `user_sync_status.status = Syncing` or `locked_until` is in the future.
+
+### Sync status values
+
+`pending` → `syncing` → `partial` (initial pass done) → `complete` (full crawl) / `failed`
+
+Auth and data responses include a `sync` block:
+
+```json
+{
+  "status": "partial",
+  "lastFullSync": null,
+  "lastPartialSync": "2026-09-29T08:00:00Z",
+  "gamesSynced": 540,
+  "gamesTotal": 1200,
+  "progressPercent": 45
+}
+```
+
+While status is `pending`/`syncing` in the first 24h and the DB shell is empty, library/stats may return `source: "steam_live"` and `fallback: true`.
+
+### Frontend sync UX
+
+- **App shell banner**: while `isUpdating`, show `Syncing X/Y games`. While `partial`, show a softer “Library partially imported” message.
+- **Incomplete stats**: treat `sync.status !== "complete"` as incomplete (badge / muted charts).
+- **Pending games**: library items with `importPending: true` should appear greyed / “pending import”.
+- **Live fallback**: if a games/stats response has `fallback: true`, show “Importing your library… showing live Steam data”.
+- Poll `GET /api/steam/sync/status` about every 5s while logged in (already done in `AppShell`).
 
 ## Project layout
 
