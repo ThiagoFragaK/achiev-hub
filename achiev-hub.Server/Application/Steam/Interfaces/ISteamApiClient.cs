@@ -1,7 +1,8 @@
 using achiev_hub.Server.Infrastructure.Steam.Models;
 
 namespace achiev_hub.Server.Application.Steam.Interfaces;
-public interface ISteamRepository
+
+public interface ISteamApiClient
 {
     Task<SteamIdValidationResult> ValidateIdAsync(string steamId, CancellationToken cancellationToken = default);
     Task<Player?> GetPlayerBySteamIdAsync(string steamId, CancellationToken cancellationToken = default);

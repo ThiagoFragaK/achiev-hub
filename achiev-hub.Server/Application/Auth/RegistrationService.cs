@@ -22,7 +22,7 @@ public class RegistrationService : IRegistrationService
     private readonly IRepository<EmailVerification> _verifications;
     private readonly IEmailSender _emailSender;
     private readonly IHostEnvironment _environment;
-    private readonly ISteamRepository _steamRepository;
+    private readonly ISteamApiClient _steamApiClient;
     private readonly ISteamSyncService _steamSyncService;
     private readonly ILogger<RegistrationService> _logger;
 
@@ -31,7 +31,7 @@ public class RegistrationService : IRegistrationService
         IRepository<EmailVerification> verifications,
         IEmailSender emailSender,
         IHostEnvironment environment,
-        ISteamRepository steamRepository,
+        ISteamApiClient steamApiClient,
         ISteamSyncService steamSyncService,
         ILogger<RegistrationService> logger)
     {
@@ -39,14 +39,14 @@ public class RegistrationService : IRegistrationService
         _verifications = verifications;
         _emailSender = emailSender;
         _environment = environment;
-        _steamRepository = steamRepository;
+        _steamApiClient = steamApiClient;
         _steamSyncService = steamSyncService;
         _logger = logger;
     }
 
     public async Task<object> ValidateSteamAsync(string steamId, CancellationToken cancellationToken = default)
     {
-        var validation = await _steamRepository.ValidateIdAsync(steamId, cancellationToken);
+        var validation = await _steamApiClient.ValidateIdAsync(steamId, cancellationToken);
         if (validation.Status == SteamIdValidationStatus.InvalidFormat)
         {
             return AuthResult.Fail("Steam ID must be a 17-digit SteamID64", 422);
