@@ -1,0 +1,37 @@
+namespace achiev_hub.Server.DTOs;
+
+public class SyncStatusDto
+{
+    public decimal AvgPercentage { get; set; }
+    public decimal AchievementSyncCoverage { get; set; }
+    public int OwnedWithStats { get; set; }
+    public int SyncedWithStats { get; set; }
+    public bool IsUpdating { get; set; }
+    public bool IsReady { get; set; }
+    public bool IsPartial { get; set; }
+    public bool SteamLibraryPublic { get; set; } = true;
+    public int Status { get; set; }
+    public string? StatusLabel { get; set; }
+    public IReadOnlyList<SyncJobStatusDto> Jobs { get; set; } = [];
+    public decimal SyncProgressPercent { get; set; }
+    public Guid? LastJobId { get; set; }
+    public SteamSync.Shared.SyncSummaryDto Sync { get; set; } = SteamSync.Shared.SyncSummaryDto.Empty;
+}
+
+public class SyncJobStatusDto
+{
+    public int Id { get; set; }
+    public string Type { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public int ProgressDone { get; set; }
+    public int ProgressTotal { get; set; }
+    public string? LastError { get; set; }
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
+public class EnqueueSyncResponseDto
+{
+    public bool Success { get; set; } = true;
+    public string Message { get; set; } = "Sync enqueued.";
+    public IReadOnlyList<Guid> JobIds { get; set; } = [];
+}

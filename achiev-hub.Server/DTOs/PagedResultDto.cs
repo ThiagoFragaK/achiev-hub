@@ -7,4 +7,8 @@ public class PagedResultDto<T>
     public int LastPage { get; set; }
     public int PerPage { get; set; }
     public int TotalCount { get; set; }
+
+    public SteamSync.Shared.SyncSummaryDto? Sync { get; set; }
+    public string? Source { get; set; }
+    public bool Fallback { get; set; }
 }

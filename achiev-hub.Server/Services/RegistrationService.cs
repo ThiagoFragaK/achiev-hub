@@ -1,12 +1,14 @@
 using System.Security.Cryptography;
 using System.Text;
+using achiev_hub.Server.Data;
 using achiev_hub.Server.DTOs.Auth;
 using achiev_hub.Server.Entities;
 using achiev_hub.Server.Enums;
 using achiev_hub.Server.Repositories.Interfaces;
-using achiev_hub.Server.Services;
 using achiev_hub.Server.Services.Interfaces;
 using achiev_hub.Server.Support;
+using Microsoft.EntityFrameworkCore;
+using SteamSync.Shared;
 
 namespace achiev_hub.Server.Services;
 
@@ -20,7 +22,10 @@ public class RegistrationService : IRegistrationService
     private readonly IRepository<EmailVerification> _verifications;
     private readonly IEmailSender _emailSender;
     private readonly IHostEnvironment _environment;
-    private readonly ISteamSyncService _steamSyncService;
+    private readonly ISteamRepository _steamRepository;
+    private readonly ISyncJobEnqueueService _syncJobEnqueueService;
+    private readonly ISteamSnapshotService _steamSnapshotService;
+    private readonly ApplicationDbContext _db;
     private readonly ILogger<RegistrationService> _logger;
 
     public RegistrationService(
@@ -28,19 +33,71 @@ public class RegistrationService : IRegistrationService
         IRepository<EmailVerification> verifications,
         IEmailSender emailSender,
         IHostEnvironment environment,
-        ISteamSyncService steamSyncService,
+        ISteamRepository steamRepository,
+        ISyncJobEnqueueService syncJobEnqueueService,
+        ISteamSnapshotService steamSnapshotService,
+        ApplicationDbContext db,
         ILogger<RegistrationService> logger)
     {
         _users = users;
         _verifications = verifications;
         _emailSender = emailSender;
         _environment = environment;
-        _steamSyncService = steamSyncService;
+        _steamRepository = steamRepository;
+        _syncJobEnqueueService = syncJobEnqueueService;
+        _steamSnapshotService = steamSnapshotService;
+        _db = db;
         _logger = logger;
     }
 
-    public async Task<object> SendVerificationAsync(string email, CancellationToken cancellationToken = default)
+    public async Task<object> ValidateSteamAsync(string steamId, CancellationToken cancellationToken = default)
     {
+        var normalized = NormalizeSteamId(steamId);
+        if (!SteamIdValidator.IsValidSteamId64(normalized))
+        {
+            return AuthResult.Fail("Steam ID must be a 17-digit SteamID64", 422);
+        }
+
+        if (await _users.AnyAsync(u => u.SteamId == normalized, cancellationToken))
+        {
+            return AuthResult.Fail("Steam ID is already registered", 409);
+        }
+
+        var player = await _steamRepository.GetPlayerBySteamIdAsync(normalized!, cancellationToken);
+        if (player is null || string.IsNullOrWhiteSpace(player.SteamId))
+        {
+            return AuthResult.Fail("Steam profile was not found. Check the Steam ID and profile visibility.", 404);
+        }
+
+        var isLibraryPublic = SteamVisibility.IsLibraryPublic(player);
+        return new
+        {
+            success = true,
+            message = isLibraryPublic
+                ? "Steam ID is valid"
+                : "Steam ID is valid, but the profile is private. You can register; library sync stays off until game details are public.",
+            data = new
+            {
+                steamId = player.SteamId,
+                personaName = player.PersonaName,
+                avatar = player.AvatarFull ?? player.Avatar,
+                isLibraryPublic,
+                communityVisibilityState = player.CommunityVisibilityState
+            }
+        };
+    }
+
+    public async Task<object> SendVerificationAsync(
+        string email,
+        string steamId,
+        CancellationToken cancellationToken = default)
+    {
+        var steamValidation = await ValidateSteamAsync(steamId, cancellationToken);
+        if (AuthResult.IsError(steamValidation, out var steamError))
+        {
+            return steamError;
+        }
+
         var normalizedEmail = NormalizeEmail(email);
         if (string.IsNullOrWhiteSpace(normalizedEmail))
         {
@@ -147,9 +204,10 @@ public class RegistrationService : IRegistrationService
                 422);
         }
 
-        if (!SteamIdValidator.IsValidSteamId64(steamId))
+        var steamValidation = await ValidateSteamAsync(steamId, cancellationToken);
+        if (AuthResult.IsError(steamValidation, out var steamError))
         {
-            return AuthResult.Fail("Steam ID must be a 17-digit SteamID64", 422);
+            return steamError;
         }
 
         if (!PasswordValidator.IsValid(request.Password, out var passwordError))
@@ -160,11 +218,6 @@ public class RegistrationService : IRegistrationService
         if (await _users.AnyAsync(u => u.Email == normalizedEmail, cancellationToken))
         {
             return AuthResult.Fail("Email is already registered", 409);
-        }
-
-        if (await _users.AnyAsync(u => u.SteamId == steamId, cancellationToken))
-        {
-            return AuthResult.Fail("Steam ID is already registered", 409);
         }
 
         EmailVerification? verification = null;
@@ -186,6 +239,9 @@ public class RegistrationService : IRegistrationService
             }
         }
 
+        var player = await _steamRepository.GetPlayerBySteamIdAsync(steamId, cancellationToken);
+        var isLibraryPublic = SteamVisibility.IsLibraryPublic(player);
+
         var user = new User
         {
             Email = normalizedEmail,
@@ -194,6 +250,7 @@ public class RegistrationService : IRegistrationService
             Role = "user",
             Status = (int)StatusEnum.Active,
             IsEmailVerified = !bypassEmailVerification,
+            SteamLibraryPublic = isLibraryPublic,
             TokenVersion = 0
         };
 
@@ -205,30 +262,75 @@ public class RegistrationService : IRegistrationService
 
         await _users.SaveChangesAsync(cancellationToken);
 
-        try
+        IReadOnlyList<Guid> jobIds = [];
+        var sync = SyncSummaryDto.Empty;
+        string message;
+        if (isLibraryPublic)
         {
-            await _steamSyncService.SyncLibraryAsync(
-                user.Id,
-                user.SteamId,
-                LibrarySyncScope.Full,
-                cancellationToken);
-            await _steamSyncService.SyncAchievementsForUserAsync(
-                user.Id,
-                user.SteamId,
-                AchievementSyncScope.AllOwnedWithStats,
-                cancellationToken);
+            try
+            {
+                await _steamSnapshotService.PersistRegistrationSnapshotAsync(
+                    user.Id,
+                    user.SteamId!,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to persist registration snapshot for user {UserId}", user.Id);
+            }
+
+            try
+            {
+                jobIds = await _syncJobEnqueueService.EnqueueRegisterSyncAsync(
+                    user.Id,
+                    user.SteamId!,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to enqueue initial sync for user {UserId}", user.Id);
+            }
+
+            sync = await BuildSyncSummaryAsync(user.Id, cancellationToken);
+            message = "Registration successful. Importing your library in the background…";
         }
-        catch (Exception ex)
+        else
         {
-            _logger.LogWarning(ex, "Initial library/achievement sync failed for user {UserId}", user.Id);
+            message =
+                "Registration successful. Your Steam profile is private, so nothing was synced. " +
+                "Make game details public, then sync or log in again.";
         }
 
         return new RegisterResponseDto
         {
             Id = user.Id,
             Email = user.Email,
-            SteamId = user.SteamId
+            SteamId = user.SteamId,
+            Status = user.Status,
+            StatusLabel = ((StatusEnum)user.Status).ToString(),
+            SteamLibraryPublic = isLibraryPublic,
+            JobIds = jobIds,
+            Message = message,
+            Sync = sync
         };
+    }
+
+    private async Task<SyncSummaryDto> BuildSyncSummaryAsync(int userId, CancellationToken cancellationToken)
+    {
+        var row = await _db.UserSyncStatuses.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.UserId == userId, cancellationToken);
+        if (row is null)
+        {
+            return SyncSummaryDto.From(SyncStatus.Pending, null, null, 0, 0, 0);
+        }
+
+        return SyncSummaryDto.From(
+            row.Status,
+            row.LastFullSync,
+            row.LastPartialSync,
+            row.GamesSyncedCount,
+            row.TotalGamesCount,
+            row.SyncProgressPercent);
     }
 
     private static string NormalizeEmail(string? email) =>

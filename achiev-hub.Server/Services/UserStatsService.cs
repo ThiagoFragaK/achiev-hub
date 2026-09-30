@@ -1,26 +1,40 @@
 using achiev_hub.Server.Data;
 using achiev_hub.Server.DTOs;
+using achiev_hub.Server.Repositories.Interfaces;
 using achiev_hub.Server.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using SteamSync.Shared;
 
 namespace achiev_hub.Server.Services;
 
 public class UserStatsService : IUserStatsService
 {
     private const int DaysWindow = 14;
+    private static readonly TimeSpan LiveFallbackWindow = TimeSpan.FromHours(24);
+    private static readonly TimeSpan SteamLiveCacheTtl = TimeSpan.FromSeconds(60);
 
     private static readonly TimeZoneInfo DateTimeZone = TimeZoneInfo.Local;
 
     private readonly ApplicationDbContext _db;
+    private readonly ISteamRepository _steamRepository;
+    private readonly IMemoryCache _cache;
 
-    public UserStatsService(ApplicationDbContext db)
+    public UserStatsService(
+        ApplicationDbContext db,
+        ISteamRepository steamRepository,
+        IMemoryCache cache)
     {
         _db = db;
+        _steamRepository = steamRepository;
+        _cache = cache;
     }
 
     public async Task<UserStatsDto> GetStatsAsync(int userId, CancellationToken cancellationToken = default)
     {
-        // A single pass over the user's unlock timestamps feeds both charts.
+        var syncRow = await _db.UserSyncStatuses.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.UserId == userId, cancellationToken);
+
         var unlockDates = await _db.UsersAchievements
             .AsNoTracking()
             .Where(ua => ua.UserId == userId && ua.UnlockDate != null)
@@ -29,17 +43,65 @@ public class UserStatsService : IUserStatsService
 
         var localDays = unlockDates.Select(ToLocalDate).ToList();
 
-        var averagePercentage = await _db.Users
+        var userStats = await _db.Users
             .AsNoTracking()
             .Where(u => u.Id == userId)
-            .Select(u => (decimal?)u.AvgPercentage)
+            .Select(u => new { u.AvgPercentage, u.AchievementSyncCoverage, u.SteamId })
             .FirstOrDefaultAsync(cancellationToken);
+
+        var ownedWithStats = await _db.UsersGames.AsNoTracking()
+            .CountAsync(ug => ug.UserId == userId && ug.Game.HasCommunityVisibleStats == true, cancellationToken);
+        var syncedWithStats = await _db.UsersGames.AsNoTracking()
+            .CountAsync(
+                ug => ug.UserId == userId
+                    && ug.Game.HasCommunityVisibleStats == true
+                    && ug.AchievementsSyncedAt != null
+                    && !ug.AchievementSyncUnavailable,
+                cancellationToken);
+
+        var sync = syncRow is null
+            ? SyncSummaryDto.Empty
+            : SyncSummaryDto.From(
+                syncRow.Status,
+                syncRow.LastFullSync,
+                syncRow.LastPartialSync,
+                syncRow.GamesSyncedCount > 0 ? syncRow.GamesSyncedCount : syncedWithStats,
+                syncRow.TotalGamesCount > 0 ? syncRow.TotalGamesCount : ownedWithStats,
+                syncRow.SyncProgressPercent);
+
+        // Live fallback only while pending/syncing within 24h and no synced achievements yet.
+        var useLive = syncedWithStats == 0
+            && !string.IsNullOrWhiteSpace(userStats?.SteamId)
+            && ShouldUseLiveFallback(syncRow);
+
+        if (useLive)
+        {
+            var liveOwned = await GetCachedOwnedCountAsync(userStats!.SteamId!, cancellationToken);
+            return new UserStatsDto
+            {
+                AchievementsLast14Days = BuildLastDays([]),
+                AchievementsPerYear = [],
+                AveragePercentage = 0,
+                AchievementSyncCoverage = 0,
+                OwnedWithStats = liveOwned,
+                SyncedWithStats = 0,
+                Sync = sync,
+                Source = "steam_live",
+                Fallback = true
+            };
+        }
 
         return new UserStatsDto
         {
             AchievementsLast14Days = BuildLastDays(localDays),
             AchievementsPerYear = BuildPerYear(localDays),
-            AveragePercentage = averagePercentage ?? 0
+            AveragePercentage = userStats?.AvgPercentage ?? 0,
+            AchievementSyncCoverage = userStats?.AchievementSyncCoverage ?? 0,
+            OwnedWithStats = ownedWithStats,
+            SyncedWithStats = syncedWithStats,
+            Sync = sync,
+            Source = "db",
+            Fallback = false
         };
     }
 
@@ -49,7 +111,12 @@ public class UserStatsService : IUserStatsService
         {
             AchievementsLast14Days = BuildLastDays([]),
             AchievementsPerYear = [],
-            AveragePercentage = 0
+            AveragePercentage = 0,
+            AchievementSyncCoverage = 0,
+            OwnedWithStats = 0,
+            SyncedWithStats = 0,
+            Sync = SyncSummaryDto.Empty,
+            Source = "db"
         };
     }
 
@@ -80,7 +147,6 @@ public class UserStatsService : IUserStatsService
         var unlockedCount = unlockDates.Count;
         var isCompleted = totalCount > 0 && unlockedCount >= totalCount;
 
-        // Steam occasionally reports an unlock without a timestamp; those cannot be placed on the timeline.
         var unlockDays = unlockDates
             .Where(date => date.HasValue)
             .Select(date => ToLocalDate(date!.Value))
@@ -100,9 +166,6 @@ public class UserStatsService : IUserStatsService
         }
 
         var start = unlockDays[0];
-
-        // While anything is still locked the run is ongoing, so the timeline reaches today.
-        // Once everything is unlocked it ends on the day the last achievement was unlocked.
         var end = isCompleted ? unlockDays[^1] : ToLocalDate(DateTime.UtcNow);
         if (end < start)
         {
@@ -128,6 +191,44 @@ public class UserStatsService : IUserStatsService
             Points = [],
             Granularity = GameProgressGranularity.Day
         };
+    }
+
+    private async Task<int> GetCachedOwnedCountAsync(string steamId, CancellationToken cancellationToken)
+    {
+        var cacheKey = $"stats-live-owned:{steamId}";
+        if (_cache.TryGetValue(cacheKey, out int cached))
+        {
+            return cached;
+        }
+
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            var owned = await _steamRepository.GetOwnedGamesAsync(steamId, cts.Token);
+            var count = owned.Count(g => g.HasCommunityVisibleStats);
+            _cache.Set(cacheKey, count, SteamLiveCacheTtl);
+            return count;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    private static bool ShouldUseLiveFallback(Entities.UserSyncStatus? syncRow)
+    {
+        if (syncRow is null)
+        {
+            return true;
+        }
+
+        if (syncRow.Status is not (SyncStatus.Pending or SyncStatus.Syncing))
+        {
+            return false;
+        }
+
+        return DateTimeOffset.UtcNow - syncRow.UpdatedAt <= LiveFallbackWindow;
     }
 
     private static IReadOnlyList<GameProgressPointDto> BuildProgressPoints(
@@ -177,13 +278,11 @@ public class UserStatsService : IUserStatsService
             };
         }
 
-        // The end date always closes the timeline, even when the last step overshoots it.
         yield return end;
     }
 
     private static string ChooseGranularity(DateTime start, DateTime end)
     {
-        // Steps are picked so a run keeps a readable number of points whatever its length.
         var days = (end - start).TotalDays;
         return days switch
         {
@@ -231,7 +330,6 @@ public class UserStatsService : IUserStatsService
         var firstYear = countsByYear.Keys.Min();
         var lastYear = countsByYear.Keys.Max();
 
-        // Years without unlocks are kept as zeros so the area chart stays continuous.
         return Enumerable.Range(firstYear, lastYear - firstYear + 1)
             .Select(year => new YearlyAchievementCountDto
             {

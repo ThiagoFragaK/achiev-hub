@@ -49,6 +49,10 @@
                     />
                 </div>
 
+                <div v-if="readyMessage" class="alert alert-success py-2" role="status">
+                    {{ readyMessage }}
+                </div>
+
                 <div v-if="loginError" class="alert alert-danger py-2" role="alert">
                     {{ loginError }}
                 </div>
@@ -98,7 +102,19 @@ export default {
             password: '',
             steamIdError: false,
             loginError: '',
+            readyMessage: '',
             loading: false
+        }
+    },
+    created() {
+        if (typeof this.$route.query.steamId === 'string') {
+            this.steamId = this.$route.query.steamId
+        }
+        if (this.$route.query.ready === '1') {
+            this.readyMessage = 'Your library is ready. You can log in now.'
+        } else if (this.$route.query.ready === 'private') {
+            this.readyMessage =
+                'Account created. Your Steam profile is private — sync stays off until game details are public. You can log in now.'
         }
     },
     methods: {
@@ -113,11 +129,15 @@ export default {
         async onLogin() {
             this.steamIdError = !this.steamId.trim()
             this.loginError = ''
+            this.readyMessage = ''
             if (this.steamIdError) return
 
             this.loading = true
             try {
-                await login(this.steamId.trim(), this.password)
+                const result = await login(this.steamId.trim(), this.password)
+                if (result?.syncMessage) {
+                    sessionStorage.setItem('achievhub.syncNotice', result.syncMessage)
+                }
                 this.redirectAfterLogin()
             } catch (error) {
                 this.loginError = error.body?.message || error.message || 'Login failed'

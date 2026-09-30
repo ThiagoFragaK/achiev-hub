@@ -31,8 +31,8 @@ namespace achiev_hub.Server.Data.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ApiName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
@@ -56,8 +56,8 @@ namespace achiev_hub.Server.Data.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.HasKey("Id");
 
@@ -139,12 +139,15 @@ namespace achiev_hub.Server.Data.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("Publishers")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("SchemaSyncedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
@@ -216,6 +219,72 @@ namespace achiev_hub.Server.Data.Migrations
                     b.ToTable("goal_achievements", (string)null);
                 });
 
+            modelBuilder.Entity("achiev_hub.Server.Entities.SyncJob", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AppId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Attempts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<DateTimeOffset>("AvailableAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Cursor")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("ProgressDone")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("ProgressTotal")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SteamId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status", "AvailableAt");
+
+                    b.HasIndex("UserId", "Type", "Status");
+
+                    b.ToTable("sync_jobs", (string)null);
+                });
+
             modelBuilder.Entity("achiev_hub.Server.Entities.User", b =>
                 {
                     b.Property<int>("Id")
@@ -223,6 +292,13 @@ namespace achiev_hub.Server.Data.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AchievementSyncCoverage")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("achievement_sync_coverage");
 
                     b.Property<decimal>("AvgPercentage")
                         .ValueGeneratedOnAdd()
@@ -270,6 +346,12 @@ namespace achiev_hub.Server.Data.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
+                    b.Property<bool>("SteamLibraryPublic")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("steam_library_public");
+
                     b.Property<int>("TokenVersion")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -285,6 +367,81 @@ namespace achiev_hub.Server.Data.Migrations
                         .HasFilter("\"SteamId\" IS NOT NULL");
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("achiev_hub.Server.Entities.UserSyncStatus", b =>
+                {
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("GamesSyncedCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("games_synced_count");
+
+                    b.Property<DateTimeOffset?>("LastAutoEnqueueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_auto_enqueue_at");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTime?>("LastFullSync")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_full_sync");
+
+                    b.Property<Guid?>("LastJobId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_job_id");
+
+                    b.Property<DateTime?>("LastPartialSync")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_partial_sync");
+
+                    b.Property<DateTimeOffset?>("LockedUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("locked_until");
+
+                    b.Property<int>("ManualEnqueueCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("manual_enqueue_count");
+
+                    b.Property<DateOnly?>("ManualEnqueueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("manual_enqueue_date");
+
+                    b.Property<int>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("status");
+
+                    b.Property<decimal>("SyncProgressPercent")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("sync_progress_percent");
+
+                    b.Property<int>("TotalGamesCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("total_games_count");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("user_sync_status", (string)null);
                 });
 
             modelBuilder.Entity("achiev_hub.Server.Entities.UsersAchievement", b =>
@@ -328,17 +485,30 @@ namespace achiev_hub.Server.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("AchievementSyncUnavailable")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<decimal>("AchievementsPercentage")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(5, 2)
                         .HasColumnType("numeric(5,2)")
                         .HasDefaultValue(0m);
 
+                    b.Property<DateTimeOffset?>("AchievementsSyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("GameId")
                         .HasColumnType("integer");
 
                     b.Property<long?>("LastPlayedUnix")
                         .HasColumnType("bigint");
+
+                    b.Property<bool>("NeedsAchievementRefresh")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
 
                     b.Property<int>("PlaytimeMinutes")
                         .ValueGeneratedOnAdd()
@@ -352,8 +522,12 @@ namespace achiev_hub.Server.Data.Migrations
 
                     b.HasIndex("GameId");
 
+                    b.HasIndex("UserId", "AchievementSyncUnavailable");
+
                     b.HasIndex("UserId", "GameId")
                         .IsUnique();
+
+                    b.HasIndex("UserId", "NeedsAchievementRefresh");
 
                     b.ToTable("users_games", (string)null);
                 });
@@ -405,6 +579,27 @@ namespace achiev_hub.Server.Data.Migrations
                     b.Navigation("Achievement");
 
                     b.Navigation("Goal");
+                });
+
+            modelBuilder.Entity("achiev_hub.Server.Entities.SyncJob", b =>
+                {
+                    b.HasOne("achiev_hub.Server.Entities.User", "User")
+                        .WithMany("SyncJobs")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("achiev_hub.Server.Entities.UserSyncStatus", b =>
+                {
+                    b.HasOne("achiev_hub.Server.Entities.User", "User")
+                        .WithOne()
+                        .HasForeignKey("achiev_hub.Server.Entities.UserSyncStatus", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("achiev_hub.Server.Entities.UsersAchievement", b =>
@@ -479,6 +674,8 @@ namespace achiev_hub.Server.Data.Migrations
             modelBuilder.Entity("achiev_hub.Server.Entities.User", b =>
                 {
                     b.Navigation("Goals");
+
+                    b.Navigation("SyncJobs");
 
                     b.Navigation("UsersAchievements");
 

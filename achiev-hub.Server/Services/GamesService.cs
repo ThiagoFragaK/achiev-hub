@@ -6,22 +6,34 @@ using achiev_hub.Server.Services.Interfaces;
 using achiev_hub.Server.Support;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using SteamSync.Shared;
 
 namespace achiev_hub.Server.Services;
 
 public class GamesService : IGamesService
 {
     private static readonly TimeZoneInfo DateTimeZone = TimeZoneInfo.Local;
+    private static readonly TimeSpan StalePartialAge = TimeSpan.FromDays(14);
+    private static readonly TimeSpan LiveFallbackWindow = TimeSpan.FromHours(24);
 
     private readonly ISteamRepository _steamRepository;
     private readonly ApplicationDbContext _db;
     private readonly IMemoryCache _cache;
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<GamesService> _logger;
 
-    public GamesService(ISteamRepository steamRepository, ApplicationDbContext db, IMemoryCache cache)
+    public GamesService(
+        ISteamRepository steamRepository,
+        ApplicationDbContext db,
+        IMemoryCache cache,
+        IServiceScopeFactory scopeFactory,
+        ILogger<GamesService> logger)
     {
         _steamRepository = steamRepository;
         _db = db;
         _cache = cache;
+        _scopeFactory = scopeFactory;
+        _logger = logger;
     }
 
     public async Task<PagedResultDto<RecentGameDto>> GetRecentGamesAsync(
@@ -45,13 +57,90 @@ public class GamesService : IGamesService
         LibraryGameFilterDto? filters = null,
         CancellationToken cancellationToken = default)
     {
-        if (userId is int authUserId)
+        if (userId is not int authUserId || !await IsSteamLibraryPublicAsync(authUserId, cancellationToken))
         {
-            return await GetLibraryFromDbAsync(authUserId, page, pageSize, filters, cancellationToken);
+            var live = await GetLibraryFromSteamAsync(steamId, page, pageSize, filters, cancellationToken);
+            live.Source = "steam_live";
+            return live;
         }
 
-        return await GetLibraryFromSteamAsync(steamId, page, pageSize, filters, cancellationToken);
+        var syncRow = await _db.UserSyncStatuses.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.UserId == authUserId, cancellationToken);
+        var dbCount = await _db.UsersGames.AsNoTracking()
+            .CountAsync(ug => ug.UserId == authUserId, cancellationToken);
+
+        var useLiveFallback = ShouldUseLiveFallback(syncRow, dbCount);
+        PagedResultDto<LibraryGameDto> result;
+        if (useLiveFallback)
+        {
+            result = await GetLibraryFromSteamAsync(steamId, page, pageSize, filters, cancellationToken);
+            result.Source = "steam_live";
+            result.Fallback = true;
+        }
+        else
+        {
+            result = await GetLibraryFromDbAsync(authUserId, page, pageSize, filters, cancellationToken);
+            result.Source = "db";
+        }
+
+        result.Sync = ToSyncSummary(syncRow);
+
+        // Fire-and-forget lazy refresh when stale — never block the response.
+        MaybeEnqueueLazyRefresh(authUserId, steamId, syncRow);
+
+        return result;
     }
+
+    private void MaybeEnqueueLazyRefresh(int userId, string steamId, Entities.UserSyncStatus? syncRow)
+    {
+        var lastSync = syncRow?.LastPartialSync ?? syncRow?.LastFullSync;
+        if (lastSync is null || DateTime.UtcNow - lastSync.Value < StalePartialAge)
+        {
+            return;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await using var scope = _scopeFactory.CreateAsyncScope();
+                var enqueue = scope.ServiceProvider.GetRequiredService<ISyncJobEnqueueService>();
+                await enqueue.EnqueueLazyRefreshAsync(userId, steamId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Lazy library refresh enqueue failed for user {UserId}", userId);
+            }
+        });
+    }
+
+    private static bool ShouldUseLiveFallback(Entities.UserSyncStatus? syncRow, int dbCount)
+    {
+        if (dbCount > 0)
+        {
+            return false;
+        }
+
+        if (syncRow is null)
+        {
+            return true;
+        }
+
+        var withinWindow = DateTimeOffset.UtcNow - syncRow.UpdatedAt <= LiveFallbackWindow;
+        return withinWindow
+            && (syncRow.Status == SyncStatus.Pending || syncRow.Status == SyncStatus.Syncing);
+    }
+
+    private static SyncSummaryDto ToSyncSummary(Entities.UserSyncStatus? row) =>
+        row is null
+            ? SyncSummaryDto.Empty
+            : SyncSummaryDto.From(
+                row.Status,
+                row.LastFullSync,
+                row.LastPartialSync,
+                row.GamesSyncedCount,
+                row.TotalGamesCount,
+                row.SyncProgressPercent);
 
     public async Task<GameDetailsDto?> GetGameDetailsAsync(
         int appId,
@@ -63,7 +152,7 @@ public class GamesService : IGamesService
             return null;
         }
 
-        if (userId is int)
+        if (userId is int authUserId && await IsSteamLibraryPublicAsync(authUserId, cancellationToken))
         {
             return await GetGameDetailsFromDbAsync(appId, cancellationToken);
         }
@@ -128,6 +217,14 @@ public class GamesService : IGamesService
     private static string? FirstNonEmpty(params string?[] values) =>
         values.FirstOrDefault(v => !string.IsNullOrWhiteSpace(v));
 
+    private async Task<bool> IsSteamLibraryPublicAsync(int userId, CancellationToken cancellationToken)
+    {
+        return await _db.Users.AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.SteamLibraryPublic)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<PagedResultDto<AchievementDto>> GetAchievementsAsync(
         string steamId,
         int appId,
@@ -138,7 +235,7 @@ public class GamesService : IGamesService
         int? userId = null,
         CancellationToken cancellationToken = default)
     {
-        if (userId is int authUserId)
+        if (userId is int authUserId && await IsSteamLibraryPublicAsync(authUserId, cancellationToken))
         {
             return await GetAchievementsFromDbAsync(authUserId, appId, page, pageSize, name, status, cancellationToken);
         }
@@ -381,7 +478,10 @@ public class GamesService : IGamesService
                 NotPlayedSince = ug.LastPlayedUnix is null or 0
                     ? "0"
                     : FormatDate(ug.LastPlayedUnix.Value),
-                HasAchievements = ug.Game.HasCommunityVisibleStats == true
+                HasAchievements = ug.Game.HasCommunityVisibleStats == true,
+                ImportPending = ug.Game.HasCommunityVisibleStats == true
+                    && ug.AchievementsSyncedAt is null
+                    && !ug.AchievementSyncUnavailable
             });
         }
 

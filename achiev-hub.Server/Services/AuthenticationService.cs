@@ -2,9 +2,11 @@ using achiev_hub.Server.DTOs.Auth;
 using achiev_hub.Server.Entities;
 using achiev_hub.Server.Enums;
 using achiev_hub.Server.Repositories.Interfaces;
-using achiev_hub.Server.Services;
 using achiev_hub.Server.Services.Interfaces;
 using achiev_hub.Server.Support;
+using Microsoft.EntityFrameworkCore;
+using SteamSync.Shared;
+using achiev_hub.Server.Data;
 
 namespace achiev_hub.Server.Services;
 
@@ -12,19 +14,16 @@ public class AuthenticationService : IAuthenticationService
 {
     private readonly IRepository<User> _users;
     private readonly JwtTokenService _jwtTokenService;
-    private readonly ISteamSyncService _steamSyncService;
-    private readonly ILogger<AuthenticationService> _logger;
+    private readonly ApplicationDbContext _db;
 
     public AuthenticationService(
         IRepository<User> users,
         JwtTokenService jwtTokenService,
-        ISteamSyncService steamSyncService,
-        ILogger<AuthenticationService> logger)
+        ApplicationDbContext db)
     {
         _users = users;
         _jwtTokenService = jwtTokenService;
-        _steamSyncService = steamSyncService;
-        _logger = logger;
+        _db = db;
     }
 
     public async Task<object> LoginAsync(string steamId, string password, CancellationToken cancellationToken = default)
@@ -45,40 +44,33 @@ public class AuthenticationService : IAuthenticationService
             return AuthResult.Fail("Account is inactive", 403);
         }
 
+        // Provisioning no longer blocks login — sync runs in the background.
+        if (user.Status == (int)StatusEnum.Provisioning)
+        {
+            user.Status = (int)StatusEnum.Active;
+        }
+
         user.LastLogin = DateTime.UtcNow;
         await _users.SaveChangesAsync(cancellationToken);
 
-        if (!string.IsNullOrWhiteSpace(user.SteamId))
-        {
-            try
-            {
-                await _steamSyncService.SyncLibraryAsync(
-                    user.Id,
-                    user.SteamId,
-                    LibrarySyncScope.Recent,
-                    cancellationToken);
-                await _steamSyncService.SyncAchievementsForUserAsync(
-                    user.Id,
-                    user.SteamId,
-                    AchievementSyncScope.RecentTwoWeeks,
-                    cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Library sync failed after login for user {UserId}", user.Id);
-            }
-        }
+        var sync = await BuildSyncSummaryAsync(user.Id, cancellationToken);
 
         return new LoginResponseDto
         {
             AccessToken = _jwtTokenService.GenerateToken(user),
             TokenType = "Bearer",
+            SyncEnqueued = user.SteamLibraryPublic,
+            SyncMessage = user.SteamLibraryPublic
+                ? null
+                : "Your Steam profile is private. Library sync is paused until game details are public.",
+            Sync = sync,
             User = new AuthUserDto
             {
                 Id = user.Id,
                 Email = user.Email,
                 SteamId = user.SteamId,
-                Role = user.Role
+                Role = user.Role,
+                SteamLibraryPublic = user.SteamLibraryPublic
             }
         };
     }
@@ -90,12 +82,14 @@ public class AuthenticationService : IAuthenticationService
         {
             AccessToken = _jwtTokenService.GenerateGuestToken(normalizedSteamId),
             TokenType = "Bearer",
+            Sync = SyncSummaryDto.Empty,
             User = new AuthUserDto
             {
                 Id = 0,
                 Email = string.Empty,
                 SteamId = normalizedSteamId,
-                Role = JwtTokenService.GuestRole
+                Role = JwtTokenService.GuestRole,
+                SteamLibraryPublic = true
             }
         };
     }
@@ -108,6 +102,24 @@ public class AuthenticationService : IAuthenticationService
             user.TokenVersion++;
             await _users.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    private async Task<SyncSummaryDto> BuildSyncSummaryAsync(int userId, CancellationToken cancellationToken)
+    {
+        var row = await _db.UserSyncStatuses.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.UserId == userId, cancellationToken);
+        if (row is null)
+        {
+            return SyncSummaryDto.Empty;
+        }
+
+        return SyncSummaryDto.From(
+            row.Status,
+            row.LastFullSync,
+            row.LastPartialSync,
+            row.GamesSyncedCount,
+            row.TotalGamesCount,
+            row.SyncProgressPercent);
     }
 }
 

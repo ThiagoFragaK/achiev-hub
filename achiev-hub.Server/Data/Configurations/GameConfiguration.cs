@@ -13,7 +13,7 @@ public class GameConfiguration : IEntityTypeConfiguration<Game>
 
         builder.Property(e => e.Name)
             .IsRequired()
-            .HasMaxLength(200);
+            .HasMaxLength(500);
 
         builder.Property(e => e.ImageUrl)
             .HasMaxLength(500);
@@ -31,6 +31,8 @@ public class GameConfiguration : IEntityTypeConfiguration<Game>
             .HasMaxLength(500);
 
         builder.Property(e => e.HasCommunityVisibleStats);
+
+        builder.Property(e => e.SchemaSyncedAt);
 
         builder.HasIndex(e => e.GameSteamId)
             .IsUnique()

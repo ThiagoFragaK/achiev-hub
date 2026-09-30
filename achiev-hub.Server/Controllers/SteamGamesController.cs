@@ -1,5 +1,4 @@
 using achiev_hub.Server.DTOs;
-using achiev_hub.Server.Services;
 using achiev_hub.Server.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,12 +13,17 @@ namespace achiev_hub.Server.Controllers;
 public class SteamGamesController : ApiControllerBase
 {
     private readonly IGamesService _gamesService;
-    private readonly ISteamSyncService _steamSyncService;
+    private readonly ISyncJobEnqueueService _enqueueService;
+    private readonly ISteamVisibilityService _steamVisibilityService;
 
-    public SteamGamesController(IGamesService gamesService, ISteamSyncService steamSyncService)
+    public SteamGamesController(
+        IGamesService gamesService,
+        ISyncJobEnqueueService enqueueService,
+        ISteamVisibilityService steamVisibilityService)
     {
         _gamesService = gamesService;
-        _steamSyncService = steamSyncService;
+        _enqueueService = enqueueService;
+        _steamVisibilityService = steamVisibilityService;
     }
 
     [HttpGet("recent")]
@@ -116,7 +120,9 @@ public class SteamGamesController : ApiControllerBase
     }
 
     [HttpPost("{appId:int}/sync-achievements")]
-    public async Task<IActionResult> SyncGameAchievements(int appId, CancellationToken cancellationToken)
+    public async Task<ActionResult<EnqueueSyncResponseDto>> SyncGameAchievements(
+        int appId,
+        CancellationToken cancellationToken)
     {
         if (IsGuest())
         {
@@ -133,19 +139,40 @@ public class SteamGamesController : ApiControllerBase
             return error;
         }
 
-        try
+        var isPublic = await _steamVisibilityService.RefreshUserSteamVisibilityAsync(userId, steamId, cancellationToken);
+        if (!isPublic)
         {
-            await _steamSyncService.SyncGameAchievementsAsync(userId, steamId, appId, cancellationToken);
-            return Ok(new { success = true, message = "Achievements synced." });
+            return Conflict(new
+            {
+                message = "Your Steam profile is private. Make game details public, then try syncing again."
+            });
         }
-        catch (Exception ex)
+
+        var jobResult = await _enqueueService.EnqueueGameAchievementSyncAsync(
+            userId,
+            steamId,
+            appId,
+            cancellationToken);
+
+        if (jobResult.RateLimited)
         {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = ex.Message });
+            return StatusCode(StatusCodes.Status429TooManyRequests, new { message = jobResult.SkipReason });
         }
+
+        if (!jobResult.Enqueued || jobResult.JobId is not Guid jobId)
+        {
+            return Conflict(new { message = jobResult.SkipReason ?? "Sync could not be enqueued." });
+        }
+
+        return Accepted(new EnqueueSyncResponseDto
+        {
+            Message = "Achievement sync enqueued.",
+            JobIds = [jobId]
+        });
     }
 
     [HttpPost("sync")]
-    public async Task<IActionResult> SyncLibrary(CancellationToken cancellationToken)
+    public async Task<ActionResult<EnqueueSyncResponseDto>> SyncLibrary(CancellationToken cancellationToken)
     {
         if (IsGuest())
         {
@@ -162,23 +189,30 @@ public class SteamGamesController : ApiControllerBase
             return error;
         }
 
-        try
+        var isPublic = await _steamVisibilityService.RefreshUserSteamVisibilityAsync(userId, steamId, cancellationToken);
+        if (!isPublic)
         {
-            await _steamSyncService.SyncLibraryAsync(
-                userId,
-                steamId,
-                LibrarySyncScope.Full,
-                cancellationToken);
-            await _steamSyncService.SyncAchievementsForUserAsync(
-                userId,
-                steamId,
-                AchievementSyncScope.AllOwnedWithStats,
-                cancellationToken);
-            return Ok(new { success = true, message = "Library synced." });
+            return Conflict(new
+            {
+                message = "Your Steam profile is private. Make game details public, then try syncing again."
+            });
         }
-        catch (Exception ex)
+
+        var jobResult = await _enqueueService.EnqueueManualLibrarySyncAsync(userId, steamId, cancellationToken);
+        if (jobResult.RateLimited)
         {
-            return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = ex.Message });
+            return StatusCode(StatusCodes.Status429TooManyRequests, new { message = jobResult.SkipReason });
         }
+
+        if (!jobResult.Enqueued || jobResult.JobId is not Guid jobId)
+        {
+            return Conflict(new { message = jobResult.SkipReason ?? "Sync could not be enqueued." });
+        }
+
+        return Accepted(new EnqueueSyncResponseDto
+        {
+            Message = "Library sync enqueued.",
+            JobIds = [jobId]
+        });
     }
 }

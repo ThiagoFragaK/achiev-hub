@@ -10,6 +10,7 @@ using achiev_hub.Server.Repositories.Interfaces;
 using achiev_hub.Server.Services;
 using achiev_hub.Server.Services.Interfaces;
 using achiev_hub.Server.Support;
+using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -46,6 +47,7 @@ if (string.IsNullOrWhiteSpace(steamApiKey))
 builder.Services.Configure<SteamApiOptions>(builder.Configuration.GetSection(SteamApiOptions.SectionName));
 builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection(SendGridOptions.SectionName));
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
+builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection(RabbitMqOptions.SectionName));
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddHttpClient<ISteamRepository, SteamRepository>();
 
@@ -56,11 +58,35 @@ builder.Services.AddMemoryCache();
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<IPlayersService, PlayersService>();
 builder.Services.AddScoped<IGamesService, GamesService>();
-builder.Services.AddScoped<ISteamSyncService, SteamSyncService>();
+builder.Services.AddScoped<ISteamVisibilityService, SteamVisibilityService>();
+builder.Services.AddScoped<ISyncJobEnqueueService, SyncJobEnqueueService>();
+builder.Services.AddScoped<ISyncStatusService, SyncStatusService>();
 builder.Services.AddScoped<IUserStatsService, UserStatsService>();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IRegistrationService, RegistrationService>();
+builder.Services.AddScoped<ISteamSnapshotService, SteamSnapshotService>();
+builder.Services.AddScoped<ILoginPostAuthSyncService, LoginPostAuthSyncService>();
 builder.Services.AddScoped<IEmailSender, SendGridEmailSender>();
+
+var rabbit = builder.Configuration.GetSection(RabbitMqOptions.SectionName).Get<RabbitMqOptions>() ?? new RabbitMqOptions();
+builder.Services.AddMassTransit(x =>
+{
+    x.UsingRabbitMq((_, cfg) =>
+    {
+        if (!string.IsNullOrWhiteSpace(rabbit.Url))
+        {
+            cfg.Host(new Uri(rabbit.Url));
+        }
+        else
+        {
+            cfg.Host(rabbit.Host, rabbit.Port, rabbit.VirtualHost, h =>
+            {
+                h.Username(rabbit.Username);
+                h.Password(rabbit.Password);
+            });
+        }
+    });
+});
 
 builder.Services.AddRateLimiter(options =>
 {
@@ -141,6 +167,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
@@ -168,13 +195,13 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
-
 app.MapControllers();
-
+app.MapHealthChecks("/health");
 app.MapFallbackToFile("/index.html");
+
+app.Logger.LogInformation("achiev-hub API starting (sync via RabbitMQ → steam-sync)");
 
 app.Run();
