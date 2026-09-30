@@ -1,19 +1,5 @@
 using achiev_hub.Server.Application.Auth;
 using achiev_hub.Server.Application.Auth.Interfaces;
-using achiev_hub.Server.Application.Users;
-using achiev_hub.Server.Application.Users.Interfaces;
-using achiev_hub.Server.Application.Games;
-using achiev_hub.Server.Application.Games.Interfaces;
-using achiev_hub.Server.Application.Achievements;
-using achiev_hub.Server.Application.Achievements.Interfaces;
-using achiev_hub.Server.Application.Goals;
-using achiev_hub.Server.Application.Goals.Interfaces;
-using achiev_hub.Server.Application.Steam;
-using achiev_hub.Server.Application.Steam.Interfaces;
-using achiev_hub.Server.Application.Stats;
-using achiev_hub.Server.Application.Stats.Interfaces;
-using achiev_hub.Server.Application.Common;
-using achiev_hub.Server.Application.Common.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -31,6 +17,20 @@ public class RegistrationController : ControllerBase
         _service = service;
     }
 
+    [HttpPost("validate-steam")]
+    public async Task<IActionResult> ValidateSteam(
+        [FromBody] ValidateSteamRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _service.ValidateSteamAsync(request.SteamId, cancellationToken);
+        if (AuthResult.IsError(result, out var error))
+        {
+            return StatusCode(error.HttpStatus, new { message = error.Message });
+        }
+
+        return Ok(result);
+    }
+
     [HttpPost("send-verification")]
     public async Task<IActionResult> SendVerification(
         [FromBody] SendVerificationRequest request,
@@ -38,7 +38,7 @@ public class RegistrationController : ControllerBase
     {
         try
         {
-            var result = await _service.SendVerificationAsync(request.Email, cancellationToken);
+            var result = await _service.SendVerificationAsync(request.Email, request.SteamId, cancellationToken);
             if (AuthResult.IsError(result, out var error))
             {
                 return StatusCode(error.HttpStatus, new { message = error.Message });

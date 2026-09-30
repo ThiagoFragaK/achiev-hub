@@ -62,8 +62,12 @@ export async function continueAsGuest(steamId) {
     return { ...data, user }
 }
 
-export async function sendVerification(email) {
-    return postJson('/api/register/send-verification', { email })
+export async function validateSteam(steamId) {
+    return postJson('/api/register/validate-steam', { steamId })
+}
+
+export async function sendVerification(email, steamId) {
+    return postJson('/api/register/send-verification', { email, steamId })
 }
 
 export async function confirmCode(email, code) {

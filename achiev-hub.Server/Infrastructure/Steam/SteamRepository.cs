@@ -33,6 +33,23 @@ public class SteamRepository : ISteamRepository
         _httpClient.Timeout = TimeSpan.FromSeconds(30);
     }
 
+    public async Task<SteamIdValidationResult> ValidateIdAsync(string steamId, CancellationToken cancellationToken = default)
+    {
+        var normalized = string.IsNullOrWhiteSpace(steamId) ? null : steamId.Trim();
+        if (!SteamIdValidator.IsValidSteamId64(normalized))
+        {
+            return SteamIdValidationResult.InvalidFormat();
+        }
+
+        var player = await GetPlayerBySteamIdAsync(normalized!, cancellationToken);
+        if (player is null || string.IsNullOrWhiteSpace(player.SteamId))
+        {
+            return SteamIdValidationResult.NotFound();
+        }
+
+        return SteamIdValidationResult.Valid(player);
+    }
+
     public async Task<Player?> GetPlayerBySteamIdAsync(string steamId, CancellationToken cancellationToken = default)
     {
         try
