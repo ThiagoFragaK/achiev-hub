@@ -21,10 +21,13 @@
                         type="text"
                         class="form-control"
                         :class="{ 'is-invalid': fieldErrors.steamId }"
-                        :disabled="loading || fieldsLocked"
+                        :disabled="loading || fieldsLocked || steamValidated"
                         autocomplete="username"
                     />
                     <div v-if="fieldErrors.steamId" class="invalid-feedback d-block">Required</div>
+                    <div v-if="steamPersona" class="form-text text-success">
+                        Steam profile: {{ steamPersona }}
+                    </div>
                 </div>
 
                 <div class="mb-3">
@@ -35,7 +38,7 @@
                         type="email"
                         class="form-control"
                         :class="{ 'is-invalid': fieldErrors.email }"
-                        :disabled="loading || fieldsLocked"
+                        :disabled="loading || fieldsLocked || !steamValidated"
                         autocomplete="email"
                     />
                     <div v-if="fieldErrors.email" class="invalid-feedback d-block">Required</div>
@@ -50,13 +53,13 @@
                             :type="showPassword ? 'text' : 'password'"
                             class="form-control pe-5"
                             :class="{ 'is-invalid': fieldErrors.password }"
-                            :disabled="loading || fieldsLocked"
+                            :disabled="loading || fieldsLocked || !steamValidated"
                             autocomplete="new-password"
                         />
                         <button
                             type="button"
                             class="btn btn-link text-secondary position-absolute top-50 end-0 translate-middle-y px-3 py-0 border-0"
-                            :disabled="loading || fieldsLocked"
+                            :disabled="loading || fieldsLocked || !steamValidated"
                             :aria-label="showPassword ? 'Hide password' : 'Show password'"
                             :aria-pressed="showPassword"
                             @click="showPassword = !showPassword"
@@ -83,13 +86,13 @@
                             :type="showConfirmPassword ? 'text' : 'password'"
                             class="form-control pe-5"
                             :class="{ 'is-invalid': fieldErrors.confirmPassword }"
-                            :disabled="loading || fieldsLocked"
+                            :disabled="loading || fieldsLocked || !steamValidated"
                             autocomplete="new-password"
                         />
                         <button
                             type="button"
                             class="btn btn-link text-secondary position-absolute top-50 end-0 translate-middle-y px-3 py-0 border-0"
-                            :disabled="loading || fieldsLocked"
+                            :disabled="loading || fieldsLocked || !steamValidated"
                             :aria-label="
                                 showConfirmPassword
                                     ? 'Hide confirm password'
@@ -147,7 +150,17 @@
                     </button>
 
                     <button
-                        v-if="!bypassEmailVerification"
+                        v-if="!steamValidated"
+                        type="button"
+                        class="btn btn-primary"
+                        :disabled="loading"
+                        @click="onValidateSteam"
+                    >
+                        {{ loading ? 'Checking Steam…' : 'Validate Steam ID' }}
+                    </button>
+
+                    <button
+                        v-if="steamValidated && !bypassEmailVerification"
                         type="button"
                         class="btn btn-primary"
                         :disabled="
@@ -169,6 +182,7 @@
                     </button>
 
                     <button
+                        v-if="steamValidated"
                         type="button"
                         class="btn btn-success"
                         :disabled="loading || (!bypassEmailVerification && !emailVerified)"
@@ -183,7 +197,12 @@
 </template>
 
 <script>
-import { confirmCode, register, sendVerification } from '@/services/authService'
+import {
+    confirmCode,
+    register,
+    sendVerification,
+    validateSteam
+} from '@/services/authService'
 import LucideIcon from '@/components/global/LucideIcon.vue'
 import { validatePassword } from '@/utils/PasswordHelper'
 
@@ -205,6 +224,8 @@ export default {
             codeSent: false,
             emailVerified: false,
             emailVerifiedToken: '',
+            steamValidated: false,
+            steamPersona: '',
             cooldownSeconds: 0,
             cooldownTimer: null,
             loading: false,
@@ -268,6 +289,29 @@ export default {
         onCancel() {
             this.$router.push({ name: 'login' })
         },
+        async onValidateSteam() {
+            this.formError = ''
+            this.formSuccess = ''
+            this.fieldErrors.steamId = !this.steamId.trim()
+            if (this.fieldErrors.steamId) return
+
+            this.loading = true
+            try {
+                const response = await validateSteam(this.steamId.trim())
+                this.steamValidated = true
+                this.steamPersona = response?.data?.personaName || ''
+                const isPublic = response?.data?.isLibraryPublic !== false
+                this.formSuccess = isPublic
+                    ? 'Steam ID looks good. Continue with email and password.'
+                    : 'Steam ID is valid, but the profile is private. You can register; library sync stays off until game details are public.'
+            } catch (error) {
+                this.steamValidated = false
+                this.steamPersona = ''
+                this.formError = error.body?.message || error.message || 'Steam validation failed'
+            } finally {
+                this.loading = false
+            }
+        },
         async onVerifyEmail() {
             this.formError = ''
             this.formSuccess = ''
@@ -280,13 +324,18 @@ export default {
             }
 
             if (this.cooldownSeconds > 0) return
+            if (!this.steamValidated) {
+                this.formError = 'Validate your Steam ID first.'
+                return
+            }
             if (!this.validateBaseFields()) return
 
             this.loading = true
             try {
-                await sendVerification(this.email.trim())
+                await sendVerification(this.email.trim(), this.steamId.trim())
                 this.codeSent = true
-                this.formSuccess = 'Verification code sent. Check your email, then enter the code and click Verify Email again.'
+                this.formSuccess =
+                    'Verification code sent. Check your email, then enter the code and confirm.'
                 this.startCooldown(60)
             } catch (error) {
                 this.formError = error.body?.message || error.message || 'Failed to send verification'
@@ -324,6 +373,10 @@ export default {
             }
         },
         async onRegister() {
+            if (!this.steamValidated) {
+                this.formError = 'Validate your Steam ID first.'
+                return
+            }
             if (!this.bypassEmailVerification && (!this.emailVerified || !this.emailVerifiedToken)) {
                 return
             }
