@@ -40,10 +40,11 @@ if (builder.Environment.IsDevelopment())
 
 builder.Services.Configure<SteamApiOptions>(builder.Configuration.GetSection(SteamApiOptions.SectionName));
 builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection(SendGridOptions.SectionName));
+builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection(RabbitMqOptions.SectionName));
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddHttpClient<ISteamApiClient, SteamApiClient>();
-builder.Services.AddScoped<ISteamSyncClient, SteamSyncClient>();
+builder.Services.AddSingleton<ISteamSyncClient, SteamSyncClient>();
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -53,6 +54,7 @@ builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
 builder.Services.AddScoped<IPlayersService, PlayersService>();
 builder.Services.AddScoped<IGamesService, GamesService>();
 builder.Services.AddScoped<ISteamSyncService, SteamSyncService>();
+builder.Services.AddScoped<ISyncStatusService, SyncStatusService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IUserStatsService, UserStatsService>();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();

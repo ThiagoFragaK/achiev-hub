@@ -1,4 +1,4 @@
-<template>
+﻿<template>
     <div class="min-vh-100 d-flex align-items-center justify-content-center px-3 py-5">
         <div class="w-100" style="max-width: 28rem">
             <div class="text-center mb-4">
@@ -12,7 +12,34 @@
 
             <hr class="mb-4 text-primary opacity-100" />
 
-            <form @submit.prevent>
+            <div v-if="preparing" class="text-center">
+                <div class="alert alert-info" role="status">
+                    <div class="fw-semibold mb-1">Importing your recently played gamesâ€¦</div>
+                    <div class="small">
+                        Weâ€™re syncing your Steam activity. Youâ€™ll be able to log in when this finishes.
+                    </div>
+                    <div v-if="prepareProgress" class="small mt-2 text-secondary">
+                        {{ prepareProgress }}
+                    </div>
+                    <div v-if="prepareError" class="small mt-2 text-danger">
+                        {{ prepareError }}
+                    </div>
+                </div>
+                <div v-if="!prepareError" class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loadingâ€¦</span>
+                </div>
+                <button
+                    v-if="prepareError"
+                    type="button"
+                    class="btn btn-outline-primary mt-3"
+                    :disabled="loading"
+                    @click="startProvisioningPoll"
+                >
+                    Retry status check
+                </button>
+            </div>
+
+            <form v-else @submit.prevent>
                 <div class="mb-3">
                     <label class="form-label fw-semibold" for="regSteamId">Steam ID</label>
                     <input
@@ -156,7 +183,7 @@
                         :disabled="loading"
                         @click="onValidateSteam"
                     >
-                        {{ loading ? 'Checking Steam…' : 'Validate Steam ID' }}
+                        {{ loading ? 'Checking Steamâ€¦' : 'Validate Steam ID' }}
                     </button>
 
                     <button
@@ -188,7 +215,7 @@
                         :disabled="loading || (!bypassEmailVerification && !emailVerified)"
                         @click="onRegister"
                     >
-                        {{ loading ? 'Registering…' : 'Register' }}
+                        {{ loading ? 'Registeringâ€¦' : 'Register' }}
                     </button>
                 </div>
             </form>
@@ -203,6 +230,7 @@ import {
     sendVerification,
     validateSteam
 } from '@/services/authService'
+import { getProvisioningStatus } from '@/services/syncService'
 import LucideIcon from '@/components/global/LucideIcon.vue'
 import { validatePassword } from '@/utils/PasswordHelper'
 
@@ -226,6 +254,10 @@ export default {
             emailVerifiedToken: '',
             steamValidated: false,
             steamPersona: '',
+            preparing: false,
+            prepareProgress: '',
+            prepareError: '',
+            prepareTimer: null,
             cooldownSeconds: 0,
             cooldownTimer: null,
             loading: false,
@@ -246,8 +278,15 @@ export default {
     },
     beforeUnmount() {
         this.clearCooldown()
+        this.clearPrepareTimer()
     },
     methods: {
+        clearPrepareTimer() {
+            if (this.prepareTimer) {
+                clearInterval(this.prepareTimer)
+                this.prepareTimer = null
+            }
+        },
         clearCooldown() {
             if (this.cooldownTimer) {
                 clearInterval(this.cooldownTimer)
@@ -265,6 +304,47 @@ export default {
                 }
                 this.cooldownSeconds -= 1
             }, 1000)
+        },
+        startProvisioningPoll() {
+            this.prepareError = ''
+            this.clearPrepareTimer()
+            const poll = async () => {
+                try {
+                    const status = await getProvisioningStatus(this.steamId.trim())
+                    const sync = status?.sync
+                    const synced = sync?.gamesSynced ?? 0
+                    const total = sync?.gamesTotal ?? 0
+                    const syncStatus = sync?.status
+
+                    if (syncStatus === 'Failed') {
+                        this.prepareError =
+                            sync?.lastError || 'First sync failed. You can log in and retry later.'
+                        this.clearPrepareTimer()
+                        return
+                    }
+
+                    this.prepareProgress =
+                        total > 0
+                            ? `Importing: ${synced} of ${total} games`
+                            : 'Importing your recently played games…'
+
+                    if (
+                        status?.statusLabel === 'Active' ||
+                        status?.isReady ||
+                        syncStatus === 'Complete'
+                    ) {
+                        this.clearPrepareTimer()
+                        this.$router.push({
+                            name: 'login',
+                            query: { steamId: this.steamId.trim(), ready: '1' }
+                        })
+                    }
+                } catch {
+                    // Keep polling; worker may still be starting.
+                }
+            }
+            poll()
+            this.prepareTimer = setInterval(poll, 3000)
         },
         validateBaseFields() {
             this.fieldErrors.steamId = !this.steamId.trim()
@@ -386,7 +466,7 @@ export default {
             this.formSuccess = ''
             this.loading = true
             try {
-                await register({
+                const response = await register({
                     steamId: this.steamId.trim(),
                     email: this.email.trim(),
                     password: this.password,
@@ -394,7 +474,17 @@ export default {
                         ? ''
                         : this.emailVerifiedToken
                 })
-                this.$router.push({ name: 'login' })
+                const data = response?.data ?? response
+                if (data?.sync?.enqueued === false) {
+                    this.preparing = true
+                    this.prepareError =
+                        data.sync.lastError ||
+                        'Failed to enqueue first sync. You can still try logging in shortly.'
+                    return
+                }
+
+                this.preparing = true
+                this.startProvisioningPoll()
             } catch (error) {
                 this.formError = error.body?.message || error.message || 'Registration failed'
             } finally {
