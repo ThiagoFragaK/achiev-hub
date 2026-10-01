@@ -1,4 +1,5 @@
 using achiev_hub.Server.Application.Steam.Interfaces;
+using achiev_hub.Server.Domain.Entities;
 using achiev_hub.Server.Domain.Enums;
 using achiev_hub.Server.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,23 @@ public class SyncStatusService : ISyncStatusService
     public SyncStatusService(ApplicationDbContext db)
     {
         _db = db;
+    }
+
+    public async Task<SyncStatusDto?> GetStatusForUserAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await _db.Users.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+        if (user is null)
+        {
+            return null;
+        }
+
+        var syncRow = await _db.UserSyncStatuses.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.UserId == user.Id, cancellationToken);
+
+        return BuildStatus(user, syncRow);
     }
 
     public async Task<SyncStatusDto?> GetProvisioningStatusBySteamIdAsync(
@@ -30,6 +48,11 @@ public class SyncStatusService : ISyncStatusService
         var syncRow = await _db.UserSyncStatuses.AsNoTracking()
             .FirstOrDefaultAsync(s => s.UserId == user.Id, cancellationToken);
 
+        return BuildStatus(user, syncRow);
+    }
+
+    private static SyncStatusDto BuildStatus(User user, UserSyncStatus? syncRow)
+    {
         var sync = syncRow is null
             ? SyncSummaryDto.Empty
             : SyncSummaryDto.From(
@@ -40,13 +63,19 @@ public class SyncStatusService : ISyncStatusService
                 syncRow.TotalGamesCount,
                 syncRow.SyncProgressPercent,
                 syncRow.LastError,
-                syncRow.LastJobId);
+                syncRow.LastJobId,
+                enqueued: true,
+                stage: syncRow.PipelineStage);
 
         var isUpdating = syncRow is not null
             && (syncRow.Status == SyncStatus.Pending || syncRow.Status == SyncStatus.Syncing);
 
-        var isReady = user.Status == (int)StatusEnum.Active
-            || syncRow?.Status == SyncStatus.Complete;
+        var firstSyncPhaseDone = syncRow is not null
+            && syncRow.PipelineStage is PipelineStage.FullLibrary
+                or PipelineStage.FullAchievements
+                or PipelineStage.Done;
+
+        var isReady = user.Status == (int)StatusEnum.Active || firstSyncPhaseDone;
 
         return new SyncStatusDto
         {

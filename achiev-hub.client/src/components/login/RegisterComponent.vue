@@ -14,9 +14,10 @@
 
             <div v-if="preparing" class="text-center">
                 <div class="alert alert-info" role="status">
-                    <div class="fw-semibold mb-1">Importing your recently played gamesâ€¦</div>
+                    <div class="fw-semibold mb-1">{{ prepareHeadline }}</div>
                     <div class="small">
-                        Weâ€™re syncing your Steam activity. Youâ€™ll be able to log in when this finishes.
+                        We're importing your recently played games and achievements.
+                        You'll be able to log in when that finishes — your full library keeps syncing afterward.
                     </div>
                     <div v-if="prepareProgress" class="small mt-2 text-secondary">
                         {{ prepareProgress }}
@@ -26,7 +27,7 @@
                     </div>
                 </div>
                 <div v-if="!prepareError" class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loadingâ€¦</span>
+                    <span class="visually-hidden">Loading…</span>
                 </div>
                 <button
                     v-if="prepareError"
@@ -183,7 +184,7 @@
                         :disabled="loading"
                         @click="onValidateSteam"
                     >
-                        {{ loading ? 'Checking Steamâ€¦' : 'Validate Steam ID' }}
+                        {{ loading ? 'Checking Steam…' : 'Validate Steam ID' }}
                     </button>
 
                     <button
@@ -215,7 +216,7 @@
                         :disabled="loading || (!bypassEmailVerification && !emailVerified)"
                         @click="onRegister"
                     >
-                        {{ loading ? 'Registeringâ€¦' : 'Register' }}
+                        {{ loading ? 'Registering…' : 'Register' }}
                     </button>
                 </div>
             </form>
@@ -255,6 +256,7 @@ export default {
             steamValidated: false,
             steamPersona: '',
             preparing: false,
+            prepareHeadline: 'Preparing your account…',
             prepareProgress: '',
             prepareError: '',
             prepareTimer: null,
@@ -305,6 +307,47 @@ export default {
                 this.cooldownSeconds -= 1
             }, 1000)
         },
+        pipelineCopy(sync, statusLabel) {
+            const synced = sync?.gamesSynced ?? 0
+            const total = sync?.gamesTotal ?? 0
+            const stage = sync?.pipelineStageLabel || ''
+            const progress = total > 0 ? ` (${synced}/${total})` : ''
+
+            if (statusLabel === 'FirstSync' || stage === 'None' || !stage) {
+                return {
+                    headline: 'Importing recently played games…',
+                    detail: 'Importing your recently played games…'
+                }
+            }
+
+            switch (stage) {
+                case 'RecentAchievements':
+                    return {
+                        headline: 'Syncing recent achievements…',
+                        detail: `Syncing achievements for recent games${progress}…`
+                    }
+                case 'FullLibrary':
+                    return {
+                        headline: 'Importing full Steam library…',
+                        detail: 'Importing your full Steam library…'
+                    }
+                case 'FullAchievements':
+                    return {
+                        headline: 'Syncing library achievements…',
+                        detail: `Syncing library achievements${progress}…`
+                    }
+                case 'Done':
+                    return {
+                        headline: 'Almost ready…',
+                        detail: 'Finishing up…'
+                    }
+                default:
+                    return {
+                        headline: 'Preparing your account…',
+                        detail: total > 0 ? `Syncing: ${synced} of ${total}` : 'Syncing your Steam data…'
+                    }
+            }
+        },
         startProvisioningPoll() {
             this.prepareError = ''
             this.clearPrepareTimer()
@@ -312,27 +355,24 @@ export default {
                 try {
                     const status = await getProvisioningStatus(this.steamId.trim())
                     const sync = status?.sync
-                    const synced = sync?.gamesSynced ?? 0
-                    const total = sync?.gamesTotal ?? 0
                     const syncStatus = sync?.status
+                    const copy = this.pipelineCopy(sync, status?.statusLabel)
 
                     if (syncStatus === 'Failed') {
                         this.prepareError =
-                            sync?.lastError || 'First sync failed. You can log in and retry later.'
+                            sync?.lastError || 'Sync failed. You can retry the status check.'
+                        this.prepareHeadline = 'Sync failed'
                         this.clearPrepareTimer()
                         return
                     }
 
-                    this.prepareProgress =
-                        total > 0
-                            ? `Importing: ${synced} of ${total} games`
-                            : 'Importing your recently played games…'
+                    this.prepareHeadline = copy.headline
+                    this.prepareProgress = copy.detail
+                    if (sync?.lastError) {
+                        this.prepareProgress = `${copy.detail} (${sync.lastError})`
+                    }
 
-                    if (
-                        status?.statusLabel === 'Active' ||
-                        status?.isReady ||
-                        syncStatus === 'Complete'
-                    ) {
+                    if (status?.statusLabel === 'Active' || status?.isReady) {
                         this.clearPrepareTimer()
                         this.$router.push({
                             name: 'login',
