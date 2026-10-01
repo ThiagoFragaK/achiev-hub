@@ -12,8 +12,8 @@
                 <img 
                     :src="data.row.icon" 
                     alt="Achievement Icon"
-                    width="42"
-                    height="42"
+                    width="20"
+                    height="20"
                     class="rounded"
                 >
                 {{ data.row.name }}
@@ -61,7 +61,7 @@ export default {
                 ],
                 pagination: {
                     currentPage: 1,
-                    perPage: 7,
+                    perPage: 15,
                     totalPages: 1,
                     totalCount: 0
                 }
