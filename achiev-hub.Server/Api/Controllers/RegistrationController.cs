@@ -1,5 +1,6 @@
 using achiev_hub.Server.Application.Auth;
 using achiev_hub.Server.Application.Auth.Interfaces;
+using achiev_hub.Server.Application.Steam.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,10 +12,12 @@ namespace achiev_hub.Server.Api.Controllers;
 public class RegistrationController : ControllerBase
 {
     private readonly IRegistrationService _service;
+    private readonly ISyncStatusService _syncStatusService;
 
-    public RegistrationController(IRegistrationService service)
+    public RegistrationController(IRegistrationService service, ISyncStatusService syncStatusService)
     {
         _service = service;
+        _syncStatusService = syncStatusService;
     }
 
     [HttpPost("validate-steam")]
@@ -29,6 +32,25 @@ public class RegistrationController : ControllerBase
         }
 
         return Ok(result);
+    }
+
+    [HttpGet("status")]
+    public async Task<IActionResult> GetProvisioningStatus(
+        [FromQuery] string steamId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(steamId))
+        {
+            return UnprocessableEntity(new { message = "steamId is required" });
+        }
+
+        var status = await _syncStatusService.GetProvisioningStatusBySteamIdAsync(steamId, cancellationToken);
+        if (status is null)
+        {
+            return NotFound(new { message = "User not found" });
+        }
+
+        return Ok(status);
     }
 
     [HttpPost("send-verification")]
@@ -85,7 +107,7 @@ public class RegistrationController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, new
         {
             success = true,
-            message = "Registration successful",
+            message = "Registration successful. Importing your recently played games…",
             data = result
         });
     }

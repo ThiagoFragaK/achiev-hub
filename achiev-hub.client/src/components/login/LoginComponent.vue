@@ -12,6 +12,10 @@
 
             <hr class="mb-4 text-primary opacity-100" />
 
+            <div v-if="readyMessage" class="alert alert-success py-2" role="status">
+                {{ readyMessage }}
+            </div>
+
             <form @submit.prevent="onLogin">
                 <div class="mb-3">
                     <label class="form-label fw-semibold" for="steamId"> Steam ID </label>
@@ -98,7 +102,16 @@ export default {
             password: '',
             steamIdError: false,
             loginError: '',
+            readyMessage: '',
             loading: false
+        }
+    },
+    mounted() {
+        if (this.$route.query.ready === '1') {
+            this.readyMessage = 'Your library is ready. You can log in now.'
+        }
+        if (typeof this.$route.query.steamId === 'string') {
+            this.steamId = this.$route.query.steamId
         }
     },
     methods: {

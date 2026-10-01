@@ -23,7 +23,7 @@ public class RegistrationService : IRegistrationService
     private readonly IEmailSender _emailSender;
     private readonly IHostEnvironment _environment;
     private readonly ISteamApiClient _steamApiClient;
-    private readonly ISteamSyncService _steamSyncService;
+    private readonly ISteamSyncClient _steamSyncClient;
     private readonly ILogger<RegistrationService> _logger;
 
     public RegistrationService(
@@ -32,7 +32,7 @@ public class RegistrationService : IRegistrationService
         IEmailSender emailSender,
         IHostEnvironment environment,
         ISteamApiClient steamApiClient,
-        ISteamSyncService steamSyncService,
+        ISteamSyncClient steamSyncClient,
         ILogger<RegistrationService> logger)
     {
         _users = users;
@@ -40,7 +40,7 @@ public class RegistrationService : IRegistrationService
         _emailSender = emailSender;
         _environment = environment;
         _steamApiClient = steamApiClient;
-        _steamSyncService = steamSyncService;
+        _steamSyncClient = steamSyncClient;
         _logger = logger;
     }
 
@@ -237,7 +237,7 @@ public class RegistrationService : IRegistrationService
             SteamId = steamId,
             Password = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Role = "user",
-            Status = (int)StatusEnum.Active,
+            Status = (int)StatusEnum.FirstSync,
             IsEmailVerified = !bypassEmailVerification,
             TokenVersion = 0
         };
@@ -250,29 +250,32 @@ public class RegistrationService : IRegistrationService
 
         await _users.SaveChangesAsync(cancellationToken);
 
+        var syncEnqueued = true;
+        string? syncEnqueueError = null;
         try
         {
-            await _steamSyncService.SyncLibraryAsync(
-                user.Id,
-                user.SteamId,
-                LibrarySyncScope.Full,
-                cancellationToken);
-            await _steamSyncService.SyncAchievementsForUserAsync(
-                user.Id,
-                user.SteamId,
-                AchievementSyncScope.AllOwnedWithStats,
-                cancellationToken);
+            await _steamSyncClient.PublishFirstSyncAsync(user.Id, user.SteamId!, cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Initial library/achievement sync failed for user {UserId}", user.Id);
+            syncEnqueued = false;
+            syncEnqueueError = "Failed to enqueue first sync. You can retry from the status screen.";
+            _logger.LogWarning(ex, "Failed to enqueue FirstSync for user {UserId}", user.Id);
         }
 
-        return new UserDto
+        return new
         {
-            Id = user.Id,
-            Email = user.Email,
-            SteamId = user.SteamId
+            id = user.Id,
+            email = user.Email,
+            steamId = user.SteamId,
+            status = user.Status,
+            statusLabel = StatusEnum.FirstSync.ToString(),
+            sync = new
+            {
+                status = syncEnqueued ? "Pending" : "failed_enqueue",
+                enqueued = syncEnqueued,
+                lastError = syncEnqueueError
+            }
         };
     }
 
