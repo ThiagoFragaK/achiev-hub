@@ -14,6 +14,8 @@
             <div class="col-12 col-lg-3">
                 <UsersAverageSemiGauge
                     :value="averagePercentage"
+                    :total-achievements="totalAchievements"
+                    :games-with-achievements="gamesWithAchievements"
                     :height="chartHeight"
                 />
             </div>
@@ -65,7 +67,9 @@ export default {
             achievementsCounts: [],
             perYearLabels: [],
             perYearCounts: [],
-            averagePercentage: 0
+            averagePercentage: 0,
+            totalAchievements: 0,
+            gamesWithAchievements: 0
         }
     },
     computed: {
@@ -105,6 +109,8 @@ export default {
                 this.perYearLabels = years.map((year) => String(year.year))
                 this.perYearCounts = years.map((year) => year.count)
                 this.averagePercentage = Math.round(stats?.averagePercentage ?? 0)
+                this.totalAchievements = stats?.totalAchievements ?? 0
+                this.gamesWithAchievements = stats?.gamesWithAchievements ?? 0
             } catch (err) {
                 this.statsError = err?.message || 'Failed to load your statistics.'
             }
