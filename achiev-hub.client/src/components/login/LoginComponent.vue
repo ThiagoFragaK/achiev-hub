@@ -61,26 +61,30 @@
                     <button type="submit" class="btn btn-primary btn-lg" :disabled="loading">
                         {{ loading ? 'Logging in…' : 'Login' }}
                     </button>
-                    <button type="button" class="btn btn-secondary btn-lg mt-4" :disabled="loading" @click="onRegister">
-                        Register
-                    </button>
+                    <div class="row g-2 mt-2">
+                        <div class="col-6">
+                            <button
+                                type="button"
+                                class="btn btn-secondary w-100"
+                                :disabled="loading"
+                                @click="onRegister"
+                            >
+                                Register
+                            </button>
+                        </div>
+                        <div class="col-6">
+                            <button
+                                type="button"
+                                class="btn btn-secondary w-100"
+                                :disabled="loading"
+                                @click="onContinueAsGuest"
+                            >
+                                Continue as Guest
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </form>
-
-            <div class="text-center mb-3">
-                <button
-                    type="button"
-                    class="btn btn-link"
-                    :disabled="loading"
-                    @click="onContinueAsGuest"
-                >
-                    Continue without login.
-                </button>
-            </div>
-
-            <!-- <div class="text-center mb-2">
-                <RouterLink to="/register" class="small"> Create an account </RouterLink>
-            </div> -->
 
             <div class="text-center">
                 <RouterLink to="/style-guide" class="small text-secondary">
