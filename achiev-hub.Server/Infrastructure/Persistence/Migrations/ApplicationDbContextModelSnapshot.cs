@@ -393,6 +393,9 @@ namespace achiev_hub.Server.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(5,2)")
                         .HasDefaultValue(0m);
 
+                    b.Property<DateTimeOffset?>("AchievementsSyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("GameId")
                         .HasColumnType("integer");
 

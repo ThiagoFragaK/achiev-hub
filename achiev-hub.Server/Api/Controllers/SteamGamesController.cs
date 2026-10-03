@@ -152,6 +152,14 @@ public class SteamGamesController : ApiControllerBase
             await _steamSyncService.SyncGameAchievementsAsync(userId, steamId, appId, cancellationToken);
             return Ok(new { success = true, message = "Achievements synced." });
         }
+        catch (SteamSyncCooldownException ex)
+        {
+            return StatusCode(StatusCodes.Status429TooManyRequests, new
+            {
+                message = ex.Message,
+                retryAfterSeconds = ex.RetryAfterSeconds
+            });
+        }
         catch (Exception ex)
         {
             return StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = ex.Message });

@@ -10,6 +10,7 @@ public class UsersGame : IEntity
     public decimal AchievementsPercentage { get; set; }
     public int PlaytimeMinutes { get; set; }
     public long? LastPlayedUnix { get; set; }
+    public DateTimeOffset? AchievementsSyncedAt { get; set; }
 
     public Game Game { get; set; } = null!;
     public User User { get; set; } = null!;
