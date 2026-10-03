@@ -3,6 +3,8 @@
         <div class="card-body d-flex flex-column align-items-center justify-content-center gap-2">
             <p class="text-secondary small text-center mb-0">
                 {{ totalAchievements.toLocaleString() }} achievements in
+            </p>
+            <p class="text-secondary small text-center mb-0">
                 {{ gamesWithAchievements.toLocaleString() }} games
             </p>
             <SemiGauge :value="value" :label="label" :height="height" />
