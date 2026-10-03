@@ -33,7 +33,6 @@
     <ProjectReference Include="..\achiev-hub.client\achiev-hub.client.esproj">
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
-    <ProjectReference Include="..\..\steam-sync\src\SteamSync.Shared\SteamSync.Shared.csproj" />
   </ItemGroup>
 
 </Project>
