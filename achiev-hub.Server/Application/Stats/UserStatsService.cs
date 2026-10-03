@@ -49,11 +49,23 @@ public class UserStatsService : IUserStatsService
             .Select(u => (decimal?)u.AvgPercentage)
             .FirstOrDefaultAsync(cancellationToken);
 
+        var totalAchievements = await _db.UsersAchievements
+            .AsNoTracking()
+            .CountAsync(ua => ua.UserId == userId, cancellationToken);
+
+        var gamesWithAchievements = await _db.UsersGames
+            .AsNoTracking()
+            .CountAsync(
+                ug => ug.UserId == userId && ug.Game.HasCommunityVisibleStats == true,
+                cancellationToken);
+
         return new UserStatsDto
         {
             AchievementsLast14Days = BuildLastDays(localDays),
             AchievementsPerYear = BuildPerYear(localDays),
-            AveragePercentage = averagePercentage ?? 0
+            AveragePercentage = averagePercentage ?? 0,
+            TotalAchievements = totalAchievements,
+            GamesWithAchievements = gamesWithAchievements
         };
     }
 
@@ -63,7 +75,9 @@ public class UserStatsService : IUserStatsService
         {
             AchievementsLast14Days = BuildLastDays([]),
             AchievementsPerYear = [],
-            AveragePercentage = 0
+            AveragePercentage = 0,
+            TotalAchievements = 0,
+            GamesWithAchievements = 0
         };
     }
 
@@ -154,6 +168,7 @@ public class UserStatsService : IUserStatsService
         var points = new List<GameProgressPointDto>();
         var unlockIndex = 0;
         var cumulative = 0;
+        GameProgressPointDto? lastPoint = null;
 
         foreach (var day in BuildTimeline(start, end, granularity))
         {
@@ -163,14 +178,32 @@ public class UserStatsService : IUserStatsService
                 unlockIndex++;
             }
 
-            points.Add(new GameProgressPointDto
+            var percentage = totalCount == 0
+                ? 0
+                : Math.Round(cumulative / (decimal)totalCount * 100, 2);
+
+            var point = new GameProgressPointDto
             {
                 Date = day.ToString("yyyy-MM-dd"),
                 Count = cumulative,
-                Percentage = totalCount == 0
-                    ? 0
-                    : Math.Round(cumulative / (decimal)totalCount * 100, 2)
-            });
+                Percentage = percentage
+            };
+
+            var isEnd = day == end;
+            var percentageChanged = lastPoint is null || lastPoint.Percentage != percentage;
+
+            // Keep first point, every % change, and always close the series on end/today.
+            if (percentageChanged || isEnd)
+            {
+                // Avoid duplicating the end date when it already matched the last change.
+                if (isEnd && lastPoint is not null && lastPoint.Date == point.Date)
+                {
+                    continue;
+                }
+
+                points.Add(point);
+                lastPoint = point;
+            }
         }
 
         return points;

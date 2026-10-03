@@ -25,13 +25,13 @@ public class GamesService : IGamesService
 {
     private static readonly TimeZoneInfo DateTimeZone = TimeZoneInfo.Local;
 
-    private readonly ISteamRepository _steamRepository;
+    private readonly ISteamApiClient _steamApiClient;
     private readonly ApplicationDbContext _db;
     private readonly IMemoryCache _cache;
 
-    public GamesService(ISteamRepository steamRepository, ApplicationDbContext db, IMemoryCache cache)
+    public GamesService(ISteamApiClient steamApiClient, ApplicationDbContext db, IMemoryCache cache)
     {
-        _steamRepository = steamRepository;
+        _steamApiClient = steamApiClient;
         _db = db;
         _cache = cache;
     }
@@ -67,7 +67,7 @@ public class GamesService : IGamesService
 
     public async Task<GameDetailsDto?> GetGameDetailsAsync(int appId, CancellationToken cancellationToken = default)
     {
-        var storeGame = await _steamRepository.GetStoreGameDetailsAsync(appId, cancellationToken);
+        var storeGame = await _steamApiClient.GetStoreGameDetailsAsync(appId, cancellationToken);
         if (storeGame is null)
         {
             return null;
@@ -97,8 +97,8 @@ public class GamesService : IGamesService
             return await GetAchievementsFromDbAsync(authUserId, appId, page, pageSize, name, status, cancellationToken);
         }
 
-        var playerResult = await _steamRepository.GetPlayerAchievementsAsync(steamId, appId, cancellationToken);
-        var schema = await _steamRepository.GetGameSchemaAsync(appId, cancellationToken);
+        var playerResult = await _steamApiClient.GetPlayerAchievementsAsync(steamId, appId, cancellationToken);
+        var schema = await _steamApiClient.GetGameSchemaAsync(appId, cancellationToken);
 
         if (playerResult is null || !playerResult.Success)
         {
@@ -242,7 +242,7 @@ public class GamesService : IGamesService
             return cached;
         }
 
-        var games = await _steamRepository.GetRecentlyPlayedGamesAsync(steamId, cancellationToken);
+        var games = await _steamApiClient.GetRecentlyPlayedGamesAsync(steamId, cancellationToken);
         var mapped = new List<RecentGameDto>(games.Count);
 
         foreach (var game in games)
@@ -276,7 +276,7 @@ public class GamesService : IGamesService
         LibraryGameFilterDto? filters,
         CancellationToken cancellationToken)
     {
-        var games = await _steamRepository.GetOwnedGamesAsync(steamId, cancellationToken);
+        var games = await _steamApiClient.GetOwnedGamesAsync(steamId, cancellationToken);
         var mapped = new List<LibraryGameDto>();
 
         foreach (var game in games)
@@ -376,7 +376,7 @@ public class GamesService : IGamesService
 
     private async Task<AchievementSummaryDto> GetAchievementSummaryAsync(string steamId, int appId, CancellationToken cancellationToken)
     {
-        var result = await _steamRepository.GetPlayerAchievementsAsync(steamId, appId, cancellationToken);
+        var result = await _steamApiClient.GetPlayerAchievementsAsync(steamId, appId, cancellationToken);
         if (result is null || !result.Success || result.Achievements.Count == 0)
         {
             return new AchievementSummaryDto();

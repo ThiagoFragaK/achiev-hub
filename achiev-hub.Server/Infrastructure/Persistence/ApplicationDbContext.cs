@@ -18,6 +18,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<UsersGame> UsersGames => Set<UsersGame>();
     public DbSet<UsersAchievement> UsersAchievements => Set<UsersAchievement>();
     public DbSet<GoalAchievement> GoalAchievements => Set<GoalAchievement>();
+    public DbSet<UserSyncStatus> UserSyncStatuses => Set<UserSyncStatus>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

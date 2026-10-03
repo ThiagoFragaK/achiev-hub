@@ -1,25 +1,14 @@
 using System.Security.Cryptography;
 using System.Text;
-using achiev_hub.Server.Application.Auth;
 using achiev_hub.Server.Application.Auth.Interfaces;
-using achiev_hub.Server.Application.Users;
-using achiev_hub.Server.Application.Users.Interfaces;
-using achiev_hub.Server.Application.Games;
-using achiev_hub.Server.Application.Games.Interfaces;
-using achiev_hub.Server.Application.Achievements;
-using achiev_hub.Server.Application.Achievements.Interfaces;
-using achiev_hub.Server.Application.Goals;
-using achiev_hub.Server.Application.Goals.Interfaces;
-using achiev_hub.Server.Domain.Entities;
-using achiev_hub.Server.Domain.Interfaces;
-using achiev_hub.Server.Domain.Enums;
-using achiev_hub.Server.Application.Common;
 using achiev_hub.Server.Application.Common.Interfaces;
 using achiev_hub.Server.Application.Steam;
 using achiev_hub.Server.Application.Steam.Interfaces;
-using achiev_hub.Server.Application.Stats;
-using achiev_hub.Server.Application.Stats.Interfaces;
-using achiev_hub.Server.Infrastructure.Auth;
+using achiev_hub.Server.Application.Users;
+using achiev_hub.Server.Domain.Entities;
+using achiev_hub.Server.Domain.Enums;
+using achiev_hub.Server.Domain.Interfaces;
+using achiev_hub.Server.Infrastructure.Steam.Models;
 
 namespace achiev_hub.Server.Application.Auth;
 
@@ -33,7 +22,8 @@ public class RegistrationService : IRegistrationService
     private readonly IRepository<EmailVerification> _verifications;
     private readonly IEmailSender _emailSender;
     private readonly IHostEnvironment _environment;
-    private readonly ISteamSyncService _steamSyncService;
+    private readonly ISteamApiClient _steamApiClient;
+    private readonly ISteamSyncClient _steamSyncClient;
     private readonly ILogger<RegistrationService> _logger;
 
     public RegistrationService(
@@ -41,19 +31,65 @@ public class RegistrationService : IRegistrationService
         IRepository<EmailVerification> verifications,
         IEmailSender emailSender,
         IHostEnvironment environment,
-        ISteamSyncService steamSyncService,
+        ISteamApiClient steamApiClient,
+        ISteamSyncClient steamSyncClient,
         ILogger<RegistrationService> logger)
     {
         _users = users;
         _verifications = verifications;
         _emailSender = emailSender;
         _environment = environment;
-        _steamSyncService = steamSyncService;
+        _steamApiClient = steamApiClient;
+        _steamSyncClient = steamSyncClient;
         _logger = logger;
     }
 
-    public async Task<object> SendVerificationAsync(string email, CancellationToken cancellationToken = default)
+    public async Task<object> ValidateSteamAsync(string steamId, CancellationToken cancellationToken = default)
     {
+        var validation = await _steamApiClient.ValidateIdAsync(steamId, cancellationToken);
+        if (validation.Status == SteamIdValidationStatus.InvalidFormat)
+        {
+            return AuthResult.Fail("Steam ID must be a 17-digit SteamID64", 422);
+        }
+
+        if (validation.Status == SteamIdValidationStatus.NotFound)
+        {
+            return AuthResult.Fail("Steam profile was not found. Check the Steam ID and profile visibility.", 404);
+        }
+
+        if (await _users.AnyAsync(u => u.SteamId == validation.SteamId, cancellationToken))
+        {
+            return AuthResult.Fail("Steam ID is already registered", 409);
+        }
+
+        return new
+        {
+            success = true,
+            message = validation.IsLibraryPublic
+                ? "Steam ID is valid"
+                : "Steam ID is valid, but the profile is private. You can register; library sync stays off until game details are public.",
+            data = new
+            {
+                steamId = validation.SteamId,
+                personaName = validation.PersonaName,
+                avatar = validation.Avatar,
+                isLibraryPublic = validation.IsLibraryPublic,
+                communityVisibilityState = validation.CommunityVisibilityState
+            }
+        };
+    }
+
+    public async Task<object> SendVerificationAsync(
+        string email,
+        string steamId,
+        CancellationToken cancellationToken = default)
+    {
+        var steamValidation = await ValidateSteamAsync(steamId, cancellationToken);
+        if (AuthResult.IsError(steamValidation, out var steamError))
+        {
+            return steamError;
+        }
+
         var normalizedEmail = NormalizeEmail(email);
         if (string.IsNullOrWhiteSpace(normalizedEmail))
         {
@@ -145,11 +181,10 @@ public class RegistrationService : IRegistrationService
     public async Task<object> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
     {
         var normalizedEmail = NormalizeEmail(request.Email);
-        var steamId = NormalizeSteamId(request.SteamId);
         var bypassEmailVerification = _environment.IsDevelopment();
 
         if (string.IsNullOrWhiteSpace(normalizedEmail)
-            || string.IsNullOrWhiteSpace(steamId)
+            || string.IsNullOrWhiteSpace(request.SteamId)
             || string.IsNullOrWhiteSpace(request.Password)
             || (!bypassEmailVerification && string.IsNullOrWhiteSpace(request.EmailVerifiedToken)))
         {
@@ -160,6 +195,12 @@ public class RegistrationService : IRegistrationService
                 422);
         }
 
+        var steamValidation = await ValidateSteamAsync(request.SteamId, cancellationToken);
+        if (AuthResult.IsError(steamValidation, out var steamError))
+        {
+            return steamError;
+        }
+
         if (!PasswordValidator.IsValid(request.Password, out var passwordError))
         {
             return AuthResult.Fail(passwordError, 422);
@@ -168,11 +209,6 @@ public class RegistrationService : IRegistrationService
         if (await _users.AnyAsync(u => u.Email == normalizedEmail, cancellationToken))
         {
             return AuthResult.Fail("Email is already registered", 409);
-        }
-
-        if (await _users.AnyAsync(u => u.SteamId == steamId, cancellationToken))
-        {
-            return AuthResult.Fail("Steam ID is already registered", 409);
         }
 
         EmailVerification? verification = null;
@@ -194,13 +230,14 @@ public class RegistrationService : IRegistrationService
             }
         }
 
+        var steamId = NormalizeSteamId(request.SteamId)!;
         var user = new User
         {
             Email = normalizedEmail,
             SteamId = steamId,
             Password = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Role = "user",
-            Status = (int)StatusEnum.Active,
+            Status = (int)StatusEnum.FirstSync,
             IsEmailVerified = !bypassEmailVerification,
             TokenVersion = 0
         };
@@ -213,29 +250,32 @@ public class RegistrationService : IRegistrationService
 
         await _users.SaveChangesAsync(cancellationToken);
 
+        var syncEnqueued = true;
+        string? syncEnqueueError = null;
         try
         {
-            await _steamSyncService.SyncLibraryAsync(
-                user.Id,
-                user.SteamId,
-                LibrarySyncScope.Full,
-                cancellationToken);
-            await _steamSyncService.SyncAchievementsForUserAsync(
-                user.Id,
-                user.SteamId,
-                AchievementSyncScope.AllOwnedWithStats,
-                cancellationToken);
+            await _steamSyncClient.PublishFirstSyncAsync(user.Id, user.SteamId!, cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Initial library/achievement sync failed for user {UserId}", user.Id);
+            syncEnqueued = false;
+            syncEnqueueError = "Failed to enqueue first sync. You can retry from the status screen.";
+            _logger.LogWarning(ex, "Failed to enqueue FirstSync for user {UserId}", user.Id);
         }
 
-        return new UserDto
+        return new
         {
-            Id = user.Id,
-            Email = user.Email,
-            SteamId = user.SteamId
+            id = user.Id,
+            email = user.Email,
+            steamId = user.SteamId,
+            status = user.Status,
+            statusLabel = StatusEnum.FirstSync.ToString(),
+            sync = new
+            {
+                status = syncEnqueued ? "Pending" : "failed_enqueue",
+                enqueued = syncEnqueued,
+                lastError = syncEnqueueError
+            }
         };
     }
 

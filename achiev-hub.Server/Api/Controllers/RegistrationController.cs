@@ -1,19 +1,6 @@
 using achiev_hub.Server.Application.Auth;
 using achiev_hub.Server.Application.Auth.Interfaces;
-using achiev_hub.Server.Application.Users;
-using achiev_hub.Server.Application.Users.Interfaces;
-using achiev_hub.Server.Application.Games;
-using achiev_hub.Server.Application.Games.Interfaces;
-using achiev_hub.Server.Application.Achievements;
-using achiev_hub.Server.Application.Achievements.Interfaces;
-using achiev_hub.Server.Application.Goals;
-using achiev_hub.Server.Application.Goals.Interfaces;
-using achiev_hub.Server.Application.Steam;
 using achiev_hub.Server.Application.Steam.Interfaces;
-using achiev_hub.Server.Application.Stats;
-using achiev_hub.Server.Application.Stats.Interfaces;
-using achiev_hub.Server.Application.Common;
-using achiev_hub.Server.Application.Common.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -25,10 +12,45 @@ namespace achiev_hub.Server.Api.Controllers;
 public class RegistrationController : ControllerBase
 {
     private readonly IRegistrationService _service;
+    private readonly ISyncStatusService _syncStatusService;
 
-    public RegistrationController(IRegistrationService service)
+    public RegistrationController(IRegistrationService service, ISyncStatusService syncStatusService)
     {
         _service = service;
+        _syncStatusService = syncStatusService;
+    }
+
+    [HttpPost("validate-steam")]
+    public async Task<IActionResult> ValidateSteam(
+        [FromBody] ValidateSteamRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _service.ValidateSteamAsync(request.SteamId, cancellationToken);
+        if (AuthResult.IsError(result, out var error))
+        {
+            return StatusCode(error.HttpStatus, new { message = error.Message });
+        }
+
+        return Ok(result);
+    }
+
+    [HttpGet("status")]
+    public async Task<IActionResult> GetProvisioningStatus(
+        [FromQuery] string steamId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(steamId))
+        {
+            return UnprocessableEntity(new { message = "steamId is required" });
+        }
+
+        var status = await _syncStatusService.GetProvisioningStatusBySteamIdAsync(steamId, cancellationToken);
+        if (status is null)
+        {
+            return NotFound(new { message = "User not found" });
+        }
+
+        return Ok(status);
     }
 
     [HttpPost("send-verification")]
@@ -38,7 +60,7 @@ public class RegistrationController : ControllerBase
     {
         try
         {
-            var result = await _service.SendVerificationAsync(request.Email, cancellationToken);
+            var result = await _service.SendVerificationAsync(request.Email, request.SteamId, cancellationToken);
             if (AuthResult.IsError(result, out var error))
             {
                 return StatusCode(error.HttpStatus, new { message = error.Message });
@@ -85,7 +107,7 @@ public class RegistrationController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, new
         {
             success = true,
-            message = "Registration successful",
+            message = "Registration successful. Importing your recently played games…",
             data = result
         });
     }
