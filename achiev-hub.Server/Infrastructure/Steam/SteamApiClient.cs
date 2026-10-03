@@ -9,16 +9,16 @@ using Microsoft.Extensions.Options;
 
 namespace achiev_hub.Server.Infrastructure.Steam;
 
-public class SteamRepository : ISteamRepository
+public class SteamApiClient : ISteamApiClient
 {
     private const string SteamApiBaseUrl = "https://api.steampowered.com";
     private const string StoreApiBaseUrl = "https://store.steampowered.com/api";
 
     private readonly HttpClient _httpClient;
-    private readonly ILogger<SteamRepository> _logger;
+    private readonly ILogger<SteamApiClient> _logger;
     private readonly string _apiKey;
 
-    public SteamRepository(HttpClient httpClient, IOptions<SteamApiOptions> options, ILogger<SteamRepository> logger)
+    public SteamApiClient(HttpClient httpClient, IOptions<SteamApiOptions> options, ILogger<SteamApiClient> logger)
     {
         _httpClient = httpClient;
         _logger = logger;
@@ -31,6 +31,23 @@ public class SteamRepository : ISteamRepository
 
         _httpClient.BaseAddress = new Uri(SteamApiBaseUrl);
         _httpClient.Timeout = TimeSpan.FromSeconds(30);
+    }
+
+    public async Task<SteamIdValidationResult> ValidateIdAsync(string steamId, CancellationToken cancellationToken = default)
+    {
+        var normalized = string.IsNullOrWhiteSpace(steamId) ? null : steamId.Trim();
+        if (!SteamIdValidator.IsValidSteamId64(normalized))
+        {
+            return SteamIdValidationResult.InvalidFormat();
+        }
+
+        var player = await GetPlayerBySteamIdAsync(normalized!, cancellationToken);
+        if (player is null || string.IsNullOrWhiteSpace(player.SteamId))
+        {
+            return SteamIdValidationResult.NotFound();
+        }
+
+        return SteamIdValidationResult.Valid(player);
     }
 
     public async Task<Player?> GetPlayerBySteamIdAsync(string steamId, CancellationToken cancellationToken = default)

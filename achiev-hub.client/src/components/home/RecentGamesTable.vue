@@ -31,23 +31,29 @@
             {{ data.row.playTimeTotal }} hours
         </template>
         <template #cell-achievements="{ data }">
-            <ProgressComponent 
-                :value="data.row.achievements.percentage" 
-                :label="data.row.achievements.percentage + '%'" 
-                :color="getColor(data.row.achievements.percentage)"
-            />
-            <span class="text-muted">
-                {{ data.row.achievements.unlocked }}/{{ data.row.achievements.total }}
-            </span>
+            <div v-if="data.row.achievements.total === 0">
+                <span class="text-muted">No achievements</span>
+            </div>
+            <div v-else>
+                <ProgressComponent 
+                    :value="data.row.achievements.percentage" 
+                    :label="formatPercentage(data.row.achievements.percentage)" 
+                    :color="getColor(data.row.achievements.percentage)"
+                />
+                <span class="text-muted">
+                    {{ data.row.achievements.unlocked }}/{{ data.row.achievements.total }}
+                </span>
+            </div>
         </template>
     </TableComponent>
 </template>
 
 <script>
-import { getSessionSteamId, steamAppIconUrl } from '@/lib/steam';
-import { getRecentGames } from '@/services/gamesService';
-import TableComponent from '@/components/global/TableComponent.vue';
-import ProgressComponent from '@/components/global/ProgressComponent.vue';
+import { getSessionSteamId, steamAppIconUrl } from '@/lib/steam'
+import { getRecentGames } from '@/services/gamesService'
+import { formatPercentage } from '@/utils/NumberFormat'
+import TableComponent from '@/components/global/TableComponent.vue'
+import ProgressComponent from '@/components/global/ProgressComponent.vue'
 
 export default {
     name: 'RecentGamesTable',
@@ -92,6 +98,7 @@ export default {
         }
     },
     methods: {
+        formatPercentage,
         iconUrl(game) {
             return steamAppIconUrl(game.appId, game.image)
         },

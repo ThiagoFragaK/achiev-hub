@@ -54,8 +54,7 @@
 
         <div class="card">
             <div class="card-body">
-                <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
-                    <h2 class="h5 mb-0">Games Achievements</h2>
+                <div class="d-flex gap-3 mb-3">
                     <button
                         type="button"
                         class="btn btn-outline-secondary btn-sm"
@@ -65,6 +64,7 @@
                     >
                         <LucideIcon icon="Funnel" :size="18" />
                     </button>
+                    <h2 class="h5 mt-2">Games Achievements</h2>
                 </div>
 
                 <GamesFilters
