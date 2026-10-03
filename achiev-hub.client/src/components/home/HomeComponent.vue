@@ -3,7 +3,7 @@
         <p v-if="statsError" class="text-danger small mb-3">{{ statsError }}</p>
 
         <div class="row g-4 mb-4">
-            <div class="col-12 col-lg">
+            <div class="col-5 col-lg-5 col-sm-12">
                 <AchievementsLast14DaysGraph
                     :labels="achievementsLabels"
                     :datasets="achievementsData"
@@ -11,7 +11,7 @@
                 />
             </div>
 
-            <div class="col-12 col-lg-3">
+            <div class="col-2 col-lg-2 col-sm-12">
                 <UsersAverageSemiGauge
                     :value="averagePercentage"
                     :total-achievements="totalAchievements"
@@ -20,7 +20,7 @@
                 />
             </div>
 
-            <div class="col-12 col-lg">
+            <div class="col-5 col-lg-5 col-sm-12">
                 <AchievementsPerYearGraph
                     :labels="perYearLabels"
                     :datasets="perYearData"
@@ -38,7 +38,6 @@
 </template>
 
 <script>
-import { getUser } from '@/lib/session'
 import { getUserStats } from '@/services/statsService'
 import AppShell from '@/components/layout/AppShell.vue'
 import AchievementsLast14DaysGraph from '@/components/home/graphs/AchievementsLast14DaysGraph.vue'
