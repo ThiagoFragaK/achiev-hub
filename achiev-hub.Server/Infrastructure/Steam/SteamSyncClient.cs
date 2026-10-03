@@ -2,9 +2,9 @@ using System.Text;
 using System.Text.Json;
 using achiev_hub.Server.Application.Steam.Interfaces;
 using achiev_hub.Server.Infrastructure.Options;
+using achiev_hub.Server.Infrastructure.Steam.Contracts;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
-using SteamSync.Shared.Messages;
 
 namespace achiev_hub.Server.Infrastructure.Steam;
 
@@ -42,7 +42,7 @@ public sealed class SteamSyncClient : ISteamSyncClient, IAsyncDisposable
 
         await channel.BasicPublishAsync(
             exchange: string.Empty,
-            routingKey: SyncQueueNames.FirstSync,
+            routingKey: SteamSyncQueueNames.FirstSync,
             mandatory: false,
             basicProperties: props,
             body: body,
@@ -105,7 +105,7 @@ public sealed class SteamSyncClient : ISteamSyncClient, IAsyncDisposable
     private static async Task DeclareFirstSyncTopologyAsync(IChannel channel, CancellationToken cancellationToken)
     {
         await channel.ExchangeDeclareAsync(
-            exchange: SyncQueueNames.FirstSyncDeadLetterExchange,
+            exchange: SteamSyncQueueNames.FirstSyncDeadLetterExchange,
             type: ExchangeType.Fanout,
             durable: true,
             autoDelete: false,
@@ -113,7 +113,7 @@ public sealed class SteamSyncClient : ISteamSyncClient, IAsyncDisposable
             cancellationToken: cancellationToken);
 
         await channel.QueueDeclareAsync(
-            queue: SyncQueueNames.FirstSyncDeadLetterQueue,
+            queue: SteamSyncQueueNames.FirstSyncDeadLetterQueue,
             durable: true,
             exclusive: false,
             autoDelete: false,
@@ -121,18 +121,18 @@ public sealed class SteamSyncClient : ISteamSyncClient, IAsyncDisposable
             cancellationToken: cancellationToken);
 
         await channel.QueueBindAsync(
-            queue: SyncQueueNames.FirstSyncDeadLetterQueue,
-            exchange: SyncQueueNames.FirstSyncDeadLetterExchange,
+            queue: SteamSyncQueueNames.FirstSyncDeadLetterQueue,
+            exchange: SteamSyncQueueNames.FirstSyncDeadLetterExchange,
             routingKey: string.Empty,
             cancellationToken: cancellationToken);
 
         var args = new Dictionary<string, object?>
         {
-            ["x-dead-letter-exchange"] = SyncQueueNames.FirstSyncDeadLetterExchange
+            ["x-dead-letter-exchange"] = SteamSyncQueueNames.FirstSyncDeadLetterExchange
         };
 
         await channel.QueueDeclareAsync(
-            queue: SyncQueueNames.FirstSync,
+            queue: SteamSyncQueueNames.FirstSync,
             durable: true,
             exclusive: false,
             autoDelete: false,

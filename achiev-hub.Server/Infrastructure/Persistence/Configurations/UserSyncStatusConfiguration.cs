@@ -1,7 +1,7 @@
 using achiev_hub.Server.Domain.Entities;
+using achiev_hub.Server.Infrastructure.Steam.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using SteamSync.Shared;
 
 namespace achiev_hub.Server.Infrastructure.Persistence.Configurations;
 

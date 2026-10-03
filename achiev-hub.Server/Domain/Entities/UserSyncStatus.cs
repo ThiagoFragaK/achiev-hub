@@ -1,4 +1,4 @@
-using SteamSync.Shared;
+using achiev_hub.Server.Infrastructure.Steam.Contracts;
 
 namespace achiev_hub.Server.Domain.Entities;
 
