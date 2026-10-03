@@ -25,6 +25,8 @@ namespace achiev_hub.Server.Application.Steam;
 
 public class SteamSyncService : ISteamSyncService
 {
+    private const int AchievementSyncCooldownMinutes = 60;
+
     private readonly ApplicationDbContext _db;
     private readonly ISteamApiClient _steamApiClient;
     private readonly IMemoryCache _cache;
@@ -246,6 +248,17 @@ public class SteamSyncService : ISteamSyncService
             return;
         }
 
+        if (usersGame.AchievementsSyncedAt is DateTimeOffset lastSynced)
+        {
+            var elapsed = DateTimeOffset.UtcNow - lastSynced;
+            var cooldown = TimeSpan.FromMinutes(AchievementSyncCooldownMinutes);
+            if (elapsed < cooldown)
+            {
+                var remaining = (int)Math.Ceiling((cooldown - elapsed).TotalSeconds);
+                throw new SteamSyncCooldownException(Math.Max(1, remaining));
+            }
+        }
+
         var schema = await _steamApiClient.GetGameSchemaAsync(appId, cancellationToken);
         var schemaAchievements = (schema?.Achievements ?? [])
             .Where(a => !string.IsNullOrWhiteSpace(a.Name))
@@ -353,6 +366,7 @@ public class SteamSyncService : ISteamSyncService
         usersGame.AchievementsPercentage = totalAchievements == 0
             ? 0
             : (decimal)Math.Round(unlockedCount / (double)totalAchievements * 100, 2);
+        usersGame.AchievementsSyncedAt = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync(cancellationToken);
 
@@ -382,6 +396,13 @@ public class SteamSyncService : ISteamSyncService
             try
             {
                 await SyncGameAchievementsAsync(userId, steamId, appId, cancellationToken);
+            }
+            catch (SteamSyncCooldownException)
+            {
+                _logger.LogDebug(
+                    "Skipping achievement sync for user {UserId} app {AppId}: within cooldown",
+                    userId,
+                    appId);
             }
             catch (Exception ex)
             {
