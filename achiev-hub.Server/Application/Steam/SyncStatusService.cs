@@ -2,8 +2,8 @@ using achiev_hub.Server.Application.Steam.Interfaces;
 using achiev_hub.Server.Domain.Entities;
 using achiev_hub.Server.Domain.Enums;
 using achiev_hub.Server.Infrastructure.Persistence;
+using achiev_hub.Server.Infrastructure.Steam.Contracts;
 using Microsoft.EntityFrameworkCore;
-using SteamSync.Shared;
 
 namespace achiev_hub.Server.Application.Steam;
 
