@@ -242,7 +242,7 @@ export default {
     },
     data() {
         return {
-            bypassEmailVerification: import.meta.env.DEV,
+            bypassEmailVerification: true,
             steamId: '',
             email: '',
             password: '',
