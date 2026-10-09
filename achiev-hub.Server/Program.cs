@@ -21,8 +21,14 @@ using achiev_hub.Server.Domain.Entities;
 using achiev_hub.Server.Domain.Interfaces;
 using achiev_hub.Server.Infrastructure.Auth;
 using achiev_hub.Server.Infrastructure.Email;
+using achiev_hub.Server.Infrastructure.HealthChecks;
+using achiev_hub.Server.Infrastructure.HealthChecks.Interfaces;
+using achiev_hub.Server.Infrastructure.Messaging;
+using achiev_hub.Server.Infrastructure.Messaging.Interfaces;
 using achiev_hub.Server.Infrastructure.Options;
 using achiev_hub.Server.Infrastructure.Persistence;
+using achiev_hub.Server.Infrastructure.Startup;
+using achiev_hub.Server.Infrastructure.Startup.Interfaces;
 using achiev_hub.Server.Infrastructure.Steam;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -42,9 +48,17 @@ builder.Services.Configure<SteamApiOptions>(builder.Configuration.GetSection(Ste
 builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection(SendGridOptions.SectionName));
 builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection(RabbitMqOptions.SectionName));
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
+builder.Services.Configure<StartupHealthCheckOptions>(builder.Configuration.GetSection(StartupHealthCheckOptions.SectionName));
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddHttpClient<ISteamApiClient, SteamApiClient>();
+builder.Services.AddSingleton<IRabbitMqConnectionFactory, RabbitMqConnectionFactory>();
 builder.Services.AddSingleton<ISteamSyncClient, SteamSyncClient>();
+
+// Startup sequence. Health checks run in registration order: Database first, then RabbitMQ.
+builder.Services.AddSingleton<IStartupHealthCheck, DatabaseHealthCheck>();
+builder.Services.AddSingleton<IStartupHealthCheck, RabbitMqHealthCheck>();
+builder.Services.AddSingleton<IStartupTask, RabbitMqTopologyInitializer>();
+builder.Services.AddSingleton<StartupOrchestrator>();
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -121,6 +135,14 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+if (!await app.Services.GetRequiredService<StartupOrchestrator>().RunAsync())
+{
+    app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup")
+        .LogCritical("Startup checks failed; shutting down.");
+    Environment.ExitCode = 1;
+    return;
+}
 
 try
 {
