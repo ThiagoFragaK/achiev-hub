@@ -1,9 +1,8 @@
 using System.Text;
 using System.Text.Json;
 using achiev_hub.Server.Application.Steam.Interfaces;
-using achiev_hub.Server.Infrastructure.Options;
+using achiev_hub.Server.Infrastructure.Messaging.Interfaces;
 using achiev_hub.Server.Infrastructure.Steam.Contracts;
-using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 
 namespace achiev_hub.Server.Infrastructure.Steam;
@@ -12,15 +11,15 @@ public sealed class SteamSyncClient : ISteamSyncClient, IAsyncDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    private readonly RabbitMqOptions _options;
+    private readonly IRabbitMqConnectionFactory _connectionFactory;
     private readonly ILogger<SteamSyncClient> _logger;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private IConnection? _connection;
     private IChannel? _channel;
 
-    public SteamSyncClient(IOptions<RabbitMqOptions> options, ILogger<SteamSyncClient> logger)
+    public SteamSyncClient(IRabbitMqConnectionFactory connectionFactory, ILogger<SteamSyncClient> logger)
     {
-        _options = options.Value;
+        _connectionFactory = connectionFactory;
         _logger = logger;
     }
 
@@ -73,71 +72,15 @@ public sealed class SteamSyncClient : ISteamSyncClient, IAsyncDisposable
             _connection?.Dispose();
             _channel?.Dispose();
 
-            var factory = CreateFactory();
-            _connection = await factory.CreateConnectionAsync(cancellationToken);
+            // Topology is declared once at startup by RabbitMqTopologyInitializer.
+            _connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
             _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
-            await DeclareFirstSyncTopologyAsync(_channel, cancellationToken);
             return _channel;
         }
         finally
         {
             _gate.Release();
         }
-    }
-
-    private ConnectionFactory CreateFactory()
-    {
-        if (!string.IsNullOrWhiteSpace(_options.Url))
-        {
-            return new ConnectionFactory { Uri = new Uri(_options.Url) };
-        }
-
-        return new ConnectionFactory
-        {
-            HostName = _options.Host,
-            Port = _options.Port,
-            UserName = _options.Username,
-            Password = _options.Password,
-            VirtualHost = _options.VirtualHost
-        };
-    }
-
-    private static async Task DeclareFirstSyncTopologyAsync(IChannel channel, CancellationToken cancellationToken)
-    {
-        await channel.ExchangeDeclareAsync(
-            exchange: SteamSyncQueueNames.FirstSyncDeadLetterExchange,
-            type: ExchangeType.Fanout,
-            durable: true,
-            autoDelete: false,
-            arguments: null,
-            cancellationToken: cancellationToken);
-
-        await channel.QueueDeclareAsync(
-            queue: SteamSyncQueueNames.FirstSyncDeadLetterQueue,
-            durable: true,
-            exclusive: false,
-            autoDelete: false,
-            arguments: null,
-            cancellationToken: cancellationToken);
-
-        await channel.QueueBindAsync(
-            queue: SteamSyncQueueNames.FirstSyncDeadLetterQueue,
-            exchange: SteamSyncQueueNames.FirstSyncDeadLetterExchange,
-            routingKey: string.Empty,
-            cancellationToken: cancellationToken);
-
-        var args = new Dictionary<string, object?>
-        {
-            ["x-dead-letter-exchange"] = SteamSyncQueueNames.FirstSyncDeadLetterExchange
-        };
-
-        await channel.QueueDeclareAsync(
-            queue: SteamSyncQueueNames.FirstSync,
-            durable: true,
-            exclusive: false,
-            autoDelete: false,
-            arguments: args,
-            cancellationToken: cancellationToken);
     }
 
     public async ValueTask DisposeAsync()
