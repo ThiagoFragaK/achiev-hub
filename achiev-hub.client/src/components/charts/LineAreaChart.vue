@@ -37,6 +37,25 @@ export default {
         }
     },
     computed: {
+        labelHeightExtra() {
+            return this.xLabelRotate !== 0 ? 48 : 0
+        },
+        wrapperHeight() {
+            if (typeof this.height === 'number') {
+                return `${this.height + this.labelHeightExtra}px`
+            }
+            if (this.labelHeightExtra === 0) {
+                return this.height
+            }
+            return `calc(${this.height} + ${this.labelHeightExtra}px)`
+        },
+        chartHeight() {
+            const extra = this.labelHeightExtra
+            if (this.measuredHeight > 0) {
+                return this.measuredHeight
+            }
+            return typeof this.height === 'number' ? this.height + extra : '100%'
+        },
         series() {
             return this.datasets.map((ds) => ({
                 name: ds.label,
