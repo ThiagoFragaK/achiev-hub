@@ -26,6 +26,14 @@ export default {
         max: {
             type: Number,
             default: undefined
+        },
+        xLabelRotate: {
+            type: Number,
+            default: 0
+        },
+        xLabelEvery: {
+            type: Number,
+            default: 1
         }
     },
     computed: {
@@ -36,6 +44,10 @@ export default {
             }))
         },
         chartOptions() {
+            const rotate = this.xLabelRotate
+            const every = Math.max(1, this.xLabelEvery)
+            const categories = this.labels
+
             return {
                 chart: {
                     type: 'area',
@@ -58,13 +70,19 @@ export default {
                 },
                 legend: { show: false },
                 xaxis: {
-                    categories: this.labels,
-                    // Rotation is disabled so every chart reserves the same label
-                    // strip and therefore the same plot area height.
+                    categories,
+                    // Default rotate 0 keeps shared charts aligned; callers can opt in.
                     labels: {
-                        rotate: 0,
-                        rotateAlways: false,
-                        hideOverlappingLabels: true
+                        rotate,
+                        rotateAlways: rotate !== 0,
+                        hideOverlappingLabels: true,
+                        formatter: (value, _timestamp, opts) => {
+                            const index = opts?.i ?? categories.indexOf(value)
+                            if (index % every !== 0) {
+                                return ''
+                            }
+                            return value
+                        }
                     }
                 },
                 yaxis: {
