@@ -26,9 +26,36 @@ export default {
         max: {
             type: Number,
             default: undefined
+        },
+        xLabelRotate: {
+            type: Number,
+            default: 0
+        },
+        xLabelEvery: {
+            type: Number,
+            default: 1
         }
     },
     computed: {
+        labelHeightExtra() {
+            return this.xLabelRotate !== 0 ? 48 : 0
+        },
+        wrapperHeight() {
+            if (typeof this.height === 'number') {
+                return `${this.height + this.labelHeightExtra}px`
+            }
+            if (this.labelHeightExtra === 0) {
+                return this.height
+            }
+            return `calc(${this.height} + ${this.labelHeightExtra}px)`
+        },
+        chartHeight() {
+            const extra = this.labelHeightExtra
+            if (this.measuredHeight > 0) {
+                return this.measuredHeight
+            }
+            return typeof this.height === 'number' ? this.height + extra : '100%'
+        },
         series() {
             return this.datasets.map((ds) => ({
                 name: ds.label,
@@ -36,6 +63,10 @@ export default {
             }))
         },
         chartOptions() {
+            const rotate = this.xLabelRotate
+            const every = Math.max(1, this.xLabelEvery)
+            const categories = this.labels
+
             return {
                 chart: {
                     type: 'area',
@@ -60,9 +91,16 @@ export default {
                 xaxis: {
                     categories: this.labels,
                     labels: {
-                        rotate: 0,
-                        rotateAlways: false,
-                        hideOverlappingLabels: true
+                        rotate,
+                        rotateAlways: rotate !== 0,
+                        hideOverlappingLabels: true,
+                        formatter: (value, _timestamp, opts) => {
+                            const index = opts?.i ?? categories.indexOf(value)
+                            if (index % every !== 0) {
+                                return ''
+                            }
+                            return value
+                        }
                     }
                 },
                 yaxis: {
