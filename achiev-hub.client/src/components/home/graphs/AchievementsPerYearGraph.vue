@@ -9,6 +9,8 @@
                 :datasets="datasets"
                 :max="max"
                 :height="height"
+                :x-label-rotate="-45"
+                :x-label-every="3"
             />
         </div>
     </div>

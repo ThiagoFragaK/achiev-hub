@@ -14,6 +14,7 @@
                 :datasets="datasets"
                 :max="max"
                 :height="height"
+                :x-label-rotate="-45"
             />
         </div>
     </div>
