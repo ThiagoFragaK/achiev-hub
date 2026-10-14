@@ -369,6 +369,7 @@ public class SteamSyncService : ISteamSyncService
         usersGame.AchievementsSyncedAt = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync(cancellationToken);
+        await RecalculateUserAvgPercentageAsync(userId, cancellationToken);
 
         _logger.LogInformation(
             "Synced achievements for user {UserId} app {AppId}: {Unlocked}/{Total}",
@@ -409,6 +410,29 @@ public class SteamSyncService : ISteamSyncService
                 _logger.LogWarning(ex, "Achievement sync failed for user {UserId} app {AppId}", userId, appId);
             }
         }
+    }
+
+    private async Task RecalculateUserAvgPercentageAsync(int userId, CancellationToken cancellationToken)
+    {
+        var average = await _db.UsersGames
+            .AsNoTracking()
+            .Where(ug =>
+                ug.UserId == userId
+                && ug.Game.HasCommunityVisibleStats == true
+                && ug.AchievementsPercentage > 0)
+            .Select(ug => (decimal?)ug.AchievementsPercentage)
+            .AverageAsync(cancellationToken);
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+        if (user is null)
+        {
+            return;
+        }
+
+        user.AvgPercentage = average is null
+            ? 0
+            : Math.Round(average.Value, 2);
+        await _db.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<List<int>> GetAllOwnedWithStatsAppIdsAsync(int userId, CancellationToken cancellationToken)
