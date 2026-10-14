@@ -89,8 +89,7 @@ export default {
                 },
                 legend: { show: false },
                 xaxis: {
-                    categories,
-                    // Default rotate 0 keeps shared charts aligned; callers can opt in.
+                    categories: this.labels,
                     labels: {
                         rotate,
                         rotateAlways: rotate !== 0,
