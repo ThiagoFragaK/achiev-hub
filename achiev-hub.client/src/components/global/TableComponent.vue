@@ -96,6 +96,11 @@ export default {
         pagination: {
             type: Object,
             required: false
+        },
+        light:{
+            type: String,
+            default: 'primary',
+            required: false
         }
     },
     emits: ['selectedRows', 'change-page'],
