@@ -3,11 +3,12 @@
         <GameHeader 
             :gameId="gameId" 
             @reload="syncAndReloadAchievements"
+            @completion-change="onCompletionChange"
         />
 
         <div class="card">
             <div class="card-body">
-                <div class="d-flex gap-3 mb-2">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                     <button
                         type="button"
                         class="btn btn-outline-secondary btn-sm"
@@ -17,7 +18,34 @@
                     >
                         <LucideIcon icon="Funnel" :size="18" />
                     </button>
-                    <h2 class="h5">Games Achievements</h2>
+                    <h2 class="h5 mb-0">Games Achievements</h2>
+                    <div class="d-flex flex-wrap gap-2 ms-auto">
+                        <div class="btn-group" role="group" aria-label="Achievement status">
+                            <button
+                                v-for="option in statusOptions"
+                                :key="option.value"
+                                type="button"
+                                class="btn btn-sm"
+                                :class="appliedFilters.status === option.value ? 'btn-primary' : 'btn-outline-secondary'"
+                                :disabled="isFullyCompleted"
+                                @click="setStatus(option.value)"
+                            >
+                                {{ option.label }}
+                            </button>
+                        </div>
+                        <div class="btn-group" role="group" aria-label="Sort achievements">
+                            <button
+                                v-for="option in sortOptions"
+                                :key="option.value"
+                                type="button"
+                                class="btn btn-sm"
+                                :class="appliedFilters.sort === option.value ? 'btn-primary' : 'btn-outline-secondary'"
+                                @click="setSort(option.value)"
+                            >
+                                {{ option.label }}
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <GamesFilters
@@ -41,7 +69,7 @@
 
 <script>
 import { getUser } from '@/lib/session'
-import { syncGameAchievements } from '@/services/gamesService';
+import { syncGameAchievements } from '@/services/gamesService'
 import AppShell from '@/components/layout/AppShell.vue'
 import GameAchievementsGraph from '@/components/games/graphs/GameAchievementsGraph.vue'
 import GamesFilters from '@/components/games/GamesFilters.vue'
@@ -68,14 +96,26 @@ export default {
             tableKey: 0,
             syncError: '',
             isLoading: false,
+            isFullyCompleted: false,
             filters: {
                 name: '',
-                status: ''
+                status: 'locked',
+                sort: 'unlockTime'
             },
             appliedFilters: {
                 name: '',
-                status: ''
+                status: 'locked',
+                sort: 'unlockTime'
             },
+            statusOptions: [
+                { value: 'locked', label: 'Locked' },
+                { value: 'unlocked', label: 'Unlocked' },
+                { value: 'all', label: 'All' }
+            ],
+            sortOptions: [
+                { value: 'unlockTime', label: 'Unlock time' },
+                { value: 'name', label: 'Name' }
+            ],
             achievementColumns: [
                 { key: 'icon', label: '' },
                 { key: 'name', label: 'Achievement' },
@@ -103,9 +143,38 @@ export default {
         applyFilters(filters) {
             this.appliedFilters = {
                 name: filters?.name || '',
-                status: filters?.status || ''
+                status: filters?.status || 'locked',
+                sort: filters?.sort || 'unlockTime'
             }
+            this.filters = { ...this.appliedFilters }
             this.tableKey++
+        },
+        setStatus(status) {
+            if (this.isFullyCompleted || this.appliedFilters.status === status) {
+                return
+            }
+            this.applyFilters({
+                ...this.appliedFilters,
+                status
+            })
+        },
+        setSort(sort) {
+            if (this.appliedFilters.sort === sort) {
+                return
+            }
+            this.applyFilters({
+                ...this.appliedFilters,
+                sort
+            })
+        },
+        onCompletionChange(isCompleted) {
+            this.isFullyCompleted = !!isCompleted
+            if (this.isFullyCompleted && this.appliedFilters.status !== 'all') {
+                this.applyFilters({
+                    ...this.appliedFilters,
+                    status: 'all'
+                })
+            }
         },
         async syncAndReloadAchievements() {
             this.syncError = ''
@@ -120,6 +189,7 @@ export default {
             this.tableKey++
         },
     },
+
     async created() {
         this.gameId = this.$route.params.id;
     }
