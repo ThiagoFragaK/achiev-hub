@@ -1,7 +1,7 @@
 <template>
     <CollapseComponent ref="collapse" :collapse-id="collapseId">
         <div class="row g-3 mb-3 align-items-end">
-            <div class="col-md-5">
+            <div class="col-md-10">
                 <label class="form-label" for="filter-achievement-name">Achievement</label>
                 <input
                     id="filter-achievement-name"
@@ -9,15 +9,8 @@
                     type="search"
                     class="form-control"
                     placeholder="Search by name"
+                    @keydown.enter.prevent="applyFilters"
                 />
-            </div>
-            <div class="col-md-5">
-                <label class="form-label" for="filter-achievement-status">Status</label>
-                <select id="filter-achievement-status" v-model="draft.status" class="form-select">
-                    <option value="">All</option>
-                    <option value="unlocked">Unlocked</option>
-                    <option value="locked">Locked</option>
-                </select>
             </div>
             <div class="col-md-2">
                 <button type="button" class="btn btn-primary w-100" @click="applyFilters">Apply</button>
@@ -49,7 +42,8 @@ export default {
         return {
             draft: {
                 name: this.modelValue.name || '',
-                status: this.modelValue.status || ''
+                status: this.modelValue.status || 'locked',
+                sort: this.modelValue.sort || 'unlockTime'
             }
         }
     },
@@ -59,7 +53,8 @@ export default {
             handler(value) {
                 this.draft = {
                     name: value?.name || '',
-                    status: value?.status || ''
+                    status: value?.status || 'locked',
+                    sort: value?.sort || 'unlockTime'
                 }
             }
         }
@@ -67,8 +62,9 @@ export default {
     methods: {
         applyFilters() {
             const filters = {
-                name: this.draft.name || '',
-                status: this.draft.status || ''
+                name: this.draft.name?.trim() || '',
+                status: this.modelValue?.status || 'locked',
+                sort: this.modelValue?.sort || 'unlockTime'
             }
             this.$emit('update:modelValue', filters)
             this.$emit('apply-filters', filters)
