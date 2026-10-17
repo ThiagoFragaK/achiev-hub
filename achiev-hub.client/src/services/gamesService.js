@@ -11,7 +11,8 @@ export function getLibrary(steamId, page = 1, pageSize = 15, filters = {}) {
         pageSize,
         name: filters.name,
         minHours: filters.minHours,
-        hasAchievements: filters.hasAchievements
+        hasAchievements: filters.hasAchievements,
+        sort: filters.sort
     })}`)
 }
 
@@ -26,7 +27,8 @@ export function getAchievements(steamId, appId, page = 1, pageSize = 7, filters 
             page,
             pageSize,
             name: filters.name,
-            status: filters.status
+            status: filters.status,
+            sort: filters.sort
         })}`
     )
 }
