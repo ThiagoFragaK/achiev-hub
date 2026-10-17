@@ -40,6 +40,7 @@ public interface IGamesService
         int pageSize,
         string? name = null,
         string? status = null,
+        string? sort = null,
         int? userId = null,
         CancellationToken cancellationToken = default);
 }

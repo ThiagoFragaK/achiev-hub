@@ -8,4 +8,5 @@ public class LibraryGameDto
     public double Playtime { get; set; }
     public string? NotPlayedSince { get; set; }
     public bool HasAchievements { get; set; }
+    public decimal AchievementsPercentage { get; set; }
 }

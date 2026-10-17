@@ -63,6 +63,7 @@ public class SteamGamesController : ApiControllerBase
         [FromQuery] string? name = null,
         [FromQuery] double? minHours = null,
         [FromQuery] bool? hasAchievements = null,
+        [FromQuery] string? sort = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(steamId))
@@ -74,7 +75,8 @@ public class SteamGamesController : ApiControllerBase
         {
             Name = name,
             MinHours = minHours,
-            HasAchievements = hasAchievements
+            HasAchievements = hasAchievements,
+            Sort = sort
         };
 
         var result = await _gamesService.GetLibraryAsync(
@@ -102,6 +104,7 @@ public class SteamGamesController : ApiControllerBase
         [FromQuery] int pageSize = 25,
         [FromQuery] string? name = null,
         [FromQuery] string? status = null,
+        [FromQuery] string? sort = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(steamId))
@@ -118,6 +121,7 @@ public class SteamGamesController : ApiControllerBase
                 pageSize,
                 name,
                 status,
+                sort,
                 ResolveUserIdForDbReads(),
                 cancellationToken);
             return Ok(result);

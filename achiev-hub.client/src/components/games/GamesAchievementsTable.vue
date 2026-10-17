@@ -45,7 +45,7 @@ export default {
         },
         filters: {
             type: Object,
-            default: () => ({ name: '', status: '' })
+            default: () => ({ name: '', status: 'locked', sort: 'unlockTime' })
         }
     },
     data() {

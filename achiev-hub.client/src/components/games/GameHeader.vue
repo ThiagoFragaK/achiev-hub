@@ -115,6 +115,7 @@ export default {
             required: true
         }
     },
+    emits: ['reload', 'completion-change'],
     data() {
         return {
             game: {
@@ -138,6 +139,9 @@ export default {
                 return 'success';
             }
             return percentage > 50 ? 'info' : 'danger';
+        },
+        emitCompletion() {
+            this.$emit('completion-change', this.isCompleted);
         },
         async reload() {
             this.$emit('reload');
@@ -168,6 +172,7 @@ export default {
                 }
                 this.error = err?.message || 'Failed to load game details.'
                 this.isLoading = false;
+                this.emitCompletion();
             }
         },
         formatProgressLabel(isoDate, granularity) {
@@ -190,6 +195,7 @@ export default {
                 this.progressPercentages = []
             } finally {
                 this.isLoading = false;
+                this.emitCompletion();
             }
         },
     },
@@ -215,7 +221,9 @@ export default {
             ]
         },
         isCompleted() {
-            return this.game.userAchievementsCount == this.game.totalAchievements;
+            const total = Number(this.game.totalAchievements) || 0;
+            const unlocked = Number(this.game.userAchievementsCount) || 0;
+            return total > 0 && unlocked >= total;
         }
     },
 }
