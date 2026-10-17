@@ -89,12 +89,13 @@ public class GamesService : IGamesService
         int pageSize,
         string? name = null,
         string? status = null,
+        string? sort = null,
         int? userId = null,
         CancellationToken cancellationToken = default)
     {
         if (userId is int authUserId)
         {
-            return await GetAchievementsFromDbAsync(authUserId, appId, page, pageSize, name, status, cancellationToken);
+            return await GetAchievementsFromDbAsync(authUserId, appId, page, pageSize, name, status, sort, cancellationToken);
         }
 
         var playerResult = await _steamApiClient.GetPlayerAchievementsAsync(steamId, appId, cancellationToken);
@@ -110,10 +111,7 @@ public class GamesService : IGamesService
             .GroupBy(achievement => achievement.Name!, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.OrdinalIgnoreCase);
 
-        var normalizedName = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
-        var normalizedStatus = string.IsNullOrWhiteSpace(status) ? null : status.Trim().ToLowerInvariant();
-
-        var mapped = new List<AchievementDto>();
+        var rows = new List<AchievementSortRow>();
         foreach (var playerAchievement in playerResult.Achievements)
         {
             if (string.IsNullOrWhiteSpace(playerAchievement.ApiName))
@@ -122,41 +120,32 @@ public class GamesService : IGamesService
             }
 
             var unlocked = playerAchievement.Achieved == 1;
-            if (normalizedStatus == "unlocked" && !unlocked)
-            {
-                continue;
-            }
-
-            if (normalizedStatus == "locked" && unlocked)
-            {
-                continue;
-            }
-
             schemaByName.TryGetValue(playerAchievement.ApiName, out var schemaAchievement);
             var displayName = string.IsNullOrWhiteSpace(schemaAchievement?.DisplayName)
                 ? playerAchievement.ApiName
                 : schemaAchievement.DisplayName;
 
-            if (normalizedName is not null &&
-                (displayName is null || displayName.IndexOf(normalizedName, StringComparison.OrdinalIgnoreCase) < 0))
+            rows.Add(new AchievementSortRow
             {
-                continue;
-            }
-
-            mapped.Add(new AchievementDto
-            {
-                Name = displayName,
-                Description = schemaAchievement is null
-                    ? null
-                    : schemaAchievement.Hidden == 1
-                        ? "Secret achievement: without description"
-                        : schemaAchievement.Description,
-                Icon = unlocked ? schemaAchievement?.Icon : schemaAchievement?.IconGray,
-                Unlocked = unlocked ? FormatDateTime(playerAchievement.UnlockTimeUnix) : "-"
+                IsUnlocked = unlocked,
+                UnlockUtc = unlocked && playerAchievement.UnlockTimeUnix > 0
+                    ? DateTimeOffset.FromUnixTimeSeconds(playerAchievement.UnlockTimeUnix).UtcDateTime
+                    : null,
+                Dto = new AchievementDto
+                {
+                    Name = displayName,
+                    Description = schemaAchievement is null
+                        ? null
+                        : schemaAchievement.Hidden == 1
+                            ? "Secret achievement: without description"
+                            : schemaAchievement.Description,
+                    Icon = unlocked ? schemaAchievement?.Icon : schemaAchievement?.IconGray,
+                    Unlocked = unlocked ? FormatDateTime(playerAchievement.UnlockTimeUnix) : "-"
+                }
             });
         }
 
-        return Paginate(mapped, page, pageSize);
+        return Paginate(FilterAndSortAchievements(rows, name, status, sort), page, pageSize);
     }
 
     private async Task<PagedResultDto<AchievementDto>> GetAchievementsFromDbAsync(
@@ -166,6 +155,7 @@ public class GamesService : IGamesService
         int pageSize,
         string? name,
         string? status,
+        string? sort,
         CancellationToken cancellationToken)
     {
         var steamAppId = appId.ToString();
@@ -189,47 +179,100 @@ public class GamesService : IGamesService
             .Where(ua => ua.UserId == userId && ua.GameId == game.Id)
             .ToDictionaryAsync(ua => ua.AchievementId, cancellationToken);
 
-        var normalizedName = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
-        var normalizedStatus = string.IsNullOrWhiteSpace(status) ? null : status.Trim().ToLowerInvariant();
-
-        var mapped = new List<AchievementDto>();
+        var rows = new List<AchievementSortRow>();
         foreach (var achievement in achievements)
         {
             var unlocked = unlocks.ContainsKey(achievement.Id);
-            if (normalizedStatus == "unlocked" && !unlocked)
-            {
-                continue;
-            }
-
-            if (normalizedStatus == "locked" && unlocked)
-            {
-                continue;
-            }
-
-            if (normalizedName is not null &&
-                achievement.Name.IndexOf(normalizedName, StringComparison.OrdinalIgnoreCase) < 0)
-            {
-                continue;
-            }
-
+            DateTime? unlockUtc = null;
             var unlockDate = "-";
             if (unlocked && unlocks.TryGetValue(achievement.Id, out var usersUnlock) && usersUnlock.UnlockDate.HasValue)
             {
+                unlockUtc = DateTime.SpecifyKind(usersUnlock.UnlockDate.Value, DateTimeKind.Utc);
                 unlockDate = FormatDateTimeFromUtc(usersUnlock.UnlockDate.Value);
             }
 
-            mapped.Add(new AchievementDto
+            rows.Add(new AchievementSortRow
             {
-                Name = achievement.Name,
-                Description = string.IsNullOrWhiteSpace(achievement.Description) && !unlocked
-                    ? "Secret achievement: without description"
-                    : achievement.Description,
-                Icon = unlocked ? achievement.ImageUrlUnlock : achievement.ImageUrlLock,
-                Unlocked = unlockDate
+                IsUnlocked = unlocked,
+                UnlockUtc = unlockUtc,
+                Dto = new AchievementDto
+                {
+                    Name = achievement.Name,
+                    Description = string.IsNullOrWhiteSpace(achievement.Description) && !unlocked
+                        ? "Secret achievement: without description"
+                        : achievement.Description,
+                    Icon = unlocked ? achievement.ImageUrlUnlock : achievement.ImageUrlLock,
+                    Unlocked = unlockDate
+                }
             });
         }
 
-        return Paginate(mapped, page, pageSize);
+        return Paginate(FilterAndSortAchievements(rows, name, status, sort), page, pageSize);
+    }
+
+    private static List<AchievementDto> FilterAndSortAchievements(
+        List<AchievementSortRow> rows,
+        string? name,
+        string? status,
+        string? sort)
+    {
+        var normalizedName = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
+        var normalizedStatus = string.IsNullOrWhiteSpace(status)
+            ? "locked"
+            : status.Trim().ToLowerInvariant();
+        if (normalizedStatus is not ("locked" or "unlocked" or "all" or ""))
+        {
+            normalizedStatus = "locked";
+        }
+
+        if (normalizedStatus == "all")
+        {
+            normalizedStatus = "";
+        }
+
+        // If every achievement is unlocked, Locked falls back to showing all.
+        if (normalizedStatus == "locked" &&
+            rows.Count > 0 &&
+            rows.All(r => r.IsUnlocked))
+        {
+            normalizedStatus = "";
+        }
+
+        IEnumerable<AchievementSortRow> query = rows;
+
+        if (normalizedName is not null)
+        {
+            query = query.Where(r =>
+                !string.IsNullOrWhiteSpace(r.Dto.Name) &&
+                r.Dto.Name.IndexOf(normalizedName, StringComparison.OrdinalIgnoreCase) >= 0);
+        }
+
+        if (normalizedStatus == "unlocked")
+        {
+            query = query.Where(r => r.IsUnlocked);
+        }
+        else if (normalizedStatus == "locked")
+        {
+            query = query.Where(r => !r.IsUnlocked);
+        }
+
+        var filtered = query.ToList();
+        var normalizedSort = sort?.Trim().ToLowerInvariant() ?? "unlocktime";
+        IOrderedEnumerable<AchievementSortRow> ordered = normalizedSort == "name"
+            ? filtered.OrderBy(r => r.Dto.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            : filtered
+                .OrderByDescending(r => r.IsUnlocked && r.UnlockUtc.HasValue)
+                .ThenByDescending(r => r.UnlockUtc)
+                .ThenBy(r => r.Dto.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+
+        return ordered.Select(r => r.Dto).ToList();
+    }
+
+    private sealed class AchievementSortRow
+    {
+        public required AchievementDto Dto { get; init; }
+        public bool IsUnlocked { get; init; }
+        public DateTime? UnlockUtc { get; init; }
     }
 
     private async Task<IReadOnlyList<RecentGameDto>> GetOrFetchRecentGamesAsync(
@@ -295,11 +338,12 @@ public class GamesService : IGamesService
                 NotPlayedSince = game.LastPlayedUnix is null or 0
                     ? "0"
                     : FormatDate(game.LastPlayedUnix.Value),
-                HasAchievements = game.HasCommunityVisibleStats
+                HasAchievements = game.HasCommunityVisibleStats,
+                AchievementsPercentage = 0
             });
         }
 
-        return Paginate(ApplyLibraryFilters(mapped, filters), page, pageSize);
+        return Paginate(ApplyLibrarySort(ApplyLibraryFilters(mapped, filters), filters), page, pageSize);
     }
 
     private async Task<PagedResultDto<LibraryGameDto>> GetLibraryFromDbAsync(
@@ -335,11 +379,12 @@ public class GamesService : IGamesService
                 NotPlayedSince = ug.LastPlayedUnix is null or 0
                     ? "0"
                     : FormatDate(ug.LastPlayedUnix.Value),
-                HasAchievements = ug.Game.HasCommunityVisibleStats == true
+                HasAchievements = ug.Game.HasCommunityVisibleStats == true,
+                AchievementsPercentage = ug.AchievementsPercentage
             });
         }
 
-        return Paginate(ApplyLibraryFilters(mapped, filters), page, pageSize);
+        return Paginate(ApplyLibrarySort(ApplyLibraryFilters(mapped, filters), filters), page, pageSize);
     }
 
     private static List<LibraryGameDto> ApplyLibraryFilters(
@@ -372,6 +417,29 @@ public class GamesService : IGamesService
         }
 
         return query.ToList();
+    }
+
+    private static List<LibraryGameDto> ApplyLibrarySort(
+        IEnumerable<LibraryGameDto> games,
+        LibraryGameFilterDto? filters)
+    {
+        var sort = filters?.Sort?.Trim().ToLowerInvariant() ?? "playtime";
+
+        return sort switch
+        {
+            "name" => games
+                .OrderBy(g => g.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            "achievements" => games
+                .OrderByDescending(g => g.HasAchievements)
+                .ThenByDescending(g => g.AchievementsPercentage)
+                .ThenBy(g => g.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ToList(),
+            _ => games
+                .OrderByDescending(g => g.Playtime)
+                .ThenBy(g => g.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+                .ToList()
+        };
     }
 
     private async Task<AchievementSummaryDto> GetAchievementSummaryAsync(string steamId, int appId, CancellationToken cancellationToken)
