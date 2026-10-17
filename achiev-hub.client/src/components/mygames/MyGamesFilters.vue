@@ -9,6 +9,7 @@
                     type="search"
                     class="form-control"
                     placeholder="Search by name"
+                    @keydown.enter.prevent="applyFilters"
                 />
             </div>
             <div class="col-md-3">
@@ -19,6 +20,7 @@
                     type="number"
                     min="0"
                     class="form-control"
+                    @keydown.enter.prevent="applyFilters"
                 />
             </div>
             <div class="col-md-3">
