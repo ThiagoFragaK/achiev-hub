@@ -7,3 +7,11 @@ export function getUserStats() {
 export function getGameProgress(appId) {
     return getJson(`/api/users/stats/games/${encodeURIComponent(String(appId))}`)
 }
+
+export function getAchievementsByMonth() {
+    return getJson('/api/users/stats/achievements-by-month')
+}
+
+export function getGamesPercentageBands() {
+    return getJson('/api/users/stats/games-percentage-bands')
+}
