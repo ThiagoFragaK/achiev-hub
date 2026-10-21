@@ -23,4 +23,12 @@ public interface IUserStatsService
     Task<GameProgressDto> GetGameProgressAsync(int userId, int appId, CancellationToken cancellationToken = default);
 
     GameProgressDto GetEmptyGameProgress();
+
+    Task<AchievementsByMonthDto> GetAchievementsByMonthAsync(int userId, CancellationToken cancellationToken = default);
+
+    AchievementsByMonthDto GetEmptyAchievementsByMonth();
+
+    Task<GamesPercentageBandsDto> GetGamesPercentageBandsAsync(int userId, CancellationToken cancellationToken = default);
+
+    GamesPercentageBandsDto GetEmptyGamesPercentageBands();
 }

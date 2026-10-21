@@ -11,7 +11,6 @@ public class UserStatsDto
 
 public class DailyAchievementCountDto
 {
-    /// <summary>Local calendar day, formatted as yyyy-MM-dd.</summary>
     public string Date { get; set; } = string.Empty;
     public int Count { get; set; }
 }
@@ -19,5 +18,29 @@ public class DailyAchievementCountDto
 public class YearlyAchievementCountDto
 {
     public int Year { get; set; }
+    public int Count { get; set; }
+}
+
+public class AchievementsByMonthDto
+{
+    public IReadOnlyList<int> AvailableYears { get; set; } = [];
+    public IReadOnlyList<YearMonthSeriesDto> Series { get; set; } = [];
+}
+
+public class YearMonthSeriesDto
+{
+    public int Year { get; set; }
+    public IReadOnlyList<int> Counts { get; set; } = [];
+}
+
+public class GamesPercentageBandsDto
+{
+    public IReadOnlyList<PercentageBandCountDto> Bands { get; set; } = [];
+}
+
+public class PercentageBandCountDto
+{
+    public string Key { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
     public int Count { get; set; }
 }

@@ -158,6 +158,47 @@ public class UserStatsService : IUserStatsService
         };
     }
 
+    public async Task<AchievementsByMonthDto> GetAchievementsByMonthAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        var unlockDates = await _db.UsersAchievements
+            .AsNoTracking()
+            .Where(ua => ua.UserId == userId && ua.UnlockDate != null)
+            .Select(ua => ua.UnlockDate!.Value)
+            .ToListAsync(cancellationToken);
+
+        var localDays = unlockDates.Select(ToLocalDate).ToList();
+        return BuildAchievementsByMonth(localDays);
+    }
+
+    public AchievementsByMonthDto GetEmptyAchievementsByMonth()
+    {
+        return new AchievementsByMonthDto
+        {
+            AvailableYears = [],
+            Series = []
+        };
+    }
+
+    public async Task<GamesPercentageBandsDto> GetGamesPercentageBandsAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        var percentages = await _db.UsersGames
+            .AsNoTracking()
+            .Where(ug => ug.UserId == userId && ug.Game.HasCommunityVisibleStats == true)
+            .Select(ug => ug.AchievementsPercentage)
+            .ToListAsync(cancellationToken);
+
+        return BuildPercentageBands(percentages);
+    }
+
+    public GamesPercentageBandsDto GetEmptyGamesPercentageBands()
+    {
+        return BuildPercentageBands([]);
+    }
+
     private static IReadOnlyList<GameProgressPointDto> BuildProgressPoints(
         IReadOnlyList<DateTime> sortedUnlockDays,
         DateTime start,
@@ -286,6 +327,80 @@ public class UserStatsService : IUserStatsService
                 Count = countsByYear.TryGetValue(year, out var count) ? count : 0
             })
             .ToList();
+    }
+
+    private static AchievementsByMonthDto BuildAchievementsByMonth(IReadOnlyCollection<DateTime> localDays)
+    {
+        if (localDays.Count == 0)
+        {
+            return new AchievementsByMonthDto
+            {
+                AvailableYears = [],
+                Series = []
+            };
+        }
+
+        var countsByYearMonth = localDays
+            .GroupBy(day => (day.Year, day.Month))
+            .ToDictionary(group => group.Key, group => group.Count());
+
+        var years = countsByYearMonth.Keys
+            .Select(key => key.Year)
+            .Distinct()
+            .OrderByDescending(year => year)
+            .ToList();
+
+        var series = years
+            .Select(year =>
+            {
+                var counts = new int[12];
+                for (var month = 1; month <= 12; month++)
+                {
+                    counts[month - 1] = countsByYearMonth.TryGetValue((year, month), out var count)
+                        ? count
+                        : 0;
+                }
+
+                return new YearMonthSeriesDto
+                {
+                    Year = year,
+                    Counts = counts
+                };
+            })
+            .ToList();
+
+        return new AchievementsByMonthDto
+        {
+            AvailableYears = years,
+            Series = series
+        };
+    }
+
+    private static readonly (string Key, string Label, Func<decimal, bool> Match)[] PercentageBandDefs =
+    [
+        ("100", "100%", p => p == 100m),
+        ("gt80", "> 80%", p => p > 80m && p < 100m),
+        ("gt60", "> 60%", p => p > 60m && p <= 80m),
+        ("gt50", "> 50%", p => p > 50m && p <= 60m),
+        ("gt30", "> 30%", p => p > 30m && p <= 50m),
+        ("gt10", "> 10%", p => p > 10m && p <= 30m),
+        ("gt0", "> 0%", p => p > 0m && p <= 10m),
+        ("0", "0%", p => p == 0m)
+    ];
+
+    private static GamesPercentageBandsDto BuildPercentageBands(IReadOnlyCollection<decimal> percentages)
+    {
+        return new GamesPercentageBandsDto
+        {
+            Bands = PercentageBandDefs
+                .Select(def => new PercentageBandCountDto
+                {
+                    Key = def.Key,
+                    Label = def.Label,
+                    Count = percentages.Count(def.Match)
+                })
+                .ToList()
+        };
     }
 
     private static DateTime ToLocalDate(DateTime storedUtc)
