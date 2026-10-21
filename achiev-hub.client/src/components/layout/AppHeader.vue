@@ -55,7 +55,6 @@
                             />
                         </span>
                     </button>
-                    <!-- data-bs-popper enables Bootstrap's CSS-only placement, used for navbar dropdowns -->
                     <ul
                         class="dropdown-menu dropdown-menu-end"
                         :class="{ show: isUserMenuOpen }"
@@ -86,8 +85,8 @@ export default {
             session: useSession(),
             links: [
                 { to: '/', label: 'Home', name: 'home' },
-                { to: '/games', label: 'My games', name: 'games' }
-                // { to: '/stats', label: 'Stats', name: 'stats' },
+                { to: '/games', label: 'My games', name: 'games' },
+                { to: '/stats', label: 'Stats', name: 'stats' },
                 // { to: '/steam', label: 'Steam', name: 'steam' }
             ]
         }
