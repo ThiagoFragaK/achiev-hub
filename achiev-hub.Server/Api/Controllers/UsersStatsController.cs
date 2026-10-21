@@ -53,4 +53,26 @@ public class UsersStatsController : ApiControllerBase
 
         return Ok(await _stats.GetGameProgressAsync(userId, appId, cancellationToken));
     }
+
+    [HttpGet("achievements-by-month")]
+    public async Task<ActionResult<AchievementsByMonthDto>> GetAchievementsByMonth(CancellationToken cancellationToken)
+    {
+        if (ResolveUserIdForDbReads() is not int userId)
+        {
+            return Ok(_stats.GetEmptyAchievementsByMonth());
+        }
+
+        return Ok(await _stats.GetAchievementsByMonthAsync(userId, cancellationToken));
+    }
+
+    [HttpGet("games-percentage-bands")]
+    public async Task<ActionResult<GamesPercentageBandsDto>> GetGamesPercentageBands(CancellationToken cancellationToken)
+    {
+        if (ResolveUserIdForDbReads() is not int userId)
+        {
+            return Ok(_stats.GetEmptyGamesPercentageBands());
+        }
+
+        return Ok(await _stats.GetGamesPercentageBandsAsync(userId, cancellationToken));
+    }
 }

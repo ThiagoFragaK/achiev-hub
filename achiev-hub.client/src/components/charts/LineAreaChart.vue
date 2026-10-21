@@ -34,6 +34,15 @@ export default {
         xLabelEvery: {
             type: Number,
             default: 1
+        },
+        showLegend: {
+            type: Boolean,
+            default: false
+        },
+        fillStyle: {
+            type: String,
+            default: 'solid',
+            validator: (value) => ['solid', 'gradient'].includes(value)
         }
     },
     computed: {
@@ -62,6 +71,26 @@ export default {
                 data: ds.data
             }))
         },
+        fillOptions() {
+            if (this.fillStyle === 'gradient') {
+                return {
+                    type: this.datasets.map((ds) => (ds.fill ? 'gradient' : 'solid')),
+                    gradient: {
+                        shadeIntensity: 1,
+                        inverseColors: false,
+                        opacityFrom: 0.9,
+                        opacityTo: 0.1,
+                        stops: [0, 95, 100]
+                    },
+                    opacity: this.datasets.map((ds) => (ds.fill ? 1 : 0))
+                }
+            }
+
+            return {
+                type: 'solid',
+                opacity: this.datasets.map((ds) => (ds.fill ? 0.35 : 0))
+            }
+        },
         chartOptions() {
             const rotate = this.xLabelRotate
             const every = Math.max(1, this.xLabelEvery)
@@ -78,16 +107,17 @@ export default {
                     curve: 'smooth',
                     width: 2
                 },
-                fill: {
-                    type: 'solid',
-                    opacity: this.datasets.map((ds) => (ds.fill ? 0.35 : 0))
-                },
+                fill: this.fillOptions,
                 colors: this.datasets.map((ds) => ds.color),
                 title: {
                     text: this.title || undefined,
                     style: { fontSize: '13px', fontWeight: 400 }
                 },
-                legend: { show: false },
+                legend: {
+                    show: this.showLegend,
+                    position: 'bottom',
+                    horizontalAlign: 'center'
+                },
                 xaxis: {
                     categories: this.labels,
                     labels: {
