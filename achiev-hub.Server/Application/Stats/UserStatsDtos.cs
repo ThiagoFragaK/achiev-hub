@@ -44,3 +44,15 @@ public class PercentageBandCountDto
     public string Label { get; set; } = string.Empty;
     public int Count { get; set; }
 }
+
+public class GamesForAverageDto
+{
+    public IReadOnlyList<GameForAverageDto> Games { get; set; } = [];
+}
+
+public class GameForAverageDto
+{
+    public int AppId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public decimal AchievementsPercentage { get; set; }
+}
