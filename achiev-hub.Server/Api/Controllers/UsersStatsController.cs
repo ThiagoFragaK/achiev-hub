@@ -75,4 +75,15 @@ public class UsersStatsController : ApiControllerBase
 
         return Ok(await _stats.GetGamesPercentageBandsAsync(userId, cancellationToken));
     }
+
+    [HttpGet("games-for-average")]
+    public async Task<ActionResult<GamesForAverageDto>> GetGamesForAverage(CancellationToken cancellationToken)
+    {
+        if (ResolveUserIdForDbReads() is not int userId)
+        {
+            return Ok(_stats.GetEmptyGamesForAverage());
+        }
+
+        return Ok(await _stats.GetGamesForAverageAsync(userId, cancellationToken));
+    }
 }
