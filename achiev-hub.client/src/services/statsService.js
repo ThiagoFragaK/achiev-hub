@@ -15,3 +15,7 @@ export function getAchievementsByMonth() {
 export function getGamesPercentageBands() {
     return getJson('/api/users/stats/games-percentage-bands')
 }
+
+export function getGamesForAverage() {
+    return getJson('/api/users/stats/games-for-average')
+}
