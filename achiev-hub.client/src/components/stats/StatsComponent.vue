@@ -9,6 +9,11 @@
                 <GamesPercentageBandGraph :height="chartHeight" />
             </div>
         </div>
+        <div class="row g-4 mt-1">
+            <div class="col-12">
+                <AverageWhatIfCard />
+            </div>
+        </div>
     </AppShell>
 </template>
 
@@ -16,6 +21,7 @@
 import AppShell from '@/components/layout/AppShell.vue'
 import AchievementsYearlyGraph from '@/components/stats/graphs/AchievementsYearlyGraph.vue'
 import GamesPercentageBandGraph from '@/components/stats/graphs/GamesPercentageBandGraph.vue'
+import AverageWhatIfCard from '@/components/stats/AverageWhatIfCard.vue'
 
 const CHART_HEIGHT = 'clamp(220px, 22vw, 320px)'
 
@@ -24,7 +30,8 @@ export default {
     components: {
         AppShell,
         AchievementsYearlyGraph,
-        GamesPercentageBandGraph
+        GamesPercentageBandGraph,
+        AverageWhatIfCard
     },
     data() {
         return {

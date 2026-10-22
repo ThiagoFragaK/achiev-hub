@@ -31,4 +31,8 @@ public interface IUserStatsService
     Task<GamesPercentageBandsDto> GetGamesPercentageBandsAsync(int userId, CancellationToken cancellationToken = default);
 
     GamesPercentageBandsDto GetEmptyGamesPercentageBands();
+
+    Task<GamesForAverageDto> GetGamesForAverageAsync(int userId, CancellationToken cancellationToken = default);
+
+    GamesForAverageDto GetEmptyGamesForAverage();
 }
