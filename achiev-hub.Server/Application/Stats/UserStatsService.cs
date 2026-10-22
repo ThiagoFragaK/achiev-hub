@@ -199,6 +199,49 @@ public class UserStatsService : IUserStatsService
         return BuildPercentageBands([]);
     }
 
+    public async Task<GamesForAverageDto> GetGamesForAverageAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await _db.UsersGames
+            .AsNoTracking()
+            .Where(ug =>
+                ug.UserId == userId
+                && ug.Game.HasCommunityVisibleStats == true
+                && ug.Game.Achievements.Any())
+            .OrderBy(ug => ug.Game.Name)
+            .Select(ug => new
+            {
+                ug.Game.GameSteamId,
+                ug.Game.Name,
+                ug.AchievementsPercentage
+            })
+            .ToListAsync(cancellationToken);
+
+        var games = new List<GameForAverageDto>();
+        foreach (var row in rows)
+        {
+            if (row.GameSteamId is null || !int.TryParse(row.GameSteamId, out var appId))
+            {
+                continue;
+            }
+
+            games.Add(new GameForAverageDto
+            {
+                AppId = appId,
+                Name = row.Name,
+                AchievementsPercentage = row.AchievementsPercentage
+            });
+        }
+
+        return new GamesForAverageDto { Games = games };
+    }
+
+    public GamesForAverageDto GetEmptyGamesForAverage()
+    {
+        return new GamesForAverageDto { Games = [] };
+    }
+
     private static IReadOnlyList<GameProgressPointDto> BuildProgressPoints(
         IReadOnlyList<DateTime> sortedUnlockDays,
         DateTime start,
