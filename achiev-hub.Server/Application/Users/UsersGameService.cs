@@ -32,10 +32,10 @@ public class UsersGameService : IUsersGameService
         _games = games;
     }
 
-    public async Task<IReadOnlyList<UsersGameDto>> GetAllAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<UsersGameDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        var items = await _usersGames.GetAllAsync(cancellationToken);
-        return items.Select(Map).ToList();
+        throw new InvalidOperationException(
+            "Listing all user games is disabled. Query by id or use the library endpoint.");
     }
 
     public async Task<UsersGameDto> GetByIdAsync(int id, CancellationToken cancellationToken = default)
