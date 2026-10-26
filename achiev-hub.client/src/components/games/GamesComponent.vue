@@ -114,7 +114,8 @@ export default {
             ],
             sortOptions: [
                 { value: 'unlockTime', label: 'Unlock time' },
-                { value: 'name', label: 'Name' }
+                { value: 'name', label: 'Name' },
+                { value: 'global', label: 'Global %' }
             ],
             achievementColumns: [
                 { key: 'icon', label: '' },

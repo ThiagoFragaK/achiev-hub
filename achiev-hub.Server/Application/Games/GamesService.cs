@@ -187,7 +187,8 @@ public class GamesService : IGamesService
                 a.Name,
                 a.Description,
                 a.ImageUrlLock,
-                a.ImageUrlUnlock
+                a.ImageUrlUnlock,
+                a.GlobalPercentage
             })
             .ToListAsync(cancellationToken);
 
@@ -215,7 +216,8 @@ public class GamesService : IGamesService
                         ? "Secret achievement: without description"
                         : achievement.Description,
                     Icon = SteamMediaUrls.AppIconUrl(steamAppId, iconHash),
-                    Unlocked = unlockDate
+                    Unlocked = unlockDate,
+                    GlobalPercentage = achievement.GlobalPercentage
                 }
             });
         }
@@ -271,12 +273,18 @@ public class GamesService : IGamesService
 
         var filtered = query.ToList();
         var normalizedSort = sort?.Trim().ToLowerInvariant() ?? "unlocktime";
-        IOrderedEnumerable<AchievementSortRow> ordered = normalizedSort == "name"
-            ? filtered.OrderBy(r => r.Dto.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
-            : filtered
+        IOrderedEnumerable<AchievementSortRow> ordered = normalizedSort switch
+        {
+            "name" => filtered.OrderBy(r => r.Dto.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase),
+            "global" => filtered
+                .OrderBy(r => r.Dto.GlobalPercentage.HasValue ? 0 : 1)
+                .ThenBy(r => r.Dto.GlobalPercentage)
+                .ThenBy(r => r.Dto.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase),
+            _ => filtered
                 .OrderByDescending(r => r.IsUnlocked && r.UnlockUtc.HasValue)
                 .ThenByDescending(r => r.UnlockUtc)
-                .ThenBy(r => r.Dto.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase);
+                .ThenBy(r => r.Dto.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+        };
 
         return ordered.Select(r => r.Dto).ToList();
     }

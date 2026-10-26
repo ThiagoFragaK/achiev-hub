@@ -65,7 +65,10 @@ namespace achiev_hub.Server.Infrastructure.Persistence.Migrations
                     b.HasIndex("GameId", "ApiName")
                         .IsUnique();
 
-                    b.ToTable("achievements", (string)null);
+                    b.ToTable("achievements", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_achievements_ApiName_not_empty", "length(btrim(\"ApiName\")) > 0");
+                        });
                 });
 
             modelBuilder.Entity("achiev_hub.Server.Domain.Entities.EmailVerification", b =>
@@ -127,6 +130,9 @@ namespace achiev_hub.Server.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<DateTimeOffset?>("GlobalPercentSyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool?>("HasCommunityVisibleStats")
                         .HasColumnType("boolean");
 
@@ -155,7 +161,10 @@ namespace achiev_hub.Server.Infrastructure.Persistence.Migrations
                     b.HasIndex("GameSteamId")
                         .IsUnique();
 
-                    b.ToTable("games", (string)null);
+                    b.ToTable("games", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_games_GameSteamId_not_empty", "length(btrim(\"GameSteamId\")) > 0");
+                        });
                 });
 
             modelBuilder.Entity("achiev_hub.Server.Domain.Entities.Goal", b =>

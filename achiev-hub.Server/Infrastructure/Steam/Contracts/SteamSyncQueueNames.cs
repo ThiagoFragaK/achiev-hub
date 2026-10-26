@@ -29,4 +29,8 @@ public static class SteamSyncQueueNames
     public const string SyncLibrary = "sync_library";
     public const string SyncLibraryDeadLetterExchange = "sync_library_dlx";
     public const string SyncLibraryDeadLetterQueue = "sync_library_dlq";
+
+    public const string GlobalAchievementUpdate = "global_achievement_update";
+    public const string GlobalAchievementUpdateDeadLetterExchange = "global_achievement_update_dlx";
+    public const string GlobalAchievementUpdateDeadLetterQueue = "global_achievement_update_dlq";
 }

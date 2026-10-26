@@ -19,7 +19,8 @@ public sealed class RabbitMqTopologyInitializer : IStartupTask
         (SteamSyncQueueNames.GamesListSync, SteamSyncQueueNames.GamesListSyncDeadLetterExchange, SteamSyncQueueNames.GamesListSyncDeadLetterQueue),
         (SteamSyncQueueNames.UserAchievementsSyncHigh, SteamSyncQueueNames.UserAchievementsSyncHighDeadLetterExchange, SteamSyncQueueNames.UserAchievementsSyncHighDeadLetterQueue),
         (SteamSyncQueueNames.UserAchievementsSyncLow, SteamSyncQueueNames.UserAchievementsSyncLowDeadLetterExchange, SteamSyncQueueNames.UserAchievementsSyncLowDeadLetterQueue),
-        (SteamSyncQueueNames.SyncLibrary, SteamSyncQueueNames.SyncLibraryDeadLetterExchange, SteamSyncQueueNames.SyncLibraryDeadLetterQueue)
+        (SteamSyncQueueNames.SyncLibrary, SteamSyncQueueNames.SyncLibraryDeadLetterExchange, SteamSyncQueueNames.SyncLibraryDeadLetterQueue),
+        (SteamSyncQueueNames.GlobalAchievementUpdate, SteamSyncQueueNames.GlobalAchievementUpdateDeadLetterExchange, SteamSyncQueueNames.GlobalAchievementUpdateDeadLetterQueue)
     ];
 
     private readonly IRabbitMqConnectionFactory _connectionFactory;

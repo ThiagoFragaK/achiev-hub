@@ -22,6 +22,9 @@
         <template #cell-description="{ data }">
             {{ data.row.description }}
         </template>
+        <template #cell-globalPercentage="{ data }">
+            {{ formatGlobalPercentage(data.row.globalPercentage) }}
+        </template>
         <template #cell-unlocked="{ data }">
             {{ data.row.unlocked || '-' }}
         </template>
@@ -57,6 +60,7 @@ export default {
                 columns: [
                     { key: 'name', label: 'Achievement' },
                     { key: 'description', label: 'Description' },
+                    { key: 'globalPercentage', label: 'Global %' },
                     { key: 'unlocked', label: 'Unlocked' }
                 ],
                 pagination: {
@@ -81,6 +85,16 @@ export default {
         async onPageChange(page) {
             this.table.pagination.currentPage = page;
             await this.getAchievements();
+        },
+        formatGlobalPercentage(value) {
+            if (value === null || value === undefined || value === '') {
+                return '—'
+            }
+            const number = Number(value)
+            if (Number.isNaN(number)) {
+                return '—'
+            }
+            return `${number.toFixed(1)}%`
         },
         async getAchievements() {
             const steamId = getSessionSteamId();
