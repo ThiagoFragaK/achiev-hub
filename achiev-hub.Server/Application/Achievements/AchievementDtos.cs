@@ -4,7 +4,7 @@ public class AchievementRecordDto
 {
     public int Id { get; set; }
     public int GameId { get; set; }
-    public string? ApiName { get; set; }
+    public string ApiName { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? ImageUrlLock { get; set; }
@@ -15,7 +15,7 @@ public class AchievementRecordDto
 public class CreateAchievementRequest
 {
     public int GameId { get; set; }
-    public string? ApiName { get; set; }
+    public string ApiName { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? ImageUrlLock { get; set; }
@@ -26,7 +26,7 @@ public class CreateAchievementRequest
 public class UpdateAchievementRequest
 {
     public int GameId { get; set; }
-    public string? ApiName { get; set; }
+    public string ApiName { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? ImageUrlLock { get; set; }

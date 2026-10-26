@@ -1,21 +1,7 @@
-using achiev_hub.Server.Application.Users;
-using achiev_hub.Server.Application.Users.Interfaces;
-using achiev_hub.Server.Application.Games;
-using achiev_hub.Server.Application.Games.Interfaces;
-using achiev_hub.Server.Application.Achievements;
 using achiev_hub.Server.Application.Achievements.Interfaces;
-using achiev_hub.Server.Application.Goals;
-using achiev_hub.Server.Application.Goals.Interfaces;
-using achiev_hub.Server.Domain.Entities;
-using achiev_hub.Server.Domain.Interfaces;
 using achiev_hub.Server.Application.Common;
 using achiev_hub.Server.Application.Common.Interfaces;
-using achiev_hub.Server.Application.Steam;
-using achiev_hub.Server.Application.Steam.Interfaces;
-using achiev_hub.Server.Application.Auth;
-using achiev_hub.Server.Application.Auth.Interfaces;
-using achiev_hub.Server.Application.Stats;
-using achiev_hub.Server.Application.Stats.Interfaces;
+using achiev_hub.Server.Domain.Entities;
 
 namespace achiev_hub.Server.Application.Achievements;
 
@@ -32,8 +18,8 @@ public class AchievementService : IAchievementService
 
     public async Task<IReadOnlyList<AchievementRecordDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        var achievements = await _achievements.GetAllAsync(cancellationToken);
-        return achievements.Select(Map).ToList();
+        throw new InvalidOperationException(
+            "Listing all achievements is disabled. Query by id or use the game achievements endpoint.");
     }
 
     public async Task<AchievementRecordDto> GetByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -44,15 +30,16 @@ public class AchievementService : IAchievementService
     public async Task<AchievementRecordDto> CreateAsync(CreateAchievementRequest request, CancellationToken cancellationToken = default)
     {
         await EnsureGameExistsAsync(request.GameId, cancellationToken);
+        var apiName = SteamMediaUrls.RequireTrimmedKey(request.ApiName, nameof(request.ApiName));
 
         var achievement = new Achievement
         {
             GameId = request.GameId,
-            ApiName = NormalizeApiName(request.ApiName),
+            ApiName = apiName,
             Name = request.Name.Trim(),
             Description = request.Description,
-            ImageUrlLock = request.ImageUrlLock,
-            ImageUrlUnlock = request.ImageUrlUnlock,
+            ImageUrlLock = SteamMediaUrls.ToStorageHash(request.ImageUrlLock),
+            ImageUrlUnlock = SteamMediaUrls.ToStorageHash(request.ImageUrlUnlock),
             GlobalPercentage = request.GlobalPercentage
         };
 
@@ -65,13 +52,14 @@ public class AchievementService : IAchievementService
     {
         var achievement = await GetRequiredAsync(id, cancellationToken);
         await EnsureGameExistsAsync(request.GameId, cancellationToken);
+        var apiName = SteamMediaUrls.RequireTrimmedKey(request.ApiName, nameof(request.ApiName));
 
         achievement.GameId = request.GameId;
-        achievement.ApiName = NormalizeApiName(request.ApiName);
+        achievement.ApiName = apiName;
         achievement.Name = request.Name.Trim();
         achievement.Description = request.Description;
-        achievement.ImageUrlLock = request.ImageUrlLock;
-        achievement.ImageUrlUnlock = request.ImageUrlUnlock;
+        achievement.ImageUrlLock = SteamMediaUrls.ToStorageHash(request.ImageUrlLock);
+        achievement.ImageUrlUnlock = SteamMediaUrls.ToStorageHash(request.ImageUrlUnlock);
         achievement.GlobalPercentage = request.GlobalPercentage;
 
         _achievements.Update(achievement);
@@ -98,11 +86,6 @@ public class AchievementService : IAchievementService
     {
         return await _achievements.GetByIdAsync(id, cancellationToken)
             ?? throw new NotFoundException($"Achievement {id} was not found.");
-    }
-
-    private static string? NormalizeApiName(string? apiName)
-    {
-        return string.IsNullOrWhiteSpace(apiName) ? null : apiName.Trim();
     }
 
     private static AchievementRecordDto Map(Achievement achievement) => new()

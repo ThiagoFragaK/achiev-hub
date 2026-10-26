@@ -1,21 +1,7 @@
-using achiev_hub.Server.Application.Users;
-using achiev_hub.Server.Application.Users.Interfaces;
-using achiev_hub.Server.Application.Games;
-using achiev_hub.Server.Application.Games.Interfaces;
-using achiev_hub.Server.Application.Achievements;
-using achiev_hub.Server.Application.Achievements.Interfaces;
-using achiev_hub.Server.Application.Goals;
-using achiev_hub.Server.Application.Goals.Interfaces;
-using achiev_hub.Server.Domain.Entities;
-using achiev_hub.Server.Domain.Interfaces;
 using achiev_hub.Server.Application.Common;
+using achiev_hub.Server.Application.Games.Interfaces;
 using achiev_hub.Server.Application.Common.Interfaces;
-using achiev_hub.Server.Application.Steam;
-using achiev_hub.Server.Application.Steam.Interfaces;
-using achiev_hub.Server.Application.Auth;
-using achiev_hub.Server.Application.Auth.Interfaces;
-using achiev_hub.Server.Application.Stats;
-using achiev_hub.Server.Application.Stats.Interfaces;
+using achiev_hub.Server.Domain.Entities;
 
 namespace achiev_hub.Server.Application.Games;
 
@@ -30,8 +16,8 @@ public class GameService : IGameService
 
     public async Task<IReadOnlyList<GameDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        var games = await _games.GetAllAsync(cancellationToken);
-        return games.Select(Map).ToList();
+        throw new InvalidOperationException(
+            "Listing all games is disabled. Query by id or use the library/Steam endpoints.");
     }
 
     public async Task<GameDto> GetByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -41,13 +27,14 @@ public class GameService : IGameService
 
     public async Task<GameDto> CreateAsync(CreateGameRequest request, CancellationToken cancellationToken = default)
     {
-        await EnsureSteamIdIsUniqueAsync(request.GameSteamId, null, cancellationToken);
+        var steamId = SteamMediaUrls.RequireTrimmedKey(request.GameSteamId, nameof(request.GameSteamId));
+        await EnsureSteamIdIsUniqueAsync(steamId, null, cancellationToken);
 
         var game = new Game
         {
             Name = request.Name.Trim(),
-            ImageUrl = request.ImageUrl,
-            GameSteamId = NormalizeSteamId(request.GameSteamId),
+            ImageUrl = SteamMediaUrls.ToStorageHash(request.ImageUrl),
+            GameSteamId = steamId,
             Developers = request.Developers,
             Publishers = request.Publishers
         };
@@ -60,11 +47,12 @@ public class GameService : IGameService
     public async Task<GameDto> UpdateAsync(int id, UpdateGameRequest request, CancellationToken cancellationToken = default)
     {
         var game = await GetRequiredAsync(id, cancellationToken);
-        await EnsureSteamIdIsUniqueAsync(request.GameSteamId, id, cancellationToken);
+        var steamId = SteamMediaUrls.RequireTrimmedKey(request.GameSteamId, nameof(request.GameSteamId));
+        await EnsureSteamIdIsUniqueAsync(steamId, id, cancellationToken);
 
         game.Name = request.Name.Trim();
-        game.ImageUrl = request.ImageUrl;
-        game.GameSteamId = NormalizeSteamId(request.GameSteamId);
+        game.ImageUrl = SteamMediaUrls.ToStorageHash(request.ImageUrl);
+        game.GameSteamId = steamId;
         game.Developers = request.Developers;
         game.Publishers = request.Publishers;
 
@@ -86,16 +74,10 @@ public class GameService : IGameService
             ?? throw new NotFoundException($"Game {id} was not found.");
     }
 
-    private async Task EnsureSteamIdIsUniqueAsync(string? steamId, int? excludeId, CancellationToken cancellationToken)
+    private async Task EnsureSteamIdIsUniqueAsync(string steamId, int? excludeId, CancellationToken cancellationToken)
     {
-        var normalized = NormalizeSteamId(steamId);
-        if (normalized is null)
-        {
-            return;
-        }
-
         var exists = await _games.AnyAsync(
-            game => game.GameSteamId == normalized && (!excludeId.HasValue || game.Id != excludeId.Value),
+            game => game.GameSteamId == steamId && (!excludeId.HasValue || game.Id != excludeId.Value),
             cancellationToken);
 
         if (exists)
@@ -104,16 +86,11 @@ public class GameService : IGameService
         }
     }
 
-    private static string? NormalizeSteamId(string? steamId)
-    {
-        return string.IsNullOrWhiteSpace(steamId) ? null : steamId.Trim();
-    }
-
     private static GameDto Map(Game game) => new()
     {
         Id = game.Id,
         Name = game.Name,
-        ImageUrl = game.ImageUrl,
+        ImageUrl = SteamMediaUrls.AppIconUrl(game.GameSteamId, game.ImageUrl),
         GameSteamId = game.GameSteamId,
         Developers = game.Developers,
         Publishers = game.Publishers
