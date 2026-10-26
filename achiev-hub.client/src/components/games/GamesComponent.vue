@@ -100,12 +100,14 @@ export default {
             filters: {
                 name: '',
                 status: 'locked',
-                sort: 'unlockTime'
+                sort: 'unlockTime',
+                global: 'all'
             },
             appliedFilters: {
                 name: '',
                 status: 'locked',
-                sort: 'unlockTime'
+                sort: 'unlockTime',
+                global: 'all'
             },
             statusOptions: [
                 { value: 'locked', label: 'Locked' },
@@ -145,7 +147,8 @@ export default {
             this.appliedFilters = {
                 name: filters?.name || '',
                 status: filters?.status || 'locked',
-                sort: filters?.sort || 'unlockTime'
+                sort: filters?.sort || 'unlockTime',
+                global: filters?.global || 'all'
             }
             this.filters = { ...this.appliedFilters }
             this.tableKey++

@@ -28,7 +28,8 @@ export function getAchievements(steamId, appId, page = 1, pageSize = 7, filters 
             pageSize,
             name: filters.name,
             status: filters.status,
-            sort: filters.sort
+            sort: filters.sort,
+            global: filters.global && filters.global !== 'all' ? filters.global : undefined
         })}`
     )
 }

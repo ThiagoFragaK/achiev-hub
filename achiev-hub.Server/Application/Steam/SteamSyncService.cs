@@ -26,6 +26,7 @@ namespace achiev_hub.Server.Application.Steam;
 public class SteamSyncService : ISteamSyncService
 {
     private const int AchievementSyncCooldownMinutes = 60;
+    private const int GlobalPercentTtlHours = 24;
 
     private readonly ApplicationDbContext _db;
     private readonly ISteamApiClient _steamApiClient;
@@ -301,6 +302,7 @@ public class SteamSyncService : ISteamSyncService
         }
 
         await _db.SaveChangesAsync(cancellationToken);
+        await SyncGlobalPercentagesAsync(game, appId, cancellationToken);
 
         var playerResult = await _steamApiClient.GetPlayerAchievementsAsync(steamId, appId, cancellationToken);
         if (playerResult is null || !playerResult.Success)
@@ -411,6 +413,85 @@ public class SteamSyncService : ISteamSyncService
                 _logger.LogWarning(ex, "Achievement sync failed for user {UserId} app {AppId}", userId, appId);
             }
         }
+    }
+
+    private async Task SyncGlobalPercentagesAsync(Game game, int appId, CancellationToken cancellationToken)
+    {
+        var ttl = TimeSpan.FromHours(GlobalPercentTtlHours);
+        if (game.GlobalPercentSyncedAt.HasValue &&
+            game.GlobalPercentSyncedAt.Value > DateTimeOffset.UtcNow - ttl)
+        {
+            _logger.LogDebug("Global percent for app {AppId} is within TTL", appId);
+            return;
+        }
+
+        try
+        {
+            var catalog = await _db.Achievements
+                .Where(a => a.GameId == game.Id)
+                .ToListAsync(cancellationToken);
+
+            if (catalog.Count == 0)
+            {
+                game.GlobalPercentSyncedAt = DateTimeOffset.UtcNow;
+                await _db.SaveChangesAsync(cancellationToken);
+                return;
+            }
+
+            var percentages = await _steamApiClient.GetGlobalAchievementPercentagesAsync(appId, cancellationToken);
+            if (percentages is null)
+            {
+                _logger.LogWarning("Global achievement percentages unavailable for app {AppId}", appId);
+                return;
+            }
+
+            var byName = percentages
+                .Where(p => !string.IsNullOrWhiteSpace(p.Name))
+                .GroupBy(p => p.Name!, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First().Percent, StringComparer.OrdinalIgnoreCase);
+
+            var updated = 0;
+            foreach (var achievement in catalog)
+            {
+                if (string.IsNullOrWhiteSpace(achievement.ApiName) ||
+                    !byName.TryGetValue(achievement.ApiName, out var percent))
+                {
+                    continue;
+                }
+
+                achievement.GlobalPercentage = RoundGlobalPercentage(percent);
+                updated++;
+            }
+
+            game.GlobalPercentSyncedAt = DateTimeOffset.UtcNow;
+            await _db.SaveChangesAsync(cancellationToken);
+
+            _logger.LogInformation(
+                "Updated global percentages for app {AppId}: {Updated}/{Catalog}",
+                appId,
+                updated,
+                catalog.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Global percentage sync failed for app {AppId}; continuing achievement sync", appId);
+        }
+    }
+
+    private static decimal RoundGlobalPercentage(decimal percent)
+    {
+        var rounded = Math.Round(percent, 2, MidpointRounding.AwayFromZero);
+        if (rounded < 0m)
+        {
+            return 0m;
+        }
+
+        if (rounded > 999.99m)
+        {
+            return 999.99m;
+        }
+
+        return rounded;
     }
 
     private async Task RecalculateUserAvgPercentageAsync(int userId, CancellationToken cancellationToken)

@@ -90,12 +90,13 @@ public class GamesService : IGamesService
         string? name = null,
         string? status = null,
         string? sort = null,
+        string? global = null,
         int? userId = null,
         CancellationToken cancellationToken = default)
     {
         if (userId is int authUserId)
         {
-            return await GetAchievementsFromDbAsync(authUserId, appId, page, pageSize, name, status, sort, cancellationToken);
+            return await GetAchievementsFromDbAsync(authUserId, appId, page, pageSize, name, status, sort, global, cancellationToken);
         }
 
         var playerResult = await _steamApiClient.GetPlayerAchievementsAsync(steamId, appId, cancellationToken);
@@ -147,7 +148,7 @@ public class GamesService : IGamesService
             });
         }
 
-        return Paginate(FilterAndSortAchievements(rows, name, status, sort), page, pageSize);
+        return Paginate(FilterAndSortAchievements(rows, name, status, sort, global), page, pageSize);
     }
 
     private async Task<PagedResultDto<AchievementDto>> GetAchievementsFromDbAsync(
@@ -158,6 +159,7 @@ public class GamesService : IGamesService
         string? name,
         string? status,
         string? sort,
+        string? global,
         CancellationToken cancellationToken)
     {
         var steamAppId = appId.ToString();
@@ -222,14 +224,15 @@ public class GamesService : IGamesService
             });
         }
 
-        return Paginate(FilterAndSortAchievements(rows, name, status, sort), page, pageSize);
+        return Paginate(FilterAndSortAchievements(rows, name, status, sort, global), page, pageSize);
     }
 
     private static List<AchievementDto> FilterAndSortAchievements(
         List<AchievementSortRow> rows,
         string? name,
         string? status,
-        string? sort)
+        string? sort,
+        string? global)
     {
         var normalizedName = string.IsNullOrWhiteSpace(name) ? null : name.Trim();
         var normalizedStatus = string.IsNullOrWhiteSpace(status)
@@ -271,6 +274,19 @@ public class GamesService : IGamesService
             query = query.Where(r => !r.IsUnlocked);
         }
 
+        var normalizedGlobal = string.IsNullOrWhiteSpace(global)
+            ? ""
+            : global.Trim().ToLowerInvariant();
+        if (normalizedGlobal is "all")
+        {
+            normalizedGlobal = "";
+        }
+
+        if (normalizedGlobal is "under1" or "under5" or "under10" or "under30" or "under50" or "above50")
+        {
+            query = query.Where(r => MatchesGlobalPercentageFilter(r.Dto.GlobalPercentage, normalizedGlobal));
+        }
+
         var filtered = query.ToList();
         var normalizedSort = sort?.Trim().ToLowerInvariant() ?? "unlocktime";
         IOrderedEnumerable<AchievementSortRow> ordered = normalizedSort switch
@@ -287,6 +303,25 @@ public class GamesService : IGamesService
         };
 
         return ordered.Select(r => r.Dto).ToList();
+    }
+
+    private static bool MatchesGlobalPercentageFilter(decimal? percentage, string filter)
+    {
+        if (percentage is not decimal value)
+        {
+            return false;
+        }
+
+        return filter switch
+        {
+            "under1" => value < 1m,
+            "under5" => value >= 1m && value < 5m,
+            "under10" => value >= 5m && value < 10m,
+            "under30" => value >= 10m && value < 30m,
+            "under50" => value >= 30m && value < 50m,
+            "above50" => value >= 50m,
+            _ => true
+        };
     }
 
     private sealed class AchievementSortRow
