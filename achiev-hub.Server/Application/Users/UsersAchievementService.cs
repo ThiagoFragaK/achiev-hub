@@ -38,10 +38,10 @@ public class UsersAchievementService : IUsersAchievementService
         _achievements = achievements;
     }
 
-    public async Task<IReadOnlyList<UsersAchievementDto>> GetAllAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<UsersAchievementDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        var items = await _usersAchievements.GetAllAsync(cancellationToken);
-        return items.Select(Map).ToList();
+        throw new InvalidOperationException(
+            "Listing all user achievements is disabled. Query by id or use stats/game endpoints.");
     }
 
     public async Task<UsersAchievementDto> GetByIdAsync(int id, CancellationToken cancellationToken = default)

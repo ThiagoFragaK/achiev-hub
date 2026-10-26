@@ -34,14 +34,21 @@ public class UserStatsService : IUserStatsService
 
     public async Task<UserStatsDto> GetStatsAsync(int userId, CancellationToken cancellationToken = default)
     {
-        // A single pass over the user's unlock timestamps feeds both charts.
-        var unlockDates = await _db.UsersAchievements
+        var sinceUtc = DateTime.UtcNow.Date.AddDays(-(DaysWindow - 1));
+
+        var recentDayCounts = await _db.UsersAchievements
             .AsNoTracking()
-            .Where(ua => ua.UserId == userId && ua.UnlockDate != null)
-            .Select(ua => ua.UnlockDate!.Value)
+            .Where(ua => ua.UserId == userId && ua.UnlockDate != null && ua.UnlockDate >= sinceUtc)
+            .GroupBy(ua => ua.UnlockDate!.Value.Date)
+            .Select(g => new { Day = g.Key, Count = g.Count() })
             .ToListAsync(cancellationToken);
 
-        var localDays = unlockDates.Select(ToLocalDate).ToList();
+        var yearCounts = await _db.UsersAchievements
+            .AsNoTracking()
+            .Where(ua => ua.UserId == userId && ua.UnlockDate != null)
+            .GroupBy(ua => ua.UnlockDate!.Value.Year)
+            .Select(g => new { Year = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
 
         var averagePercentage = await _db.Users
             .AsNoTracking()
@@ -61,8 +68,10 @@ public class UserStatsService : IUserStatsService
 
         return new UserStatsDto
         {
-            AchievementsLast14Days = BuildLastDays(localDays),
-            AchievementsPerYear = BuildPerYear(localDays),
+            AchievementsLast14Days = BuildLastDaysFromCounts(
+                recentDayCounts.ToDictionary(r => ToLocalDate(r.Day), r => r.Count)),
+            AchievementsPerYear = BuildPerYearFromCounts(
+                yearCounts.ToDictionary(r => r.Year, r => r.Count)),
             AveragePercentage = averagePercentage ?? 0,
             TotalAchievements = totalAchievements,
             GamesWithAchievements = gamesWithAchievements
@@ -162,14 +171,15 @@ public class UserStatsService : IUserStatsService
         int userId,
         CancellationToken cancellationToken = default)
     {
-        var unlockDates = await _db.UsersAchievements
+        var monthCounts = await _db.UsersAchievements
             .AsNoTracking()
             .Where(ua => ua.UserId == userId && ua.UnlockDate != null)
-            .Select(ua => ua.UnlockDate!.Value)
+            .GroupBy(ua => new { ua.UnlockDate!.Value.Year, ua.UnlockDate!.Value.Month })
+            .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
             .ToListAsync(cancellationToken);
 
-        var localDays = unlockDates.Select(ToLocalDate).ToList();
-        return BuildAchievementsByMonth(localDays);
+        return BuildAchievementsByMonthFromCounts(
+            monthCounts.ToDictionary(r => (r.Year, r.Month), r => r.Count));
     }
 
     public AchievementsByMonthDto GetEmptyAchievementsByMonth()
@@ -221,7 +231,7 @@ public class UserStatsService : IUserStatsService
         var games = new List<GameForAverageDto>();
         foreach (var row in rows)
         {
-            if (row.GameSteamId is null || !int.TryParse(row.GameSteamId, out var appId))
+            if (!int.TryParse(row.GameSteamId, out var appId))
             {
                 continue;
             }
@@ -327,13 +337,17 @@ public class UserStatsService : IUserStatsService
 
     private static IReadOnlyList<DailyAchievementCountDto> BuildLastDays(IReadOnlyCollection<DateTime> localDays)
     {
-        var today = ToLocalDate(DateTime.UtcNow);
-        var first = today.AddDays(-(DaysWindow - 1));
-
         var countsByDay = localDays
-            .Where(day => day >= first && day <= today)
             .GroupBy(day => day)
             .ToDictionary(group => group.Key, group => group.Count());
+        return BuildLastDaysFromCounts(countsByDay);
+    }
+
+    private static IReadOnlyList<DailyAchievementCountDto> BuildLastDaysFromCounts(
+        IReadOnlyDictionary<DateTime, int> countsByDay)
+    {
+        var today = ToLocalDate(DateTime.UtcNow);
+        var first = today.AddDays(-(DaysWindow - 1));
 
         return Enumerable.Range(0, DaysWindow)
             .Select(offset =>
@@ -348,16 +362,13 @@ public class UserStatsService : IUserStatsService
             .ToList();
     }
 
-    private static IReadOnlyList<YearlyAchievementCountDto> BuildPerYear(IReadOnlyCollection<DateTime> localDays)
+    private static IReadOnlyList<YearlyAchievementCountDto> BuildPerYearFromCounts(
+        IReadOnlyDictionary<int, int> countsByYear)
     {
-        if (localDays.Count == 0)
+        if (countsByYear.Count == 0)
         {
             return [];
         }
-
-        var countsByYear = localDays
-            .GroupBy(day => day.Year)
-            .ToDictionary(group => group.Key, group => group.Count());
 
         var firstYear = countsByYear.Keys.Min();
         var lastYear = countsByYear.Keys.Max();
@@ -372,9 +383,10 @@ public class UserStatsService : IUserStatsService
             .ToList();
     }
 
-    private static AchievementsByMonthDto BuildAchievementsByMonth(IReadOnlyCollection<DateTime> localDays)
+    private static AchievementsByMonthDto BuildAchievementsByMonthFromCounts(
+        IReadOnlyDictionary<(int Year, int Month), int> countsByYearMonth)
     {
-        if (localDays.Count == 0)
+        if (countsByYearMonth.Count == 0)
         {
             return new AchievementsByMonthDto
             {
@@ -382,10 +394,6 @@ public class UserStatsService : IUserStatsService
                 Series = []
             };
         }
-
-        var countsByYearMonth = localDays
-            .GroupBy(day => (day.Year, day.Month))
-            .ToDictionary(group => group.Key, group => group.Count());
 
         var years = countsByYearMonth.Keys
             .Select(key => key.Year)

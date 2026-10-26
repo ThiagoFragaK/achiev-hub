@@ -14,7 +14,7 @@ public class CreateGameRequest
 {
     public string Name { get; set; } = string.Empty;
     public string? ImageUrl { get; set; }
-    public string? GameSteamId { get; set; }
+    public string GameSteamId { get; set; } = string.Empty;
     public string? Developers { get; set; }
     public string? Publishers { get; set; }
 }
@@ -23,7 +23,7 @@ public class UpdateGameRequest
 {
     public string Name { get; set; } = string.Empty;
     public string? ImageUrl { get; set; }
-    public string? GameSteamId { get; set; }
+    public string GameSteamId { get; set; } = string.Empty;
     public string? Developers { get; set; }
     public string? Publishers { get; set; }
 }

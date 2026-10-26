@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/1.0.4338480">
   <PropertyGroup>
+    <!-- SpaProxy on the server launches Vite; keep this for standalone client runs only. -->
     <StartupCommand>npm run dev</StartupCommand>
     <JavaScriptTestRoot>.\</JavaScriptTestRoot>
     <JavaScriptTestFramework>Vitest</JavaScriptTestFramework>
@@ -7,5 +8,7 @@
     <ShouldRunBuildScript>false</ShouldRunBuildScript>
     <!-- Folder where production build objects will be placed -->
     <BuildOutputFolder>$(MSBuildProjectDirectory)\dist</BuildOutputFolder>
+    <!-- Avoid VS Web Tools registering a second SelfHostWebServer alongside SpaProxy. -->
+    <NoDefaultLaunchSettingsFile>true</NoDefaultLaunchSettingsFile>
   </PropertyGroup>
 </Project>
