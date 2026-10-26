@@ -16,11 +16,17 @@ SELECT COUNT(*) FILTER (WHERE "ImageUrlLock" LIKE 'http%') AS lock_urls,
        ROUND(AVG(LENGTH("ImageUrlUnlock"))::numeric, 1) AS avg_unlock_len
 FROM achievements;
 
--- Null-key sanity (expect 0)
+-- Null/blank-key sanity (expect 0; also enforced by CHECK constraints)
 SELECT COUNT(*) FILTER (WHERE "ApiName" IS NULL OR btrim("ApiName") = '') AS bad_apiname
 FROM achievements;
 SELECT COUNT(*) FILTER (WHERE "GameSteamId" IS NULL OR btrim("GameSteamId") = '') AS bad_steam_id
 FROM games;
+
+-- Confirm CHECK constraints exist
+SELECT conrelid::regclass AS table_name, conname, pg_get_constraintdef(oid) AS def
+FROM pg_constraint
+WHERE contype = 'c'
+  AND conname IN ('CK_achievements_ApiName_not_empty', 'CK_games_GameSteamId_not_empty');
 
 -- Index health (after ANALYZE + traffic)
 SELECT indexrelname, idx_scan, pg_size_pretty(pg_relation_size(indexrelid)) AS size

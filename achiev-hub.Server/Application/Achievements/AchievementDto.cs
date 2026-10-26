@@ -6,4 +6,5 @@ public class AchievementDto
     public string? Description { get; set; }
     public string? Icon { get; set; }
     public string Unlocked { get; set; } = "-";
+    public decimal? GlobalPercentage { get; set; }
 }
