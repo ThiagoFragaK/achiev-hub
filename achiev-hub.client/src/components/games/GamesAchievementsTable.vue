@@ -23,7 +23,9 @@
             {{ data.row.description }}
         </template>
         <template #cell-globalPercentage="{ data }">
-            {{ formatGlobalPercentage(data.row.globalPercentage) }}
+            <span :class="globalPercentageColorClass(data.row.globalPercentage)">
+                {{ formatGlobalPercentage(data.row.globalPercentage) }}
+            </span>
         </template>
         <template #cell-unlocked="{ data }">
             {{ data.row.unlocked || '-' }}
@@ -33,6 +35,7 @@
 
 <script>
 import { getSessionSteamId } from '@/lib/steam';
+import { formatGlobalPercentage, globalPercentageColorClass } from '@/lib/globalPercentage';
 import { getAchievements as fetchAchievements } from '@/services/gamesService';
 import TableComponent from '@/components/global/TableComponent.vue';
 
@@ -48,7 +51,7 @@ export default {
         },
         filters: {
             type: Object,
-            default: () => ({ name: '', status: 'locked', sort: 'unlockTime' })
+            default: () => ({ name: '', status: 'locked', sort: 'unlockTime', global: 'all' })
         }
     },
     data() {
@@ -82,19 +85,11 @@ export default {
         }
     },
     methods: {
+        formatGlobalPercentage,
+        globalPercentageColorClass,
         async onPageChange(page) {
             this.table.pagination.currentPage = page;
             await this.getAchievements();
-        },
-        formatGlobalPercentage(value) {
-            if (value === null || value === undefined || value === '') {
-                return '—'
-            }
-            const number = Number(value)
-            if (Number.isNaN(number)) {
-                return '—'
-            }
-            return `${number.toFixed(1)}%`
         },
         async getAchievements() {
             const steamId = getSessionSteamId();
@@ -140,3 +135,29 @@ export default {
     }
 }
 </script>
+
+<style scoped>
+.global-pct--under-1 {
+    color: #fd7e14;
+}
+
+.global-pct--under-5 {
+    color: #0d6efd;
+}
+
+.global-pct--under-10 {
+    color: #20c997;
+}
+
+.global-pct--under-30 {
+    color: #90ee90;
+}
+
+.global-pct--under-50 {
+    color: #adb5bd;
+}
+
+.global-pct--above-50 {
+    color: #fff;
+}
+</style>

@@ -105,6 +105,7 @@ public class SteamGamesController : ApiControllerBase
         [FromQuery] string? name = null,
         [FromQuery] string? status = null,
         [FromQuery] string? sort = null,
+        [FromQuery] string? global = null,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(steamId))
@@ -122,6 +123,7 @@ public class SteamGamesController : ApiControllerBase
                 name,
                 status,
                 sort,
+                global,
                 ResolveUserIdForDbReads(),
                 cancellationToken);
             return Ok(result);
