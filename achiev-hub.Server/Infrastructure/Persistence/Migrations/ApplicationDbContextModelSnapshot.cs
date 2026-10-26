@@ -31,6 +31,7 @@ namespace achiev_hub.Server.Infrastructure.Persistence.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("ApiName")
+                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
@@ -47,12 +48,12 @@ namespace achiev_hub.Server.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(5,2)");
 
                     b.Property<string>("ImageUrlLock")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
 
                     b.Property<string>("ImageUrlUnlock")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -62,8 +63,7 @@ namespace achiev_hub.Server.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("GameId", "ApiName")
-                        .IsUnique()
-                        .HasFilter("\"ApiName\" IS NOT NULL AND \"ApiName\" <> ''");
+                        .IsUnique();
 
                     b.ToTable("achievements", (string)null);
                 });
@@ -123,6 +123,7 @@ namespace achiev_hub.Server.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.Property<string>("GameSteamId")
+                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
@@ -130,12 +131,12 @@ namespace achiev_hub.Server.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<string>("HeaderImageUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("ImageUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -152,8 +153,7 @@ namespace achiev_hub.Server.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("GameSteamId")
-                        .IsUnique()
-                        .HasFilter("\"GameSteamId\" IS NOT NULL");
+                        .IsUnique();
 
                     b.ToTable("games", (string)null);
                 });
@@ -395,6 +395,11 @@ namespace achiev_hub.Server.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("UserId", "AchievementId")
                         .IsUnique();
+
+                    b.HasIndex("UserId", "GameId");
+
+                    b.HasIndex("UserId", "UnlockDate")
+                        .HasFilter("unlock_date IS NOT NULL");
 
                     b.ToTable("users_achievements", (string)null);
                 });

@@ -124,24 +124,22 @@ public class SteamSyncService : ISteamSyncService
         }
 
         var steamIds = byAppId.Keys.Select(id => id.ToString()).ToList();
-        var existingGames = await _db.Games
-            .Where(g => g.GameSteamId != null && steamIds.Contains(g.GameSteamId))
-            .ToListAsync(cancellationToken);
+        var existingGames = await LoadGamesBySteamIdsAsync(steamIds, cancellationToken);
 
         var gamesBySteamId = existingGames
-            .Where(g => g.GameSteamId is not null)
-            .ToDictionary(g => g.GameSteamId!, StringComparer.Ordinal);
+            .ToDictionary(g => g.GameSteamId, StringComparer.Ordinal);
 
         foreach (var input in byAppId.Values)
         {
             var steamAppId = input.AppId.ToString();
+            var iconHash = SteamMediaUrls.ToStorageHash(input.ImageUrl);
             if (!gamesBySteamId.TryGetValue(steamAppId, out var game))
             {
                 game = new Game
                 {
                     GameSteamId = steamAppId,
                     Name = string.IsNullOrWhiteSpace(input.Name) ? steamAppId : input.Name.Trim(),
-                    ImageUrl = input.ImageUrl,
+                    ImageUrl = iconHash,
                     HasCommunityVisibleStats = input.HasCommunityVisibleStats
                 };
                 _db.Games.Add(game);
@@ -154,9 +152,9 @@ public class SteamSyncService : ISteamSyncService
                     game.Name = input.Name.Trim();
                 }
 
-                if (!string.IsNullOrWhiteSpace(input.ImageUrl))
+                if (!string.IsNullOrWhiteSpace(iconHash))
                 {
-                    game.ImageUrl = input.ImageUrl;
+                    game.ImageUrl = iconHash;
                 }
 
                 if (input.HasCommunityVisibleStats.HasValue)
@@ -271,12 +269,16 @@ public class SteamSyncService : ISteamSyncService
             .ToListAsync(cancellationToken);
 
         var catalogByApiName = existingCatalog
-            .Where(a => !string.IsNullOrWhiteSpace(a.ApiName))
-            .ToDictionary(a => a.ApiName!, StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(a => a.ApiName, StringComparer.OrdinalIgnoreCase);
 
         foreach (var schemaRow in schemaAchievements)
         {
-            var apiName = schemaRow.Name!;
+            var apiName = schemaRow.Name!.Trim();
+            if (apiName.Length == 0)
+            {
+                continue;
+            }
+
             if (!catalogByApiName.TryGetValue(apiName, out var achievement))
             {
                 achievement = new Achievement
@@ -294,8 +296,8 @@ public class SteamSyncService : ISteamSyncService
             achievement.Description = schemaRow.Hidden == 1 && string.IsNullOrWhiteSpace(schemaRow.Description)
                 ? null
                 : schemaRow.Description;
-            achievement.ImageUrlLock = schemaRow.IconGray;
-            achievement.ImageUrlUnlock = schemaRow.Icon;
+            achievement.ImageUrlLock = SteamMediaUrls.ToStorageHash(schemaRow.IconGray);
+            achievement.ImageUrlUnlock = SteamMediaUrls.ToStorageHash(schemaRow.Icon);
         }
 
         await _db.SaveChangesAsync(cancellationToken);
@@ -320,8 +322,7 @@ public class SteamSyncService : ISteamSyncService
             .ToListAsync(cancellationToken);
 
         var achievementIdsByApiName = refreshedCatalog
-            .Where(a => !string.IsNullOrWhiteSpace(a.ApiName))
-            .ToDictionary(a => a.ApiName!, a => a.Id, StringComparer.OrdinalIgnoreCase);
+            .ToDictionary(a => a.ApiName, a => a.Id, StringComparer.OrdinalIgnoreCase);
 
         var existingUnlocks = await _db.UsersAchievements
             .Where(ua => ua.UserId == userId && ua.GameId == game.Id)
@@ -446,7 +447,7 @@ public class SteamSyncService : ISteamSyncService
         var appIds = new List<int>();
         foreach (var id in steamIds)
         {
-            if (id is not null && int.TryParse(id, out var appId) && appId > 0)
+            if (int.TryParse(id, out var appId) && appId > 0)
             {
                 appIds.Add(appId);
             }
@@ -463,6 +464,24 @@ public class SteamSyncService : ISteamSyncService
             .Select(g => g.AppId)
             .Distinct()
             .ToList();
+    }
+
+    private async Task<List<Game>> LoadGamesBySteamIdsAsync(
+        IReadOnlyList<string> steamIds,
+        CancellationToken cancellationToken)
+    {
+        const int chunkSize = 500;
+        var result = new List<Game>();
+        for (var i = 0; i < steamIds.Count; i += chunkSize)
+        {
+            var chunk = steamIds.Skip(i).Take(chunkSize).ToList();
+            var rows = await _db.Games
+                .Where(g => chunk.Contains(g.GameSteamId))
+                .ToListAsync(cancellationToken);
+            result.AddRange(rows);
+        }
+
+        return result;
     }
 
     private sealed record SyncGameInput(
