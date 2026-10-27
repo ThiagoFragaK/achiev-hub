@@ -130,6 +130,9 @@ namespace achiev_hub.Server.Infrastructure.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<DateTimeOffset?>("GlobalPercentSyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool?>("HasCommunityVisibleStats")
                         .HasColumnType("boolean");
 
