@@ -50,27 +50,41 @@ namespace achiev_hub.Server.Infrastructure.Persistence.Migrations
                 WHERE btrim("GameSteamId") = '';
                 """);
 
-            migrationBuilder.AddCheckConstraint(
-                name: "CK_games_GameSteamId_not_empty",
-                table: "games",
-                sql: "length(btrim(\"GameSteamId\")) > 0");
+            // Idempotent: constraint may already exist if an older duplicate migration
+            // (e.g. 20261026180000_EnforceNonEmptyBusinessKeys) was applied before the merge cleanup.
+            migrationBuilder.Sql(
+                """
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conname = 'CK_games_GameSteamId_not_empty'
+                    ) THEN
+                        ALTER TABLE games
+                        ADD CONSTRAINT "CK_games_GameSteamId_not_empty"
+                        CHECK (length(btrim("GameSteamId")) > 0);
+                    END IF;
 
-            migrationBuilder.AddCheckConstraint(
-                name: "CK_achievements_ApiName_not_empty",
-                table: "achievements",
-                sql: "length(btrim(\"ApiName\")) > 0");
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conname = 'CK_achievements_ApiName_not_empty'
+                    ) THEN
+                        ALTER TABLE achievements
+                        ADD CONSTRAINT "CK_achievements_ApiName_not_empty"
+                        CHECK (length(btrim("ApiName")) > 0);
+                    END IF;
+                END $$;
+                """);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropCheckConstraint(
-                name: "CK_games_GameSteamId_not_empty",
-                table: "games");
-
-            migrationBuilder.DropCheckConstraint(
-                name: "CK_achievements_ApiName_not_empty",
-                table: "achievements");
+            migrationBuilder.Sql(
+                """
+                ALTER TABLE games DROP CONSTRAINT IF EXISTS "CK_games_GameSteamId_not_empty";
+                ALTER TABLE achievements DROP CONSTRAINT IF EXISTS "CK_achievements_ApiName_not_empty";
+                """);
         }
     }
 }
