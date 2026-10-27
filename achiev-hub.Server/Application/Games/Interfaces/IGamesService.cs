@@ -41,6 +41,7 @@ public interface IGamesService
         string? name = null,
         string? status = null,
         string? sort = null,
+        string? global = null,
         int? userId = null,
         CancellationToken cancellationToken = default);
 }
