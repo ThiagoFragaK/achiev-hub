@@ -1,16 +1,20 @@
 <template>
     <div v-if="error" class="alert alert-danger" role="alert">{{ error }}</div>
-    <TableComponent 
-        :data="table.data" 
+    <TableComponent
+        ref="table"
+        :data="table.data"
         :columns="table.columns"
         :isLoading="isLoading"
         :pagination="table.pagination"
+        :hasSelection="hasSelection"
+        :disabledIds="excludeIds"
         @change-page="onPageChange"
+        @selectedRows="onSelectedRows"
     >
         <template #cell-name="{ data }">
             <div class="d-flex align-items-center gap-2">
-                <img 
-                    :src="data.row.icon" 
+                <img
+                    :src="data.row.icon"
                     alt="Achievement Icon"
                     width="20"
                     height="20"
@@ -34,10 +38,10 @@
 </template>
 
 <script>
-import { getSessionSteamId } from '@/lib/steam';
-import { formatGlobalPercentage, globalPercentageColorClass } from '@/lib/globalPercentage';
-import { getAchievements as fetchAchievements } from '@/services/gamesService';
-import TableComponent from '@/components/global/TableComponent.vue';
+import { getSessionSteamId } from '@/lib/steam'
+import { formatGlobalPercentage, globalPercentageColorClass } from '@/lib/globalPercentage'
+import { getAchievements as fetchAchievements } from '@/services/gamesService'
+import TableComponent from '@/components/global/TableComponent.vue'
 
 export default {
     name: 'GamesAchievementsTable',
@@ -52,8 +56,17 @@ export default {
         filters: {
             type: Object,
             default: () => ({ name: '', status: 'locked', sort: 'unlockTime', global: 'all' })
+        },
+        hasSelection: {
+            type: Boolean,
+            default: false
+        },
+        excludeIds: {
+            type: Array,
+            default: () => []
         }
     },
+    emits: ['selectedRows'],
     data() {
         return {
             isLoading: false,
@@ -72,7 +85,7 @@ export default {
                     totalPages: 1,
                     totalCount: 0
                 }
-            },
+            }
         }
     },
     watch: {
@@ -82,18 +95,30 @@ export default {
                 this.table.pagination.currentPage = 1
                 this.getAchievements()
             }
+        },
+        hasSelection(value) {
+            if (!value) {
+                this.cleanSelection()
+            }
         }
     },
     methods: {
         formatGlobalPercentage,
         globalPercentageColorClass,
+        cleanSelection() {
+            this.$refs.table?.cleanSelection?.()
+            this.$emit('selectedRows', [])
+        },
+        onSelectedRows(rows) {
+            this.$emit('selectedRows', rows)
+        },
         async onPageChange(page) {
-            this.table.pagination.currentPage = page;
-            await this.getAchievements();
+            this.table.pagination.currentPage = page
+            await this.getAchievements()
         },
         async getAchievements() {
-            const steamId = getSessionSteamId();
-            const gameId = this.gameId;
+            const steamId = getSessionSteamId()
+            const gameId = this.gameId
             if (!steamId) {
                 this.error = 'Steam ID is missing from your session.'
                 this.table.data = []
@@ -131,8 +156,7 @@ export default {
         }
     },
     async created() {
-        await this.getAchievements();
+        await this.getAchievements()
     }
 }
 </script>
-
