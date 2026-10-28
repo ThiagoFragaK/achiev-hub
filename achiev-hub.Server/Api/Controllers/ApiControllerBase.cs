@@ -21,6 +21,7 @@ public abstract class ApiControllerBase : ControllerBase
         {
             NotFoundException => NotFound(new { message = exception.Message }),
             ConflictException => Conflict(new { message = exception.Message }),
+            BadRequestException => BadRequest(new { message = exception.Message }),
             SteamApiException => StatusCode(StatusCodes.Status503ServiceUnavailable, new { message = SteamApiException.UserMessage }),
             _ => throw exception
         };
