@@ -136,28 +136,3 @@ export default {
 }
 </script>
 
-<style scoped>
-.global-pct--under-1 {
-    color: #fd7e14;
-}
-
-.global-pct--under-5 {
-    color: #0d6efd;
-}
-
-.global-pct--under-10 {
-    color: #20c997;
-}
-
-.global-pct--under-30 {
-    color: #90ee90;
-}
-
-.global-pct--under-50 {
-    color: #adb5bd;
-}
-
-.global-pct--above-50 {
-    color: #fff;
-}
-</style>

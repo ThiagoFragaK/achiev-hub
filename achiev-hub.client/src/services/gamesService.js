@@ -4,6 +4,10 @@ export function getRecentGames(steamId, page = 1, pageSize = 7) {
     return getJson(`/api/steam/games/recent${toQuery({ steamId, page, pageSize })}`)
 }
 
+export function getRecentAchievements(page = 1, pageSize = 10) {
+    return getJson(`/api/steam/games/recent-achievements${toQuery({ page, pageSize })}`)
+}
+
 export function getLibrary(steamId, page = 1, pageSize = 15, filters = {}) {
     return getJson(`/api/steam/games${toQuery({
         steamId,
