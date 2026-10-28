@@ -151,6 +151,86 @@ public class GamesService : IGamesService
         return Paginate(FilterAndSortAchievements(rows, name, status, sort, global), page, pageSize);
     }
 
+    public async Task<PagedResultDto<RecentAchievementDto>> GetRecentAchievementsAsync(
+        int userId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        const int maxRecent = 100;
+        if (pageSize <= 0)
+        {
+            pageSize = 10;
+        }
+
+        pageSize = Math.Min(pageSize, 10);
+
+        var unlockQuery = _db.UsersAchievements
+            .AsNoTracking()
+            .Where(ua => ua.UserId == userId && ua.UnlockDate != null);
+
+        var unlockedCount = await unlockQuery.CountAsync(cancellationToken);
+        var totalCount = Math.Min(unlockedCount, maxRecent);
+        if (totalCount == 0)
+        {
+            return new PagedResultDto<RecentAchievementDto>
+            {
+                Data = [],
+                CurrentPage = 1,
+                LastPage = 1,
+                PerPage = pageSize,
+                TotalCount = 0
+            };
+        }
+
+        var lastPage = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
+        var currentPage = page <= 0 ? 1 : Math.Min(page, lastPage);
+        var skip = (currentPage - 1) * pageSize;
+        var take = Math.Min(pageSize, totalCount - skip);
+
+        var rows = await unlockQuery
+            .OrderByDescending(ua => ua.UnlockDate)
+            .Skip(skip)
+            .Take(take)
+            .Select(ua => new
+            {
+                AchievementName = ua.Achievement.Name,
+                ua.Achievement.Description,
+                ua.Achievement.ImageUrlUnlock,
+                ua.Achievement.GlobalPercentage,
+                ua.UnlockDate,
+                GameName = ua.Game.Name,
+                ua.Game.GameSteamId
+            })
+            .ToListAsync(cancellationToken);
+
+        var data = rows.Select(row =>
+        {
+            var appId = int.TryParse(row.GameSteamId, out var parsed) ? parsed : 0;
+            return new RecentAchievementDto
+            {
+                Name = row.AchievementName,
+                Description = row.Description,
+                Icon = SteamMediaUrls.AppIconUrl(row.GameSteamId, row.ImageUrlUnlock),
+                AppId = appId,
+                GameName = row.GameName,
+                Unlocked = row.UnlockDate.HasValue
+                    ? FormatDateTimeFromUtc(row.UnlockDate.Value)
+                    : "-",
+                GlobalPercentage = row.GlobalPercentage
+            };
+        }).ToList();
+
+        return new PagedResultDto<RecentAchievementDto>
+        {
+            Data = data,
+            CurrentPage = currentPage,
+            LastPage = lastPage,
+            PerPage = pageSize,
+            TotalCount = totalCount
+        };
+    }
+
     private async Task<PagedResultDto<AchievementDto>> GetAchievementsFromDbAsync(
         int userId,
         int appId,
