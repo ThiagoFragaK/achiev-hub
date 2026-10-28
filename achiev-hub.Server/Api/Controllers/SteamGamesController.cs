@@ -55,6 +55,32 @@ public class SteamGamesController : ApiControllerBase
         return Ok(result);
     }
 
+    [HttpGet("recent-achievements")]
+    public async Task<ActionResult<PagedResultDto<RecentAchievementDto>>> GetRecentAchievements(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        CancellationToken cancellationToken = default)
+    {
+        if (ResolveUserIdForDbReads() is not int userId)
+        {
+            return Ok(new PagedResultDto<RecentAchievementDto>
+            {
+                Data = [],
+                CurrentPage = 1,
+                LastPage = 1,
+                PerPage = pageSize <= 0 ? 10 : Math.Min(pageSize, 10),
+                TotalCount = 0
+            });
+        }
+
+        var result = await _gamesService.GetRecentAchievementsAsync(
+            userId,
+            page,
+            pageSize,
+            cancellationToken);
+        return Ok(result);
+    }
+
     [HttpGet]
     public async Task<ActionResult<PagedResultDto<LibraryGameDto>>> GetLibrary(
         [FromQuery] string steamId,
