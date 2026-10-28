@@ -207,6 +207,24 @@ public class GoalsController : ApiControllerBase
         }
     }
 
+    [HttpPost("{id:int}/reopen")]
+    public async Task<ActionResult<GoalDto>> Reopen(int id, CancellationToken cancellationToken)
+    {
+        if (ResolveUserId() is not int userId || IsGuest())
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            return Ok(await _goals.ReopenAsync(userId, id, cancellationToken));
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
