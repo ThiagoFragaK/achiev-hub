@@ -8,6 +8,8 @@ import Register from '@/pages/Register.vue'
 import Stats from '@/pages/Stats.vue'
 import Steam from '@/pages/Steam.vue'
 import StyleGuide from '@/pages/StyleGuide.vue'
+import Goals from '@/pages/goals/Goals.vue'
+import GoalsForm from '@/pages/goals/GoalsForm.vue'
 
 const router = createRouter({
     history: createWebHistory(),
@@ -44,6 +46,17 @@ const router = createRouter({
             name: 'stats',
             component: Stats
         },
+        {
+            path: '/goals',
+            name: 'goals',
+            component: Goals
+        },
+        {
+            path: '/goals/new',
+            name: 'goals-form',
+            component: GoalsForm
+        },
+
         {
             path: '/steam',
             name: 'steam',
