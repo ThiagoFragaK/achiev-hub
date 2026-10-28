@@ -44,4 +44,10 @@ public interface IGamesService
         string? global = null,
         int? userId = null,
         CancellationToken cancellationToken = default);
+
+    Task<PagedResultDto<RecentAchievementDto>> GetRecentAchievementsAsync(
+        int userId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
 }
