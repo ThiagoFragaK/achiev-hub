@@ -293,6 +293,7 @@ public class GamesService : IGamesService
                 UnlockUtc = unlockUtc,
                 Dto = new AchievementDto
                 {
+                    Id = achievement.Id,
                     Name = achievement.Name,
                     Description = string.IsNullOrWhiteSpace(achievement.Description) && !unlocked
                         ? "Secret achievement: without description"
@@ -341,8 +342,10 @@ public class GamesService : IGamesService
         if (normalizedName is not null)
         {
             query = query.Where(r =>
-                !string.IsNullOrWhiteSpace(r.Dto.Name) &&
-                r.Dto.Name.IndexOf(normalizedName, StringComparison.OrdinalIgnoreCase) >= 0);
+                (!string.IsNullOrWhiteSpace(r.Dto.Name) &&
+                 r.Dto.Name.IndexOf(normalizedName, StringComparison.OrdinalIgnoreCase) >= 0)
+                || (!string.IsNullOrWhiteSpace(r.Dto.Description) &&
+                    r.Dto.Description.IndexOf(normalizedName, StringComparison.OrdinalIgnoreCase) >= 0));
         }
 
         if (normalizedStatus == "unlocked")

@@ -31,17 +31,20 @@ public class SteamSyncService : ISteamSyncService
     private readonly ApplicationDbContext _db;
     private readonly ISteamApiClient _steamApiClient;
     private readonly IMemoryCache _cache;
+    private readonly IGoalService _goals;
     private readonly ILogger<SteamSyncService> _logger;
 
     public SteamSyncService(
         ApplicationDbContext db,
         ISteamApiClient steamApiClient,
         IMemoryCache cache,
+        IGoalService goals,
         ILogger<SteamSyncService> logger)
     {
         _db = db;
         _steamApiClient = steamApiClient;
         _cache = cache;
+        _goals = goals;
         _logger = logger;
     }
 
@@ -373,6 +376,7 @@ public class SteamSyncService : ISteamSyncService
 
         await _db.SaveChangesAsync(cancellationToken);
         await RecalculateUserAvgPercentageAsync(userId, cancellationToken);
+        await _goals.RefreshForGameAsync(userId, game.Id, cancellationToken);
 
         _logger.LogInformation(
             "Synced achievements for user {UserId} app {AppId}: {Unlocked}/{Total}",
