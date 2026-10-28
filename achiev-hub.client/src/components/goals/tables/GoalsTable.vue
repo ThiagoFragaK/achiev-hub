@@ -25,10 +25,20 @@
                 </div>
             </template>
             <template #cell-achievements="{ data }">
-                {{ data.row.achievementsMissing }}
-                <span v-if="data.row.achievementsTotal > 0" class="text-secondary">
-                    / {{ data.row.achievementsTotal }}
-                </span>
+                <div class="mt-2 me-2 d-inline-block">
+                    {{ data.row.achievementsMissing }}
+                    <span v-if="data.row.achievementsTotal > 0" class="text-secondary">
+                        / {{ data.row.achievementsTotal }}
+                    </span>
+                </div>
+                <button
+                    type="button"
+                    class="btn btn-sm btn-outline-warning"
+                    aria-label="Edit goal achievements"
+                    @click="openAchievementsModal(data.row)"
+                >
+                    Show
+                </button>
             </template>
             <template #cell-status="{ data }">
                 <span class="badge" :class="statusBadgeClass(data.row.status)">
@@ -40,14 +50,6 @@
             </template>
             <template #cell-actions="{ data }">
                 <div v-if="isActive(data.row.status)" class="d-flex justify-content-center gap-1">
-                    <button
-                        type="button"
-                        class="btn btn-sm btn-outline-primary"
-                        aria-label="Edit goal achievements"
-                        @click="openAchievementsModal(data.row)"
-                    >
-                        <LucideIcon icon="List" :size="16" />
-                    </button>
                     <button
                         type="button"
                         class="btn btn-sm btn-outline-warning"
