@@ -53,6 +53,10 @@ export function abandonGoal(id) {
     return postJson(`/api/goals/${encodeURIComponent(String(id))}/abandon`, {})
 }
 
+export function reopenGoal(id) {
+    return postJson(`/api/goals/${encodeURIComponent(String(id))}/reopen`, {})
+}
+
 export function deleteGoal(id) {
     return deleteJson(`/api/goals/${encodeURIComponent(String(id))}`)
 }

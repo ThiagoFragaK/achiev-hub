@@ -307,6 +307,34 @@ public class GoalService : IGoalService
         return await GetByIdAsync(userId, id, cancellationToken);
     }
 
+    public async Task<GoalDto> ReopenAsync(int userId, int id, CancellationToken cancellationToken = default)
+    {
+        var goal = await GetOwnedGoalAsync(userId, id, track: true, cancellationToken);
+        if (goal.Status != GoalStatus.Abandoned)
+        {
+            throw new ConflictException("Only abandoned goals can be reopened.");
+        }
+
+        var hasActive = await _db.Goals.AnyAsync(
+            g => g.UserId == userId
+                 && g.GameId == goal.GameId
+                 && g.Status == GoalStatus.Active
+                 && g.Id != goal.Id,
+            cancellationToken);
+        if (hasActive)
+        {
+            throw new ConflictException("This game already has an active goal.");
+        }
+
+        goal.Status = GoalStatus.Active;
+        goal.CompletedAt = null;
+
+        var currentPercent = await GetUserPercentageAsync(userId, goal.GameId, cancellationToken);
+        await RefreshGoalEntityAsync(goal, currentPercent, cancellationToken);
+        await _db.SaveChangesAsync(cancellationToken);
+        return await GetByIdAsync(userId, id, cancellationToken);
+    }
+
     public async Task DeleteAsync(int userId, int id, CancellationToken cancellationToken = default)
     {
         var goal = await GetOwnedGoalAsync(userId, id, track: true, cancellationToken);

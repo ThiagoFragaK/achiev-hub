@@ -13,6 +13,7 @@ public interface IGoalService
     Task<IReadOnlyList<GoalAchievementDetailDto>> GetAchievementsAsync(int userId, int id, CancellationToken cancellationToken = default);
     Task<GoalDto> ReplaceAchievementsAsync(int userId, int id, ReplaceGoalAchievementsRequest request, CancellationToken cancellationToken = default);
     Task<GoalDto> AbandonAsync(int userId, int id, CancellationToken cancellationToken = default);
+    Task<GoalDto> ReopenAsync(int userId, int id, CancellationToken cancellationToken = default);
     Task DeleteAsync(int userId, int id, CancellationToken cancellationToken = default);
     Task RefreshForGameAsync(int userId, int gameId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<EligibleGameDto>> GetEligibleGamesAsync(int userId, string? query = null, CancellationToken cancellationToken = default);
