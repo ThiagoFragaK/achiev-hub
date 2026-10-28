@@ -76,6 +76,19 @@ export async function postJson(url, body) {
     })
 }
 
+export async function putJson(url, body) {
+    return request(url, {
+        method: 'PUT',
+        body: JSON.stringify(body)
+    })
+}
+
+export async function deleteJson(url) {
+    return request(url, {
+        method: 'DELETE'
+    })
+}
+
 export function toQuery(params) {
     const search = new URLSearchParams()
 
