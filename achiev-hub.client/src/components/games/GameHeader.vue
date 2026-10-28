@@ -1,5 +1,5 @@
 <template>
-    <p v-if="isLoading" class="text-secondary">Loading game details…</p>
+    <p v-if="isLoadingHeader" class="text-secondary">Loading game details…</p>
     <p v-else-if="error" class="text-danger">{{ error }}</p>
 
     <div v-else class="row g-4 align-items-start">
@@ -52,7 +52,11 @@
                     </button>
                 </div>
                 <div class="col-10 mt-3">
+                    <LoadingComponent 
+                        v-if="isLoading"
+                    />
                     <ProgressComponent
+                        v-else
                         :value="achievementsPercentage"
                         :label="formatPercentage(achievementsPercentage)"
                         :color="getColor(achievementsPercentage)"
@@ -93,6 +97,7 @@ import ImageComponent from '@/components/global/ImageComponent.vue'
 import LucideIcon from '@/components/global/LucideIcon.vue'
 import ProgressComponent from '@/components/global/ProgressComponent.vue'
 import GameAchievementsGraph from '@/components/games/graphs/GameAchievementsGraph.vue';
+import LoadingComponent from '@/components/global/LoadingComponent.vue';
 
 const labelFormatters = {
     day: new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }),
@@ -107,7 +112,8 @@ export default {
         ImageComponent,
         LucideIcon,
         ProgressComponent,
-        GameAchievementsGraph
+        GameAchievementsGraph,
+        LoadingComponent
     },
     props: {
         gameId: {
@@ -127,9 +133,10 @@ export default {
                 userAchievementsCount: ''
             },
             isLoading: false,
+            isLoadingHeader: true,
             error: null,
             progressLabels: [],
-            progressPercentages: []
+            progressPercentages: [],
         }
     },
     methods: {
@@ -153,7 +160,7 @@ export default {
                 return;
             }
 
-            this.isLoading = true;
+            this.isLoadingHeader = true;
             try {
                 const details = await getGameDetails(this.gameId)
                 this.game = {
@@ -171,8 +178,10 @@ export default {
                     publishers: ''
                 }
                 this.error = err?.message || 'Failed to load game details.'
-                this.isLoading = false;
                 this.emitCompletion();
+            }
+            finally {
+                this.isLoadingHeader = false;
             }
         },
         formatProgressLabel(isoDate, granularity) {
@@ -180,6 +189,7 @@ export default {
             return formatter.format(new Date(`${isoDate}T00:00:00`))
         },
         async getProgress() {
+            this.isLoading = true;
             try {
                 const progress = await getGameProgress(this.gameId);
                 this.game.totalAchievements = progress?.totalCount ?? 0;
