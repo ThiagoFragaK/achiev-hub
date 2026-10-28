@@ -29,11 +29,14 @@
             </div>
         </div>
 
-        <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
-            <h2 class="h5 mb-0">Recent Games</h2>
-        </div>
-
-        <RecentGamesTable :key="recentGamesKey" :hide-title="true" />
+        <TabsComponent v-model="activeTab" :tabs="tabs">
+            <template #recent-games>
+                <RecentGamesTable :key="recentGamesKey" :hide-title="true" />
+            </template>
+            <template #recent-achievements>
+                <RecentAchievementsTable />
+            </template>
+        </TabsComponent>
     </AppShell>
 </template>
 
@@ -44,6 +47,8 @@ import AchievementsLast14DaysGraph from '@/components/home/graphs/AchievementsLa
 import AchievementsPerYearGraph from '@/components/home/graphs/AchievementsPerYearGraph.vue'
 import UsersAverageSemiGauge from '@/components/home/graphs/UsersAverageSemiGauge.vue'
 import RecentGamesTable from '@/components/home/RecentGamesTable.vue'
+import RecentAchievementsTable from '@/components/home/RecentAchievementsTable.vue'
+import TabsComponent from '@/components/global/TabsComponent.vue'
 
 const dayFormatter = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' })
 const CHART_HEIGHT = 'clamp(180px, 18vw, 280px)'
@@ -56,6 +61,8 @@ export default {
         AchievementsPerYearGraph,
         RecentGamesTable,
         UsersAverageSemiGauge,
+        TabsComponent,
+        RecentAchievementsTable,
     },
     data() {
         return {
@@ -68,7 +75,18 @@ export default {
             perYearCounts: [],
             averagePercentage: 0,
             totalAchievements: 0,
-            gamesWithAchievements: 0
+            gamesWithAchievements: 0,
+            activeTab: 'recent-games',
+            tabs: [
+                {
+                    name: 'recent-games',
+                    label: 'Recent Games',
+                },
+                {
+                    name: 'recent-achievements',
+                    label: 'Recent Achievements',
+                },
+            ],
         }
     },
     computed: {
@@ -77,8 +95,8 @@ export default {
                 {
                     label: 'Achievements',
                     data: this.achievementsCounts,
-                    color: '#0d6efd'
-                }
+                    color: '#0d6efd',
+                },
             ]
         },
         perYearData() {
@@ -87,10 +105,10 @@ export default {
                     label: 'Achievements',
                     data: this.perYearCounts,
                     color: '#0d6efd',
-                    fill: true
-                }
+                    fill: true,
+                },
             ]
-        }
+        },
     },
     methods: {
         formatDay(isoDate) {
@@ -117,6 +135,6 @@ export default {
     },
     async created() {
         await this.getStats()
-    }
+    },
 }
 </script>
