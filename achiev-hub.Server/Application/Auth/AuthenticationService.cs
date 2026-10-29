@@ -49,7 +49,8 @@ public class AuthenticationService : IAuthenticationService
                 Id = user.Id,
                 Email = user.Email,
                 SteamId = user.SteamId,
-                Role = user.Role
+                Role = user.Role,
+                ShowGoals = user.ShowGoals
             }
         };
     }
@@ -66,7 +67,8 @@ public class AuthenticationService : IAuthenticationService
                 Id = 0,
                 Email = string.Empty,
                 SteamId = normalizedSteamId,
-                Role = JwtTokenService.GuestRole
+                Role = JwtTokenService.GuestRole,
+                ShowGoals = false
             }
         };
     }
