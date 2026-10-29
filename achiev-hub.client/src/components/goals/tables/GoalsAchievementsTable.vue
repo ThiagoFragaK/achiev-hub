@@ -90,6 +90,7 @@ export default {
             error: '',
             draftSearch: '',
             appliedSearch: '',
+            selectedById: {},
             table: {
                 data: [],
                 columns: [
@@ -106,6 +107,11 @@ export default {
             }
         }
     },
+    computed: {
+        selectedRows() {
+            return Object.values(this.selectedById)
+        }
+    },
     watch: {
         gameId: {
             immediate: false,
@@ -113,6 +119,7 @@ export default {
                 this.draftSearch = ''
                 this.appliedSearch = ''
                 this.table.pagination.currentPage = 1
+                this.clearAccumulatedSelection()
                 this.getAchievements()
             }
         }
@@ -120,12 +127,51 @@ export default {
     methods: {
         formatGlobalPercentage,
         globalPercentageColorClass,
-        cleanSelection() {
-            this.$refs.table?.cleanSelection?.()
+        clearAccumulatedSelection() {
+            this.selectedById = {}
             this.$emit('selectedRows', [])
         },
+        cleanSelection() {
+            this.clearAccumulatedSelection()
+            this.$refs.table?.cleanSelection?.()
+        },
+        emitSelection() {
+            this.$emit('selectedRows', this.selectedRows)
+        },
         onSelectedRows(rows) {
-            this.$emit('selectedRows', rows)
+            const pageIdSet = new Set(
+                this.table.data
+                    .map((row) => Number(row.id))
+                    .filter((id) => Number.isFinite(id) && id > 0)
+            )
+            const next = { ...this.selectedById }
+
+            for (const id of Object.keys(next).map(Number)) {
+                if (pageIdSet.has(id)) {
+                    delete next[id]
+                }
+            }
+
+            for (const row of rows || []) {
+                const id = Number(row.id)
+                if (!pageIdSet.has(id)) {
+                    continue
+                }
+                next[id] = row
+            }
+
+            this.selectedById = next
+            this.emitSelection()
+        },
+        restoreSelectionOnPage() {
+            const table = this.$refs.table
+            if (!table) {
+                return
+            }
+            table.selectedRows = this.table.data.filter((row) => {
+                const id = Number(row.id)
+                return Number.isFinite(id) && id > 0 && this.selectedById[id] != null
+            })
         },
         applySearch() {
             this.appliedSearch = (this.draftSearch || '').trim()
@@ -175,6 +221,8 @@ export default {
                 this.table.pagination.totalPages = 1
             } finally {
                 this.isLoading = false
+                await this.$nextTick()
+                this.restoreSelectionOnPage()
             }
         }
     },
