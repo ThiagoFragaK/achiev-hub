@@ -65,3 +65,11 @@ public class GoalsCompletedSeriesDto
     public IReadOnlyList<string> Labels { get; set; } = [];
     public IReadOnlyList<int> Counts { get; set; } = [];
 }
+
+public class UnacknowledgedCompletedGoalDto
+{
+    public int Id { get; set; }
+    public string GameName { get; set; } = string.Empty;
+    public int AchievementsEarned { get; set; }
+    public decimal FinalPercentage { get; set; }
+}

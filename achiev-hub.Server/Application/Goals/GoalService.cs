@@ -366,7 +366,7 @@ public class GoalService : IGoalService
         }
 
         var currentPercent = await GetUserPercentageAsync(userId, gameId, cancellationToken);
-        await RefreshGoalEntityAsync(goal, currentPercent, cancellationToken);
+        await RefreshGoalEntityAsync(goal, currentPercent, cancellationToken, notifyUser: true);
         await _db.SaveChangesAsync(cancellationToken);
     }
 
@@ -463,6 +463,73 @@ public class GoalService : IGoalService
         };
     }
 
+    public async Task<IReadOnlyList<UnacknowledgedCompletedGoalDto>> GetUnacknowledgedCompletedAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        var acknowledgedAt = await _db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.GoalsAcknowledgedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var goals = await _db.Goals
+            .AsNoTracking()
+            .Include(g => g.Game)
+            .Include(g => g.GoalAchievements)
+            .Where(g =>
+                g.UserId == userId
+                && g.Status == GoalStatus.Completed
+                && g.CompletedAt != null
+                && (acknowledgedAt == null || g.CompletedAt > acknowledgedAt))
+            .OrderByDescending(g => g.CompletedAt)
+            .ToListAsync(cancellationToken);
+
+        if (goals.Count == 0)
+        {
+            return [];
+        }
+
+        var gameIds = goals.Select(g => g.GameId).Distinct().ToList();
+        var percentagesByGameId = await _db.UsersGames
+            .AsNoTracking()
+            .Where(ug => ug.UserId == userId && gameIds.Contains(ug.GameId))
+            .ToDictionaryAsync(ug => ug.GameId, ug => ug.AchievementsPercentage, cancellationToken);
+
+        var unlockedCountsByGameId = await _db.UsersAchievements
+            .AsNoTracking()
+            .Where(ua => ua.UserId == userId && gameIds.Contains(ua.GameId))
+            .GroupBy(ua => ua.GameId)
+            .Select(g => new { GameId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.GameId, x => x.Count, cancellationToken);
+
+        return goals.Select(goal =>
+        {
+            var attachedCompleted = goal.GoalAchievements.Count(ga => ga.Status == GoalAchievementStatus.Completed);
+            var achievementsEarned = goal.GoalAchievements.Count > 0
+                ? attachedCompleted
+                : unlockedCountsByGameId.GetValueOrDefault(goal.GameId);
+
+            return new UnacknowledgedCompletedGoalDto
+            {
+                Id = goal.Id,
+                GameName = goal.Game?.Name ?? string.Empty,
+                AchievementsEarned = achievementsEarned,
+                FinalPercentage = percentagesByGameId.GetValueOrDefault(goal.GameId)
+            };
+        }).ToList();
+    }
+
+    public async Task AcknowledgeCompletedAsync(int userId, CancellationToken cancellationToken = default)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
+            ?? throw new NotFoundException($"User {userId} was not found.");
+
+        user.ShowGoals = false;
+        user.GoalsAcknowledgedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+
     private async Task ValidateLockedAchievementsAsync(
         int userId,
         int gameId,
@@ -502,7 +569,11 @@ public class GoalService : IGoalService
         }
     }
 
-    private async Task RefreshGoalEntityAsync(Goal goal, decimal currentPercent, CancellationToken cancellationToken)
+    private async Task RefreshGoalEntityAsync(
+        Goal goal,
+        decimal currentPercent,
+        CancellationToken cancellationToken,
+        bool notifyUser = false)
     {
         if (goal.Status != GoalStatus.Active)
         {
@@ -543,6 +614,15 @@ public class GoalService : IGoalService
         {
             goal.Status = GoalStatus.Completed;
             goal.CompletedAt = DateTimeOffset.UtcNow;
+
+            if (notifyUser)
+            {
+                var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == goal.UserId, cancellationToken);
+                if (user is not null)
+                {
+                    user.ShowGoals = true;
+                }
+            }
         }
     }
 

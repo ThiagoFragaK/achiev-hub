@@ -270,6 +270,10 @@ namespace achiev_hub.Server.Infrastructure.Persistence.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<DateTimeOffset?>("GoalsAcknowledgedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("goals_acknowledged_at");
+
                     b.Property<bool>("IsEmailVerified")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -294,6 +298,12 @@ namespace achiev_hub.Server.Infrastructure.Persistence.Migrations
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)")
                         .HasDefaultValue("user");
+
+                    b.Property<bool>("ShowGoals")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("show_goals");
 
                     b.Property<int>("Status")
                         .ValueGeneratedOnAdd()
