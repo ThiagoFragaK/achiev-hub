@@ -180,12 +180,25 @@ namespace achiev_hub.Server.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(0);
 
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
                     b.Property<int>("GameId")
                         .HasColumnType("integer");
 
                     b.Property<decimal>("PercentageGoal")
                         .HasPrecision(5, 2)
                         .HasColumnType("numeric(5,2)");
+
+                    b.Property<int>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<int>("UserId")
                         .HasColumnType("integer");
@@ -194,7 +207,9 @@ namespace achiev_hub.Server.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("GameId");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "GameId")
+                        .IsUnique()
+                        .HasFilter("\"Status\" = 0");
 
                     b.ToTable("goals", (string)null);
                 });

@@ -8,11 +8,12 @@
                             type="checkbox"
                             class="form-check-input"
                             :checked="allSelected"
+                            :disabled="selectableRows.length === 0"
                             @change="selectAllRow"
                         />
                     </th>
                     <th v-for="(column, index) in columns" :key="index">
-                        {{ column.label || column }}
+                        {{ column.label }}
                     </th>
                 </tr>
             </thead>
@@ -34,6 +35,7 @@
                             class="form-check-input"
                             :value="row"
                             :checked="isSelected(row)"
+                            :disabled="isRowDisabled(row)"
                             @change="selectRow(row)"
                         />
                     </td>
@@ -68,8 +70,9 @@
 </template>
 
 <script>
-import LoadingComponent from '@/components/global/LoadingComponent.vue';
-import PaginationComponent from '@/components/global/PaginationComponent.vue';
+import LoadingComponent from '@/components/global/LoadingComponent.vue'
+import PaginationComponent from '@/components/global/PaginationComponent.vue'
+
 export default {
     name: 'TableComponent',
     components: {
@@ -93,11 +96,15 @@ export default {
             type: Boolean,
             default: false
         },
+        disabledIds: {
+            type: Array,
+            default: () => []
+        },
         pagination: {
             type: Object,
             required: false
         },
-        light:{
+        light: {
             type: String,
             default: 'primary',
             required: false
@@ -110,23 +117,39 @@ export default {
         }
     },
     computed: {
+        disabledIdSet() {
+            return new Set((this.disabledIds || []).map(Number))
+        },
+        selectableRows() {
+            return this.data.filter((row) => !this.isRowDisabled(row))
+        },
         allSelected() {
-            return this.data.length > 0 && this.selectedRows.length === this.data.length
+            return this.selectableRows.length > 0
+                && this.selectableRows.every((row) => this.selectedRows.includes(row))
         }
     },
     mounted() {
         this.cleanSelection()
     },
     methods: {
+        isRowDisabled(row) {
+            if (this.disabledIdSet.size === 0) {
+                return false
+            }
+            return this.disabledIdSet.has(Number(row.id))
+        },
         selectAllRow() {
             if (this.allSelected) {
                 this.selectedRows = []
             } else {
-                this.selectedRows = [...this.data]
+                this.selectedRows = [...this.selectableRows]
             }
             this.$emit('selectedRows', this.selectedRows)
         },
         selectRow(row) {
+            if (this.isRowDisabled(row)) {
+                return
+            }
             const index = this.selectedRows.indexOf(row)
             if (index === -1) {
                 this.selectedRows.push(row)
@@ -140,6 +163,7 @@ export default {
         },
         cleanSelection() {
             this.selectedRows = []
+            this.$emit('selectedRows', [])
         }
     }
 }
