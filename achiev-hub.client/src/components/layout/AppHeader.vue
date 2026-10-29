@@ -87,6 +87,7 @@ export default {
                 { to: '/', label: 'Home', name: 'home' },
                 { to: '/games', label: 'My games', name: 'games' },
                 { to: '/stats', label: 'Stats', name: 'stats' },
+                { to: '/goals', label: 'Goals', name: 'goals' },
                 // { to: '/steam', label: 'Steam', name: 'steam' }
             ]
         }
@@ -123,6 +124,9 @@ export default {
         isActive(name) {
             if (name === 'games') {
                 return this.$route.name === 'games' || this.$route.name === 'game-detail'
+            }
+            if (name === 'goals') {
+                return this.$route.name === 'goals' || this.$route.name === 'goals-form'
             }
             return this.$route.name === name
         },
