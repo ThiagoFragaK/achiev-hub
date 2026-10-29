@@ -18,4 +18,6 @@ public interface IGoalService
     Task RefreshForGameAsync(int userId, int gameId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<EligibleGameDto>> GetEligibleGamesAsync(int userId, string? query = null, CancellationToken cancellationToken = default);
     Task<GoalsCompletedSeriesDto> GetCompletedSeriesAsync(int userId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<UnacknowledgedCompletedGoalDto>> GetUnacknowledgedCompletedAsync(int userId, CancellationToken cancellationToken = default);
+    Task AcknowledgeCompletedAsync(int userId, CancellationToken cancellationToken = default);
 }

@@ -20,6 +20,14 @@ export function getCompletedSeries() {
     return getJson('/api/goals/completed-series')
 }
 
+export function getUnacknowledgedCompletedGoals() {
+    return getJson('/api/goals/unacknowledged-completed')
+}
+
+export function acknowledgeGoals() {
+    return postJson('/api/goals/acknowledge', {})
+}
+
 export function createGoal({ appId, percentageGoal, achievementIds = [] }) {
     return postJson('/api/goals', {
         appId,
