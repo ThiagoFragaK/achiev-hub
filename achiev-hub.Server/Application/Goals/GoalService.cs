@@ -197,7 +197,17 @@ public class GoalService : IGoalService
             });
         }
 
-        var currentPercent = await GetUserPercentageAsync(userId, goal.GameId, cancellationToken);
+        var (unlocked, total) = await GetUserAchievementCountsAsync(userId, goal.GameId, cancellationToken);
+        var currentPercent = total > 0
+            ? Math.Round(unlocked / (decimal)total * 100m, 2)
+            : await GetUserPercentageAsync(userId, goal.GameId, cancellationToken);
+
+        goal.PercentageGoal = DerivePercentageGoal(
+            unlocked,
+            goal.GoalAchievements.Count,
+            total,
+            currentPercent);
+
         await RefreshGoalEntityAsync(goal, currentPercent, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
         return await GetByIdAsync(userId, id, cancellationToken);
@@ -544,6 +554,48 @@ public class GoalService : IGoalService
             .Select(ug => (decimal?)ug.AchievementsPercentage)
             .FirstOrDefaultAsync(cancellationToken);
         return percent ?? 0m;
+    }
+
+    private async Task<(int Unlocked, int Total)> GetUserAchievementCountsAsync(
+        int userId,
+        int gameId,
+        CancellationToken cancellationToken)
+    {
+        var total = await _db.Achievements
+            .AsNoTracking()
+            .CountAsync(a => a.GameId == gameId, cancellationToken);
+        var unlocked = await _db.UsersAchievements
+            .AsNoTracking()
+            .CountAsync(ua => ua.UserId == userId && ua.GameId == gameId, cancellationToken);
+        return (unlocked, total);
+    }
+
+    /// <summary>
+    /// Same formula as the goals UI: (unlocked + attached) / total * 100.
+    /// Falls back to just above current progress when that would not be valid.
+    /// </summary>
+    private static decimal DerivePercentageGoal(int unlocked, int selected, int total, decimal currentPercent)
+    {
+        decimal derived;
+        if (total <= 0 || selected <= 0)
+        {
+            derived = Math.Min(100m, Math.Round(currentPercent + 0.01m, 2));
+        }
+        else
+        {
+            derived = Math.Min(100m, Math.Round((unlocked + selected) / (decimal)total * 100m, 2));
+        }
+
+        if (derived <= currentPercent)
+        {
+            derived = Math.Min(100m, Math.Round(currentPercent + 0.01m, 2));
+            if (derived <= currentPercent)
+            {
+                derived = 100m;
+            }
+        }
+
+        return derived;
     }
 
     private async Task<Goal> GetOwnedGoalAsync(int userId, int id, bool track, CancellationToken cancellationToken)
