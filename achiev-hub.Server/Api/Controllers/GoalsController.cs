@@ -55,6 +55,37 @@ public class GoalsController : ApiControllerBase
         return Ok(await _goals.GetCompletedSeriesAsync(userId, cancellationToken));
     }
 
+    [HttpGet("unacknowledged-completed")]
+    public async Task<ActionResult<IReadOnlyList<UnacknowledgedCompletedGoalDto>>> GetUnacknowledgedCompleted(
+        CancellationToken cancellationToken)
+    {
+        if (ResolveUserId() is not int userId || IsGuest())
+        {
+            return Ok(Array.Empty<UnacknowledgedCompletedGoalDto>());
+        }
+
+        return Ok(await _goals.GetUnacknowledgedCompletedAsync(userId, cancellationToken));
+    }
+
+    [HttpPost("acknowledge")]
+    public async Task<IActionResult> Acknowledge(CancellationToken cancellationToken)
+    {
+        if (ResolveUserId() is not int userId || IsGuest())
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            await _goals.AcknowledgeCompletedAsync(userId, cancellationToken);
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            return HandleException(ex);
+        }
+    }
+
     [HttpGet("by-game/{appId:int}")]
     public async Task<ActionResult<GoalDto>> GetActiveByGame(int appId, CancellationToken cancellationToken)
     {

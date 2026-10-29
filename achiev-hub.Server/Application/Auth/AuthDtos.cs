@@ -17,6 +17,7 @@ public class AuthUserDto
     public string Email { get; set; } = string.Empty;
     public string? SteamId { get; set; }
     public string Role { get; set; } = string.Empty;
+    public bool ShowGoals { get; set; }
 }
 
 public class LoginResponseDto
