@@ -19,17 +19,20 @@ public class SteamOpenIdController : ControllerBase
     private readonly IAuthenticationService _auth;
     private readonly IMemoryCache _cache;
     private readonly SteamOpenIdOptions _options;
+    private readonly JwtSettings _jwtSettings;
 
     public SteamOpenIdController(
         SteamOpenIdValidator openId,
         IAuthenticationService auth,
         IMemoryCache cache,
-        IOptions<SteamOpenIdOptions> options)
+        IOptions<SteamOpenIdOptions> options,
+        IOptions<JwtSettings> jwtSettings)
     {
         _openId = openId;
         _auth = auth;
         _cache = cache;
         _options = options.Value;
+        _jwtSettings = jwtSettings.Value;
     }
 
     [AllowAnonymous]
@@ -131,7 +134,22 @@ public class SteamOpenIdController : ControllerBase
 
         _cache.Remove(key);
         var login = JsonSerializer.Deserialize<LoginResponseDto>(json);
-        return Ok(new { success = true, data = login });
+        if (login is null || string.IsNullOrWhiteSpace(login.AccessToken))
+        {
+            return Unauthorized(new { message = "Invalid or expired Steam login code." });
+        }
+
+        AuthCookie.Append(Response, Request, login.AccessToken, _jwtSettings.ExpiryMinutes);
+        return Ok(new
+        {
+            success = true,
+            data = new
+            {
+                accessToken = (string?)null,
+                tokenType = "Cookie",
+                user = login.User
+            }
+        });
     }
 
     private static string LinkCacheKey(string state) => $"openid:link:{state}";
