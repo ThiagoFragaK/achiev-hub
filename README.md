@@ -42,12 +42,16 @@ The backend talks to the Steam Web API and persists users, games, achievements, 
 
    Optional local overrides: copy `appsettings.Development.local.json.example` to `appsettings.Development.local.json` (gitignored).
 
-3. Put your Steam API key in [user secrets](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets) (do not commit it):
+3. Put secrets in [user secrets](https://learn.microsoft.com/en-us/aspnet/core/security/app-secrets) (do not commit them). Tracked `appsettings*.json` files must not contain a Steam API key:
 
    ```bash
    cd achiev-hub.Server
    dotnet user-secrets set "SteamApi:ApiKey" "YOUR_KEY"
+   # Optional override if you do not use appsettings.Development.json Jwt:Key:
+   # dotnet user-secrets set "Jwt:Key" "a-long-random-secret-at-least-32-bytes"
    ```
+
+   Docker Compose reads `STEAM_API_KEY` from the environment (see `.env.example`).
 
 ## Auth
 
