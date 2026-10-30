@@ -300,4 +300,54 @@ Legend: **C** conforme · **NC** não conforme · **NA** não aplicável · **S*
 
 ---
 
-*Post-remediation addendum will be appended after Phase 4.*
+---
+
+## Post-remediation addendum (2026-10-30)
+
+### Status after Phase 4
+
+| Sev | Open Critical/High | Notes |
+|-----|--------------------|-------|
+| Critical | **0** | F01 removed from tracked configs (history still contains key — rotate); F02 ownership/admin enforced |
+| High | **0** | F03 OpenID hybrid with `check_authentication`; F04 steamId bound; F05 HttpOnly cookie; F06 worker binding |
+| Medium | 0 remaining of F07–F10 as filed | Rate limits, register/status auth, admin roles, HSTS/CSP/headers |
+| Low | Partial | Seed Dev-only create-if-missing; JWT placeholder only in Development appsettings |
+
+### Checklist A (OpenID) — post-fix
+
+| Item | Status |
+|------|--------|
+| `check_authentication` | C |
+| `openid.mode == id_res` | C |
+| `op_endpoint` exact | C |
+| `claimed_id` + SteamID64 regex | C |
+| `return_to` exact (with state) | C |
+| `response_nonce` anti-replay | C |
+| App state CSRF cookie + cache | C |
+| Forge callback without Steam | C (fails check_authentication) |
+| No Steam password phishing | C |
+| Link by SteamID64 | C |
+| Re-link takeover | C (conflict if owned; non-admin cannot change SteamId via Users PUT) |
+| Admin 2FA independent of Steam | NC — **human decision pending** |
+
+### Test suites
+
+- `achiev-hub.Server.Tests`: 18 passed
+- `SteamSync.Worker.Tests`: 4 passed
+- `gitleaks`: not installed on this machine (manual key grep: tracked appsettings empty; gitignored `*.local.json` still hold the old key locally)
+
+### Remaining human actions
+
+1. **Rotate** Steam Web API key `5CFB****83B5` in Steamworks (still in git history and local gitignored files).
+2. Configure Steam key IP allowlist / method permissions.
+3. Optionally purge git history (BFG/filter-repo) after rotation.
+4. Decide admin MFA and guest-mode retirement.
+5. Set production `SteamOpenId:ReturnTo`/`Realm` and `Jwt:Key` via secrets manager.
+6. LGPD retention / incident contacts.
+7. Install gitleaks/TruffleHog in CI.
+
+### Conscious residual risks
+
+- RabbitMQ job authenticity still trusts the broker network (no HMAC).
+- `AllowedHosts: *` remains for local/Docker convenience — tighten per environment for production.
+- npm advisories on transitive frontend packages (Vue/Vite toolchain) reported by JS SDK during build — track separately.
