@@ -1,19 +1,5 @@
 using achiev_hub.Server.Application.Users;
 using achiev_hub.Server.Application.Users.Interfaces;
-using achiev_hub.Server.Application.Games;
-using achiev_hub.Server.Application.Games.Interfaces;
-using achiev_hub.Server.Application.Achievements;
-using achiev_hub.Server.Application.Achievements.Interfaces;
-using achiev_hub.Server.Application.Goals;
-using achiev_hub.Server.Application.Goals.Interfaces;
-using achiev_hub.Server.Application.Auth;
-using achiev_hub.Server.Application.Auth.Interfaces;
-using achiev_hub.Server.Application.Steam;
-using achiev_hub.Server.Application.Steam.Interfaces;
-using achiev_hub.Server.Application.Stats;
-using achiev_hub.Server.Application.Stats.Interfaces;
-using achiev_hub.Server.Application.Common;
-using achiev_hub.Server.Application.Common.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -31,6 +17,7 @@ public class UsersController : ApiControllerBase
         _users = users;
     }
 
+    [Authorize(Roles = "admin")]
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<UserDto>>> GetAll(CancellationToken cancellationToken)
     {
@@ -40,6 +27,11 @@ public class UsersController : ApiControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<UserDto>> GetById(int id, CancellationToken cancellationToken)
     {
+        if (ForbidUnlessSelfOrAdmin(id) is { } denied)
+        {
+            return denied;
+        }
+
         try
         {
             return Ok(await _users.GetByIdAsync(id, cancellationToken));
@@ -50,6 +42,7 @@ public class UsersController : ApiControllerBase
         }
     }
 
+    [Authorize(Roles = "admin")]
     [HttpPost]
     public async Task<ActionResult<UserDto>> Create(CreateUserRequest request, CancellationToken cancellationToken)
     {
@@ -67,6 +60,25 @@ public class UsersController : ApiControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<UserDto>> Update(int id, UpdateUserRequest request, CancellationToken cancellationToken)
     {
+        if (ForbidUnlessSelfOrAdmin(id) is { } denied)
+        {
+            return denied;
+        }
+
+        // Non-admins cannot reassign SteamId via this endpoint (prevents account takeover).
+        if (!IsAdmin())
+        {
+            try
+            {
+                var existing = await _users.GetByIdAsync(id, cancellationToken);
+                request.SteamId = existing.SteamId;
+            }
+            catch (Exception ex)
+            {
+                return HandleException(ex);
+            }
+        }
+
         try
         {
             return Ok(await _users.UpdateAsync(id, request, cancellationToken));
@@ -77,6 +89,7 @@ public class UsersController : ApiControllerBase
         }
     }
 
+    [Authorize(Roles = "admin")]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
