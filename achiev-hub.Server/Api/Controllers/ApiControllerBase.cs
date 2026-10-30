@@ -1,12 +1,6 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using achiev_hub.Server.Application.Common;
 using achiev_hub.Server.Application.Common.Interfaces;
-using achiev_hub.Server.Infrastructure.Auth;
-using achiev_hub.Server.Application.Auth;
-using achiev_hub.Server.Application.Auth.Interfaces;
-using achiev_hub.Server.Application.Games;
-using achiev_hub.Server.Application.Games.Interfaces;
+using achiev_hub.Server.Infrastructure.Security;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -27,21 +21,46 @@ public abstract class ApiControllerBase : ControllerBase
         };
     }
 
-    protected bool IsGuest()
-    {
-        return User.IsInRole(JwtTokenService.GuestRole)
-            || User.FindFirstValue(JwtTokenService.TokenKindClaim) == JwtTokenService.GuestTokenKind;
-    }
+    protected bool IsGuest() => AccessControl.IsGuest(User);
 
-    protected int? ResolveUserId()
-    {
-        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirstValue(JwtRegisteredClaimNames.Sub);
-        return int.TryParse(userIdClaim, out var userId) && userId > 0 ? userId : null;
-    }
+    protected bool IsAdmin() => AccessControl.IsAdmin(User);
+
+    protected int? ResolveUserId() => AccessControl.TryGetUserId(User);
 
     protected int? ResolveUserIdForDbReads()
     {
         return IsGuest() ? null : ResolveUserId();
+    }
+
+    protected ActionResult? ForbidUnlessAdmin()
+    {
+        return IsAdmin() ? null : Forbid();
+    }
+
+    protected ActionResult? ForbidUnlessSelfOrAdmin(int resourceUserId)
+    {
+        return AccessControl.CanAccessOwnedResource(User, resourceUserId) ? null : NotFound();
+    }
+
+    protected int RequireAuthenticatedUserId()
+    {
+        return ResolveUserId()
+            ?? throw new UnauthorizedAccessException("Authenticated user id is required.");
+    }
+
+    protected ActionResult? ForbidGuests(string message = "Guests cannot use this endpoint.")
+    {
+        return IsGuest() ? StatusCode(StatusCodes.Status403Forbidden, new { message }) : null;
+    }
+
+    protected ActionResult? TryResolveBoundSteamId(string? requestedSteamId, out string steamId)
+    {
+        steamId = string.Empty;
+        if (!SteamIdBinder.TryResolve(AccessControl.TryGetSteamId(User), requestedSteamId, out steamId, out var error))
+        {
+            return BadRequest(new { message = error });
+        }
+
+        return null;
     }
 }

@@ -1,28 +1,16 @@
-using achiev_hub.Server.Application.Games;
-using achiev_hub.Server.Application.Games.Interfaces;
-using achiev_hub.Server.Application.Achievements;
-using achiev_hub.Server.Application.Achievements.Interfaces;
 using achiev_hub.Server.Application.Steam;
 using achiev_hub.Server.Application.Steam.Interfaces;
-using achiev_hub.Server.Application.Stats;
-using achiev_hub.Server.Application.Stats.Interfaces;
-using achiev_hub.Server.Application.Users;
-using achiev_hub.Server.Application.Users.Interfaces;
-using achiev_hub.Server.Application.Goals;
-using achiev_hub.Server.Application.Goals.Interfaces;
-using achiev_hub.Server.Application.Auth;
-using achiev_hub.Server.Application.Auth.Interfaces;
-using achiev_hub.Server.Application.Common;
-using achiev_hub.Server.Application.Common.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace achiev_hub.Server.Api.Controllers;
 
 [Authorize]
 [ApiController]
 [Route("api/steam/players")]
-public class SteamPlayersController : ControllerBase
+[EnableRateLimiting("steam")]
+public class SteamPlayersController : ApiControllerBase
 {
     private readonly IPlayersService _playersService;
 
@@ -34,12 +22,17 @@ public class SteamPlayersController : ControllerBase
     [HttpGet("{steamId}")]
     public async Task<ActionResult<PlayerDto>> GetPlayer(string steamId, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(steamId))
+        if (ForbidGuests("Guests cannot look up Steam players.") is { } guestDenied)
         {
-            return BadRequest("steamId is required.");
+            return guestDenied;
         }
 
-        var player = await _playersService.GetPlayerAsync(steamId, cancellationToken);
+        if (TryResolveBoundSteamId(steamId, out var boundSteamId) is { } denied)
+        {
+            return denied;
+        }
+
+        var player = await _playersService.GetPlayerAsync(boundSteamId, cancellationToken);
         return player is null ? NotFound() : Ok(player);
     }
 }

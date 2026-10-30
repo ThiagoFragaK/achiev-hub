@@ -21,20 +21,25 @@ using achiev_hub.Server.Domain.Entities;
 using achiev_hub.Server.Domain.Interfaces;
 using achiev_hub.Server.Infrastructure.Auth;
 using achiev_hub.Server.Infrastructure.Email;
+using achiev_hub.Server.Infrastructure.Options;
 using achiev_hub.Server.Infrastructure.HealthChecks;
 using achiev_hub.Server.Infrastructure.HealthChecks.Interfaces;
 using achiev_hub.Server.Infrastructure.Messaging;
 using achiev_hub.Server.Infrastructure.Messaging.Interfaces;
-using achiev_hub.Server.Infrastructure.Options;
 using achiev_hub.Server.Infrastructure.Persistence;
 using achiev_hub.Server.Infrastructure.Startup;
 using achiev_hub.Server.Infrastructure.Startup.Interfaces;
+using achiev_hub.Server.Infrastructure.Security;
 using achiev_hub.Server.Infrastructure.Steam;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+SecurityConfiguration.Validate(builder.Configuration, builder.Environment);
 
 if (builder.Environment.IsDevelopment())
 {
@@ -45,12 +50,14 @@ if (builder.Environment.IsDevelopment())
 }
 
 builder.Services.Configure<SteamApiOptions>(builder.Configuration.GetSection(SteamApiOptions.SectionName));
+builder.Services.Configure<SteamOpenIdOptions>(builder.Configuration.GetSection(SteamOpenIdOptions.SectionName));
 builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection(SendGridOptions.SectionName));
 builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection(RabbitMqOptions.SectionName));
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<StartupHealthCheckOptions>(builder.Configuration.GetSection(StartupHealthCheckOptions.SectionName));
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddHttpClient<ISteamApiClient, SteamApiClient>();
+builder.Services.AddHttpClient<SteamOpenIdValidator>();
 builder.Services.AddSingleton<IRabbitMqConnectionFactory, RabbitMqConnectionFactory>();
 builder.Services.AddSingleton<ISteamSyncClient, SteamSyncClient>();
 
@@ -101,6 +108,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
         options.Events = new JwtBearerEvents
         {
+            OnMessageReceived = context =>
+            {
+                // Prefer Authorization header when present; otherwise read HttpOnly auth cookie.
+                if (string.IsNullOrEmpty(context.Token))
+                {
+                    context.Token = AuthCookie.Read(context.Request);
+                }
+
+                return Task.CompletedTask;
+            },
             OnTokenValidated = async context =>
             {
                 var isGuest = context.Principal?.IsInRole(JwtTokenService.GuestRole) == true
@@ -131,6 +148,22 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("auth", limiter =>
+    {
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.PermitLimit = 30;
+        limiter.QueueLimit = 0;
+    });
+    options.AddFixedWindowLimiter("steam", limiter =>
+    {
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.PermitLimit = 60;
+        limiter.QueueLimit = 0;
+    });
+});
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
@@ -148,7 +181,7 @@ try
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await DbSeeder.SeedAsync(db);
+    await DbSeeder.SeedAsync(db, app.Environment);
 }
 catch (Exception ex) when (ex is Npgsql.NpgsqlException or InvalidOperationException)
 {
@@ -166,8 +199,14 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+else
+{
+    app.UseHsts();
+}
 
 app.UseHttpsRedirection();
+app.UseSecurityHeaders();
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -177,3 +216,5 @@ app.MapControllers();
 app.MapFallbackToFile("/index.html");
 
 app.Run();
+
+public partial class Program;

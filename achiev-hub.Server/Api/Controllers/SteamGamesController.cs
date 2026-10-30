@@ -1,29 +1,20 @@
 using System.Security.Claims;
+using achiev_hub.Server.Application.Achievements;
 using achiev_hub.Server.Application.Games;
 using achiev_hub.Server.Application.Games.Interfaces;
-using achiev_hub.Server.Application.Achievements;
-using achiev_hub.Server.Application.Achievements.Interfaces;
 using achiev_hub.Server.Application.Steam;
 using achiev_hub.Server.Application.Steam.Interfaces;
-using achiev_hub.Server.Application.Stats;
-using achiev_hub.Server.Application.Stats.Interfaces;
-using achiev_hub.Server.Application.Users;
-using achiev_hub.Server.Application.Users.Interfaces;
-using achiev_hub.Server.Application.Goals;
-using achiev_hub.Server.Application.Goals.Interfaces;
-using achiev_hub.Server.Application.Auth;
-using achiev_hub.Server.Application.Auth.Interfaces;
 using achiev_hub.Server.Application.Common;
-using achiev_hub.Server.Application.Common.Interfaces;
-using achiev_hub.Server.Infrastructure.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace achiev_hub.Server.Api.Controllers;
 
 [Authorize]
 [ApiController]
 [Route("api/steam/games")]
+[EnableRateLimiting("steam")]
 public class SteamGamesController : ApiControllerBase
 {
     private readonly IGamesService _gamesService;
@@ -37,18 +28,23 @@ public class SteamGamesController : ApiControllerBase
 
     [HttpGet("recent")]
     public async Task<ActionResult<PagedResultDto<RecentGameDto>>> GetRecentGames(
-        [FromQuery] string steamId,
+        [FromQuery] string? steamId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 7,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(steamId))
+        if (ForbidGuests() is { } guestDenied)
         {
-            return BadRequest("steamId is required.");
+            return guestDenied;
+        }
+
+        if (TryResolveBoundSteamId(steamId, out var boundSteamId) is { } denied)
+        {
+            return denied;
         }
 
         var result = await _gamesService.GetRecentGamesAsync(
-            steamId,
+            boundSteamId,
             page,
             pageSize,
             cancellationToken: cancellationToken);
@@ -83,7 +79,7 @@ public class SteamGamesController : ApiControllerBase
 
     [HttpGet]
     public async Task<ActionResult<PagedResultDto<LibraryGameDto>>> GetLibrary(
-        [FromQuery] string steamId,
+        [FromQuery] string? steamId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
         [FromQuery] string? name = null,
@@ -92,9 +88,14 @@ public class SteamGamesController : ApiControllerBase
         [FromQuery] string? sort = null,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(steamId))
+        if (ForbidGuests() is { } guestDenied)
         {
-            return BadRequest("steamId is required.");
+            return guestDenied;
+        }
+
+        if (TryResolveBoundSteamId(steamId, out var boundSteamId) is { } denied)
+        {
+            return denied;
         }
 
         var filters = new LibraryGameFilterDto
@@ -106,7 +107,7 @@ public class SteamGamesController : ApiControllerBase
         };
 
         var result = await _gamesService.GetLibraryAsync(
-            steamId,
+            boundSteamId,
             page,
             pageSize,
             ResolveUserIdForDbReads(),
@@ -125,7 +126,7 @@ public class SteamGamesController : ApiControllerBase
     [HttpGet("{appId:int}/achievements")]
     public async Task<ActionResult<PagedResultDto<AchievementDto>>> GetAchievements(
         int appId,
-        [FromQuery] string steamId,
+        [FromQuery] string? steamId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 25,
         [FromQuery] string? name = null,
@@ -134,15 +135,20 @@ public class SteamGamesController : ApiControllerBase
         [FromQuery] string? global = null,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(steamId))
+        if (ForbidGuests() is { } guestDenied)
         {
-            return BadRequest("steamId is required.");
+            return guestDenied;
+        }
+
+        if (TryResolveBoundSteamId(steamId, out var boundSteamId) is { } denied)
+        {
+            return denied;
         }
 
         try
         {
             var result = await _gamesService.GetAchievementsAsync(
-                steamId,
+                boundSteamId,
                 appId,
                 page,
                 pageSize,

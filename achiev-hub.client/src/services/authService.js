@@ -23,42 +23,26 @@ async function attachSteamProfile(user) {
 export async function login(steamId, password) {
     const response = await postJson('/api/login', { steamId, password })
     const data = response?.data
-    if (!data?.accessToken) {
+    if (!data?.user) {
         throw new Error(response?.message || 'Login failed')
     }
 
-    setSession({
-        accessToken: data.accessToken,
-        user: data.user
-    })
-
+    setSession({ user: data.user })
     const user = await attachSteamProfile(data.user)
-    setSession({
-        accessToken: data.accessToken,
-        user
-    })
-
+    setSession({ user })
     return { ...data, user }
 }
 
 export async function continueAsGuest(steamId) {
     const response = await postJson('/api/guest', { steamId })
     const data = response?.data
-    if (!data?.accessToken) {
+    if (!data?.user) {
         throw new Error(response?.message || 'Guest session failed')
     }
 
-    setSession({
-        accessToken: data.accessToken,
-        user: data.user
-    })
-
+    setSession({ user: data.user })
     const user = await attachSteamProfile(data.user)
-    setSession({
-        accessToken: data.accessToken,
-        user
-    })
-
+    setSession({ user })
     return { ...data, user }
 }
 
@@ -89,4 +73,21 @@ export async function logout() {
     } finally {
         clearSession()
     }
+}
+
+export function beginSteamOpenIdLogin() {
+    window.location.assign('/api/auth/steam')
+}
+
+export async function exchangeSteamOpenIdCode(code) {
+    const response = await postJson('/api/auth/steam/exchange', { code })
+    const data = response?.data
+    if (!data?.user) {
+        throw new Error(response?.message || 'Steam login failed')
+    }
+
+    setSession({ user: data.user })
+    const user = await attachSteamProfile(data.user)
+    setSession({ user })
+    return { ...data, user }
 }
