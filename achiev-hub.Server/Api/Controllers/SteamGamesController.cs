@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using achiev_hub.Server.Application.Achievements;
 using achiev_hub.Server.Application.Games;
 using achiev_hub.Server.Application.Games.Interfaces;
 using achiev_hub.Server.Application.Steam;
