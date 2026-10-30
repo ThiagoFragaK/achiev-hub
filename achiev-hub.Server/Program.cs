@@ -29,12 +29,15 @@ using achiev_hub.Server.Infrastructure.Options;
 using achiev_hub.Server.Infrastructure.Persistence;
 using achiev_hub.Server.Infrastructure.Startup;
 using achiev_hub.Server.Infrastructure.Startup.Interfaces;
+using achiev_hub.Server.Infrastructure.Security;
 using achiev_hub.Server.Infrastructure.Steam;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+
+SecurityConfiguration.Validate(builder.Configuration, builder.Environment);
 
 if (builder.Environment.IsDevelopment())
 {
@@ -177,3 +180,5 @@ app.MapControllers();
 app.MapFallbackToFile("/index.html");
 
 app.Run();
+
+public partial class Program;
