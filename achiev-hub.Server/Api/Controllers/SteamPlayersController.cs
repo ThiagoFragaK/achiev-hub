@@ -2,12 +2,14 @@ using achiev_hub.Server.Application.Steam;
 using achiev_hub.Server.Application.Steam.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace achiev_hub.Server.Api.Controllers;
 
 [Authorize]
 [ApiController]
 [Route("api/steam/players")]
+[EnableRateLimiting("steam")]
 public class SteamPlayersController : ApiControllerBase
 {
     private readonly IPlayersService _playersService;

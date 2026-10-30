@@ -7,12 +7,14 @@ using achiev_hub.Server.Application.Steam.Interfaces;
 using achiev_hub.Server.Application.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace achiev_hub.Server.Api.Controllers;
 
 [Authorize]
 [ApiController]
 [Route("api/steam/games")]
+[EnableRateLimiting("steam")]
 public class SteamGamesController : ApiControllerBase
 {
     private readonly IGamesService _gamesService;

@@ -31,7 +31,9 @@ using achiev_hub.Server.Infrastructure.Startup;
 using achiev_hub.Server.Infrastructure.Startup.Interfaces;
 using achiev_hub.Server.Infrastructure.Security;
 using achiev_hub.Server.Infrastructure.Steam;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -146,6 +148,22 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("auth", limiter =>
+    {
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.PermitLimit = 30;
+        limiter.QueueLimit = 0;
+    });
+    options.AddFixedWindowLimiter("steam", limiter =>
+    {
+        limiter.Window = TimeSpan.FromMinutes(1);
+        limiter.PermitLimit = 60;
+        limiter.QueueLimit = 0;
+    });
+});
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
@@ -163,7 +181,7 @@ try
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await DbSeeder.SeedAsync(db);
+    await DbSeeder.SeedAsync(db, app.Environment);
 }
 catch (Exception ex) when (ex is Npgsql.NpgsqlException or InvalidOperationException)
 {
@@ -181,8 +199,14 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+else
+{
+    app.UseHsts();
+}
 
 app.UseHttpsRedirection();
+app.UseSecurityHeaders();
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();

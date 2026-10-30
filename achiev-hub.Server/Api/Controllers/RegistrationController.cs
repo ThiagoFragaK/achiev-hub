@@ -1,14 +1,16 @@
 using achiev_hub.Server.Application.Auth;
 using achiev_hub.Server.Application.Auth.Interfaces;
 using achiev_hub.Server.Application.Steam.Interfaces;
+using achiev_hub.Server.Infrastructure.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace achiev_hub.Server.Api.Controllers;
 
 [ApiController]
-[AllowAnonymous]
 [Route("api/register")]
+[EnableRateLimiting("auth")]
 public class RegistrationController : ControllerBase
 {
     private readonly IRegistrationService _service;
@@ -20,6 +22,7 @@ public class RegistrationController : ControllerBase
         _syncStatusService = syncStatusService;
     }
 
+    [AllowAnonymous]
     [HttpPost("validate-steam")]
     public async Task<IActionResult> ValidateSteam(
         [FromBody] ValidateSteamRequest request,
@@ -34,25 +37,34 @@ public class RegistrationController : ControllerBase
         return Ok(result);
     }
 
+    [Authorize]
     [HttpGet("status")]
     public async Task<IActionResult> GetProvisioningStatus(
-        [FromQuery] string steamId,
+        [FromQuery] string? steamId,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(steamId))
+        if (AccessControl.IsGuest(User))
         {
-            return UnprocessableEntity(new { message = "steamId is required" });
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Guests cannot query provisioning status." });
         }
 
-        var status = await _syncStatusService.GetProvisioningStatusBySteamIdAsync(steamId, cancellationToken);
+        var claimSteamId = AccessControl.TryGetSteamId(User);
+        if (!SteamIdBinder.TryResolve(claimSteamId, steamId, out var boundSteamId, out var bindError))
+        {
+            return BadRequest(new { message = bindError });
+        }
+
+        var status = await _syncStatusService.GetProvisioningStatusBySteamIdAsync(boundSteamId, cancellationToken);
         if (status is null)
         {
-            return NotFound(new { message = "User not found" });
+            // Uniform response — do not reveal whether another SteamId exists.
+            return Ok(new { status = "unknown", message = "No provisioning data for this account." });
         }
 
         return Ok(status);
     }
 
+    [AllowAnonymous]
     [HttpPost("send-verification")]
     public async Task<IActionResult> SendVerification(
         [FromBody] SendVerificationRequest request,
@@ -74,6 +86,7 @@ public class RegistrationController : ControllerBase
         }
     }
 
+    [AllowAnonymous]
     [HttpPost("confirm-code")]
     public async Task<IActionResult> ConfirmCode(
         [FromBody] ConfirmCodeRequest request,
@@ -93,6 +106,7 @@ public class RegistrationController : ControllerBase
         });
     }
 
+    [AllowAnonymous]
     [HttpPost]
     public async Task<IActionResult> Register(
         [FromBody] RegisterRequest request,
