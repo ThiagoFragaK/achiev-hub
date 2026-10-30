@@ -1,19 +1,5 @@
 using achiev_hub.Server.Application.Users;
 using achiev_hub.Server.Application.Users.Interfaces;
-using achiev_hub.Server.Application.Games;
-using achiev_hub.Server.Application.Games.Interfaces;
-using achiev_hub.Server.Application.Achievements;
-using achiev_hub.Server.Application.Achievements.Interfaces;
-using achiev_hub.Server.Application.Goals;
-using achiev_hub.Server.Application.Goals.Interfaces;
-using achiev_hub.Server.Application.Auth;
-using achiev_hub.Server.Application.Auth.Interfaces;
-using achiev_hub.Server.Application.Steam;
-using achiev_hub.Server.Application.Steam.Interfaces;
-using achiev_hub.Server.Application.Stats;
-using achiev_hub.Server.Application.Stats.Interfaces;
-using achiev_hub.Server.Application.Common;
-using achiev_hub.Server.Application.Common.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -31,6 +17,7 @@ public class UsersGamesController : ApiControllerBase
         _usersGames = usersGames;
     }
 
+    [Authorize(Roles = "admin")]
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<UsersGameDto>>> GetAll(CancellationToken cancellationToken)
     {
@@ -42,7 +29,13 @@ public class UsersGamesController : ApiControllerBase
     {
         try
         {
-            return Ok(await _usersGames.GetByIdAsync(id, cancellationToken));
+            var item = await _usersGames.GetByIdAsync(id, cancellationToken);
+            if (ForbidUnlessSelfOrAdmin(item.UserId) is { } denied)
+            {
+                return denied;
+            }
+
+            return Ok(item);
         }
         catch (Exception ex)
         {
@@ -53,6 +46,16 @@ public class UsersGamesController : ApiControllerBase
     [HttpPost]
     public async Task<ActionResult<UsersGameDto>> Create(CreateUsersGameRequest request, CancellationToken cancellationToken)
     {
+        if (ResolveUserId() is not int userId)
+        {
+            return Unauthorized();
+        }
+
+        if (!IsAdmin())
+        {
+            request.UserId = userId;
+        }
+
         try
         {
             var created = await _usersGames.CreateAsync(request, cancellationToken);
@@ -69,6 +72,17 @@ public class UsersGamesController : ApiControllerBase
     {
         try
         {
+            var existing = await _usersGames.GetByIdAsync(id, cancellationToken);
+            if (ForbidUnlessSelfOrAdmin(existing.UserId) is { } denied)
+            {
+                return denied;
+            }
+
+            if (!IsAdmin())
+            {
+                request.UserId = existing.UserId;
+            }
+
             return Ok(await _usersGames.UpdateAsync(id, request, cancellationToken));
         }
         catch (Exception ex)
@@ -82,6 +96,12 @@ public class UsersGamesController : ApiControllerBase
     {
         try
         {
+            var existing = await _usersGames.GetByIdAsync(id, cancellationToken);
+            if (ForbidUnlessSelfOrAdmin(existing.UserId) is { } denied)
+            {
+                return denied;
+            }
+
             await _usersGames.DeleteAsync(id, cancellationToken);
             return NoContent();
         }

@@ -1,19 +1,5 @@
-using achiev_hub.Server.Application.Users;
-using achiev_hub.Server.Application.Users.Interfaces;
-using achiev_hub.Server.Application.Games;
-using achiev_hub.Server.Application.Games.Interfaces;
 using achiev_hub.Server.Application.Achievements;
 using achiev_hub.Server.Application.Achievements.Interfaces;
-using achiev_hub.Server.Application.Goals;
-using achiev_hub.Server.Application.Goals.Interfaces;
-using achiev_hub.Server.Application.Auth;
-using achiev_hub.Server.Application.Auth.Interfaces;
-using achiev_hub.Server.Application.Steam;
-using achiev_hub.Server.Application.Steam.Interfaces;
-using achiev_hub.Server.Application.Stats;
-using achiev_hub.Server.Application.Stats.Interfaces;
-using achiev_hub.Server.Application.Common;
-using achiev_hub.Server.Application.Common.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -50,6 +36,7 @@ public class AchievementsController : ApiControllerBase
         }
     }
 
+    [Authorize(Roles = "admin")]
     [HttpPost]
     public async Task<ActionResult<AchievementRecordDto>> Create(CreateAchievementRequest request, CancellationToken cancellationToken)
     {
@@ -64,6 +51,7 @@ public class AchievementsController : ApiControllerBase
         }
     }
 
+    [Authorize(Roles = "admin")]
     [HttpPut("{id:int}")]
     public async Task<ActionResult<AchievementRecordDto>> Update(int id, UpdateAchievementRequest request, CancellationToken cancellationToken)
     {
@@ -77,6 +65,7 @@ public class AchievementsController : ApiControllerBase
         }
     }
 
+    [Authorize(Roles = "admin")]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
