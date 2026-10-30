@@ -1,77 +1,79 @@
 <template>
     <div>
-        <div v-if="error" class="alert alert-danger" role="alert">{{ error }}</div>
-        <TableComponent
-            :data="table.data"
-            :columns="table.columns"
-            :isLoading="table.isLoading"
-        >
-            <template #cell-game="{ data }">
-                <div class="d-flex align-items-center gap-2">
-                    <img
-                        v-if="data.row.gameIcon"
-                        :src="data.row.gameIcon"
-                        :alt="data.row.gameName"
-                        width="32"
-                        height="32"
-                        class="rounded"
-                    />
-                    <RouterLink
-                        :to="{ name: 'game-detail', params: { id: data.row.appId } }"
-                        class="fw-medium"
-                    >
-                        {{ data.row.gameName }}
-                    </RouterLink>
-                </div>
-            </template>
-            <template #cell-achievements="{ data }">
-                <div class="mt-2 me-2 d-inline-block">
-                    {{ data.row.achievementsMissing }}
-                    <span v-if="data.row.achievementsTotal > 0" class="text-secondary">
-                        / {{ data.row.achievementsTotal }}
-                    </span>
-                </div>
-                <button
-                    type="button"
-                    class="btn btn-sm btn-outline-warning"
-                    aria-label="Edit goal achievements"
-                    @click="openAchievementsModal(data.row)"
-                >
-                    Show
-                </button>
-            </template>
-            <template #cell-status="{ data }">
-                <span class="badge" :class="statusBadgeClass(data.row.status)">
-                    {{ statusLabel(data.row.status) }}
-                </span>
-            </template>
-            <template #cell-endGoal="{ data }">
-                {{ formatPercentage(data.row.percentageGoal) }}
-            </template>
-            <template #cell-actions="{ data }">
-                <div v-if="isActive(data.row.status)" class="d-flex justify-content-center gap-1">
+        <TabsComponent v-model="statusFilter" :tabs="statusTabs">
+            <div v-if="error" class="alert alert-danger" role="alert">{{ error }}</div>
+            <TableComponent
+                :data="table.data"
+                :columns="table.columns"
+                :isLoading="table.isLoading"
+            >
+                <template #cell-game="{ data }">
+                    <div class="d-flex align-items-center gap-2">
+                        <img
+                            v-if="data.row.gameIcon"
+                            :src="data.row.gameIcon"
+                            :alt="data.row.gameName"
+                            width="32"
+                            height="32"
+                            class="rounded"
+                        />
+                        <RouterLink
+                            :to="{ name: 'game-detail', params: { id: data.row.appId } }"
+                            class="fw-medium"
+                        >
+                            {{ data.row.gameName }}
+                        </RouterLink>
+                    </div>
+                </template>
+                <template #cell-achievements="{ data }">
+                    <div class="mt-2 me-2 d-inline-block">
+                        {{ data.row.achievementsMissing }}
+                        <span v-if="data.row.achievementsTotal > 0" class="text-secondary">
+                            / {{ data.row.achievementsTotal }}
+                        </span>
+                    </div>
                     <button
                         type="button"
                         class="btn btn-sm btn-outline-warning"
-                        :disabled="actionLoadingId === data.row.id"
-                        @click="onAbandon(data.row)"
+                        aria-label="Edit goal achievements"
+                        @click="openAchievementsModal(data.row)"
                     >
-                        Abandon
+                        Show
                     </button>
-                </div>
-                <div v-else-if="isAbandoned(data.row.status)" class="d-flex justify-content-center gap-1">
-                    <button
-                        type="button"
-                        class="btn btn-sm btn-outline-info"
-                        :disabled="actionLoadingId === data.row.id"
-                        @click="onReopen(data.row)"
-                    >
-                        Reopen
-                    </button>
-                </div>
-                <span v-else class="text-secondary">—</span>
-            </template>
-        </TableComponent>
+                </template>
+                <template #cell-status="{ data }">
+                    <span class="badge" :class="statusBadgeClass(data.row.status)">
+                        {{ statusLabel(data.row.status) }}
+                    </span>
+                </template>
+                <template #cell-endGoal="{ data }">
+                    {{ formatPercentage(data.row.percentageGoal) }}
+                </template>
+                <template #cell-actions="{ data }">
+                    <div v-if="isActive(data.row.status)" class="d-flex justify-content-center gap-1">
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-warning"
+                            :disabled="actionLoadingId === data.row.id"
+                            @click="onAbandon(data.row)"
+                        >
+                            Abandon
+                        </button>
+                    </div>
+                    <div v-else-if="isAbandoned(data.row.status)" class="d-flex justify-content-center gap-1">
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-info"
+                            :disabled="actionLoadingId === data.row.id"
+                            @click="onReopen(data.row)"
+                        >
+                            Reopen
+                        </button>
+                    </div>
+                    <span v-else class="text-secondary">—</span>
+                </template>
+            </TableComponent>
+        </TabsComponent>
 
         <GoalAchievementsModal
             ref="achievementsModal"
@@ -108,6 +110,7 @@
 
 <script>
 import TableComponent from '@/components/global/TableComponent.vue'
+import TabsComponent from '@/components/global/TabsComponent.vue'
 import ConfirmModal from '@/components/global/ConfirmModal.vue'
 import GoalAchievementsModal from '@/components/goals/modals/GoalAchievementsModal.vue'
 import { abandonGoal, getGoals, reopenGoal } from '@/services/goalsService'
@@ -119,16 +122,29 @@ const STATUS = {
     Abandoned: 2
 }
 
+const STATUS_BY_FILTER = {
+    active: STATUS.Active,
+    completed: STATUS.Completed,
+    abandoned: STATUS.Abandoned
+}
+
 export default {
     name: 'GoalsTable',
     components: {
         TableComponent,
+        TabsComponent,
         ConfirmModal,
         GoalAchievementsModal
     },
     data() {
         return {
             error: '',
+            statusFilter: 'active',
+            statusTabs: [
+                { name: 'active', label: 'Active' },
+                { name: 'completed', label: 'Completed' },
+                { name: 'abandoned', label: 'Abandoned' }
+            ],
             actionLoadingId: null,
             actionKind: null,
             pendingAbandonRow: null,
@@ -160,6 +176,11 @@ export default {
                 : 'Reopen this abandoned goal?'
         }
     },
+    watch: {
+        statusFilter() {
+            this.load()
+        }
+    },
     async created() {
         await this.load()
     },
@@ -185,7 +206,8 @@ export default {
             this.table.isLoading = true
             this.error = ''
             try {
-                this.table.data = await getGoals() || []
+                const status = STATUS_BY_FILTER[this.statusFilter]
+                this.table.data = await getGoals(status) || []
             } catch (err) {
                 this.table.data = []
                 this.error = err?.message || 'Failed to load goals.'
