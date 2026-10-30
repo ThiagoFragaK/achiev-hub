@@ -90,3 +90,28 @@ export async function logout() {
         clearSession()
     }
 }
+
+export function beginSteamOpenIdLogin() {
+    window.location.assign('/api/auth/steam')
+}
+
+export async function exchangeSteamOpenIdCode(code) {
+    const response = await postJson('/api/auth/steam/exchange', { code })
+    const data = response?.data
+    if (!data?.accessToken) {
+        throw new Error(response?.message || 'Steam login failed')
+    }
+
+    setSession({
+        accessToken: data.accessToken,
+        user: data.user
+    })
+
+    const user = await attachSteamProfile(data.user)
+    setSession({
+        accessToken: data.accessToken,
+        user
+    })
+
+    return { ...data, user }
+}

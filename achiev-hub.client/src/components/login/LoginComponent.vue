@@ -61,6 +61,14 @@
                     <button type="submit" class="btn btn-primary btn-lg" :disabled="loading">
                         {{ loading ? 'Logging in…' : 'Login' }}
                     </button>
+                    <button
+                        type="button"
+                        class="btn btn-dark btn-lg mt-2"
+                        :disabled="loading"
+                        @click="onSteamLogin"
+                    >
+                        Sign in with Steam
+                    </button>
                     <div class="row g-2 mt-2">
                         <div class="col-6">
                             <button
@@ -96,7 +104,12 @@
 </template>
 
 <script>
-import { continueAsGuest, login } from '@/services/authService'
+import {
+    beginSteamOpenIdLogin,
+    continueAsGuest,
+    exchangeSteamOpenIdCode,
+    login
+} from '@/services/authService'
 
 export default {
     name: 'LoginComponent',
@@ -110,17 +123,34 @@ export default {
             loading: false
         }
     },
-    mounted() {
+    async mounted() {
         if (this.$route.query.ready === '1') {
             this.readyMessage = 'Your library is ready. You can log in now.'
         }
         if (typeof this.$route.query.steamId === 'string') {
             this.steamId = this.$route.query.steamId
         }
+        if (typeof this.$route.query.steam_error === 'string') {
+            this.loginError = this.$route.query.steam_error
+        }
+        if (typeof this.$route.query.steam_code === 'string') {
+            this.loading = true
+            try {
+                await exchangeSteamOpenIdCode(this.$route.query.steam_code)
+                this.redirectAfterLogin()
+            } catch (error) {
+                this.loginError = error.body?.message || error.message || 'Steam login failed'
+            } finally {
+                this.loading = false
+            }
+        }
     },
     methods: {
         onRegister() {
             this.$router.push('/register')
+        },
+        onSteamLogin() {
+            beginSteamOpenIdLogin()
         },
         redirectAfterLogin() {
             const redirect =
