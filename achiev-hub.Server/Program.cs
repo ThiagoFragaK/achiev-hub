@@ -106,6 +106,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
         options.Events = new JwtBearerEvents
         {
+            OnMessageReceived = context =>
+            {
+                // Prefer Authorization header when present; otherwise read HttpOnly auth cookie.
+                if (string.IsNullOrEmpty(context.Token))
+                {
+                    context.Token = AuthCookie.Read(context.Request);
+                }
+
+                return Task.CompletedTask;
+            },
             OnTokenValidated = async context =>
             {
                 var isGuest = context.Principal?.IsInRole(JwtTokenService.GuestRole) == true

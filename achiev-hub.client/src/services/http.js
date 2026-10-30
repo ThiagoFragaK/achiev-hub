@@ -1,4 +1,4 @@
-import { clearSession, getToken } from '@/lib/session'
+import { clearSession } from '@/lib/session'
 import router from '@/router'
 
 export class HttpError extends Error {
@@ -16,14 +16,19 @@ async function request(url, options = {}) {
         headers.set('Content-Type', 'application/json')
     }
 
-    const token = getToken()
-    if (token) {
-        headers.set('Authorization', `Bearer ${token}`)
-    }
+    const response = await fetch(url, {
+        ...options,
+        headers,
+        credentials: 'same-origin'
+    })
 
-    const response = await fetch(url, { ...options, headers })
-
-    if (response.status === 401 && !url.includes('/api/login') && !url.includes('/api/guest') && !url.includes('/api/register')) {
+    if (
+        response.status === 401 &&
+        !url.includes('/api/login') &&
+        !url.includes('/api/guest') &&
+        !url.includes('/api/register') &&
+        !url.includes('/api/auth/steam/exchange')
+    ) {
         clearSession()
         if (router.currentRoute.value.name !== 'login') {
             router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
@@ -39,11 +44,7 @@ async function request(url, options = {}) {
             body = text
         }
 
-        throw new HttpError(
-            readErrorMessage(body, response.status),
-            response.status,
-            body
-        )
+        throw new HttpError(readErrorMessage(body, response.status), response.status, body)
     }
 
     if (response.status === 204) {

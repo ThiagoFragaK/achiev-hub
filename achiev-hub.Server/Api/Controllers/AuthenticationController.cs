@@ -1,23 +1,10 @@
 using System.Security.Claims;
 using achiev_hub.Server.Application.Auth;
 using achiev_hub.Server.Application.Auth.Interfaces;
-using achiev_hub.Server.Application.Users;
-using achiev_hub.Server.Application.Users.Interfaces;
-using achiev_hub.Server.Application.Games;
-using achiev_hub.Server.Application.Games.Interfaces;
-using achiev_hub.Server.Application.Achievements;
-using achiev_hub.Server.Application.Achievements.Interfaces;
-using achiev_hub.Server.Application.Goals;
-using achiev_hub.Server.Application.Goals.Interfaces;
-using achiev_hub.Server.Application.Steam;
-using achiev_hub.Server.Application.Steam.Interfaces;
-using achiev_hub.Server.Application.Stats;
-using achiev_hub.Server.Application.Stats.Interfaces;
-using achiev_hub.Server.Application.Common;
-using achiev_hub.Server.Application.Common.Interfaces;
 using achiev_hub.Server.Infrastructure.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 namespace achiev_hub.Server.Api.Controllers;
 
@@ -26,10 +13,12 @@ namespace achiev_hub.Server.Api.Controllers;
 public class AuthenticationController : ControllerBase
 {
     private readonly IAuthenticationService _service;
+    private readonly JwtSettings _jwtSettings;
 
-    public AuthenticationController(IAuthenticationService service)
+    public AuthenticationController(IAuthenticationService service, IOptions<JwtSettings> jwtSettings)
     {
         _service = service;
+        _jwtSettings = jwtSettings.Value;
     }
 
     [AllowAnonymous]
@@ -47,12 +36,7 @@ public class AuthenticationController : ControllerBase
             return StatusCode(error.HttpStatus, new { message = error.Message });
         }
 
-        return Ok(new
-        {
-            success = true,
-            message = "Login successful",
-            data = response
-        });
+        return Ok(IssueSession((LoginResponseDto)response));
     }
 
     [AllowAnonymous]
@@ -65,12 +49,7 @@ public class AuthenticationController : ControllerBase
         }
 
         var response = _service.ContinueAsGuest(request.SteamId);
-        return Ok(new
-        {
-            success = true,
-            message = "Guest session created",
-            data = response
-        });
+        return Ok(IssueSession((LoginResponseDto)response));
     }
 
     [Authorize]
@@ -79,18 +58,35 @@ public class AuthenticationController : ControllerBase
     {
         var isGuest = User.IsInRole(JwtTokenService.GuestRole)
             || User.FindFirstValue(JwtTokenService.TokenKindClaim) == JwtTokenService.GuestTokenKind;
-        if (isGuest)
+        if (!isGuest)
         {
-            return Ok(new { success = true, message = "Logged out successfully" });
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized(new { message = "Invalid token" });
+            }
+
+            await _service.LogoutAsync(userId, cancellationToken);
         }
 
-        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!int.TryParse(userIdClaim, out var userId))
-        {
-            return Unauthorized(new { message = "Invalid token" });
-        }
-
-        await _service.LogoutAsync(userId, cancellationToken);
+        AuthCookie.Delete(Response, Request);
         return Ok(new { success = true, message = "Logged out successfully" });
+    }
+
+    private object IssueSession(LoginResponseDto login)
+    {
+        AuthCookie.Append(Response, Request, login.AccessToken, _jwtSettings.ExpiryMinutes);
+        // Do not return the raw JWT to JavaScript — cookie is the session credential.
+        return new
+        {
+            success = true,
+            message = "Login successful",
+            data = new
+            {
+                accessToken = (string?)null,
+                tokenType = "Cookie",
+                user = login.User
+            }
+        };
     }
 }

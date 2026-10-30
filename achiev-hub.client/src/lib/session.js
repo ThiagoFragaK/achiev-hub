@@ -1,6 +1,5 @@
 import { reactive } from 'vue'
 
-const TOKEN_KEY = 'achiev-hub-token'
 const USER_KEY = 'achiev-hub-user'
 
 function readStoredUser() {
@@ -14,7 +13,6 @@ function readStoredUser() {
 }
 
 const state = reactive({
-    token: localStorage.getItem(TOKEN_KEY),
     user: readStoredUser()
 })
 
@@ -22,8 +20,9 @@ export function useSession() {
     return state
 }
 
+/** @deprecated Token lives in an HttpOnly cookie; kept for API compatibility. */
 export function getToken() {
-    return state.token || localStorage.getItem(TOKEN_KEY)
+    return null
 }
 
 export function getUser() {
@@ -31,16 +30,12 @@ export function getUser() {
 }
 
 export function isAuthenticated() {
-    return !!getToken()
+    return !!getUser()
 }
 
 export function setSession({ accessToken, user }) {
-    state.token = accessToken || null
-    if (accessToken) {
-        localStorage.setItem(TOKEN_KEY, accessToken)
-    } else {
-        localStorage.removeItem(TOKEN_KEY)
-    }
+    // accessToken is intentionally ignored — auth uses HttpOnly cookie only.
+    void accessToken
 
     if (user) {
         state.user = user
@@ -56,9 +51,8 @@ export function mergeUser(partial) {
 }
 
 export function clearSession() {
-    state.token = null
     state.user = null
-    localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
+    localStorage.removeItem('achiev-hub-token')
     localStorage.removeItem('achiev-hub-session')
 }
