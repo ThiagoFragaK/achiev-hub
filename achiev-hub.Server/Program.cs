@@ -21,11 +21,11 @@ using achiev_hub.Server.Domain.Entities;
 using achiev_hub.Server.Domain.Interfaces;
 using achiev_hub.Server.Infrastructure.Auth;
 using achiev_hub.Server.Infrastructure.Email;
+using achiev_hub.Server.Infrastructure.Options;
 using achiev_hub.Server.Infrastructure.HealthChecks;
 using achiev_hub.Server.Infrastructure.HealthChecks.Interfaces;
 using achiev_hub.Server.Infrastructure.Messaging;
 using achiev_hub.Server.Infrastructure.Messaging.Interfaces;
-using achiev_hub.Server.Infrastructure.Options;
 using achiev_hub.Server.Infrastructure.Persistence;
 using achiev_hub.Server.Infrastructure.Startup;
 using achiev_hub.Server.Infrastructure.Startup.Interfaces;
@@ -48,12 +48,14 @@ if (builder.Environment.IsDevelopment())
 }
 
 builder.Services.Configure<SteamApiOptions>(builder.Configuration.GetSection(SteamApiOptions.SectionName));
+builder.Services.Configure<SteamOpenIdOptions>(builder.Configuration.GetSection(SteamOpenIdOptions.SectionName));
 builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection(SendGridOptions.SectionName));
 builder.Services.Configure<RabbitMqOptions>(builder.Configuration.GetSection(RabbitMqOptions.SectionName));
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.Configure<StartupHealthCheckOptions>(builder.Configuration.GetSection(StartupHealthCheckOptions.SectionName));
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddHttpClient<ISteamApiClient, SteamApiClient>();
+builder.Services.AddHttpClient<SteamOpenIdValidator>();
 builder.Services.AddSingleton<IRabbitMqConnectionFactory, RabbitMqConnectionFactory>();
 builder.Services.AddSingleton<ISteamSyncClient, SteamSyncClient>();
 

@@ -40,19 +40,55 @@ public class AuthenticationService : IAuthenticationService
         user.LastLogin = DateTime.UtcNow;
         await _users.SaveChangesAsync(cancellationToken);
 
-        return new LoginResponseDto
+        return ToLoginResponse(user);
+    }
+
+    public async Task<object> LoginWithVerifiedSteamIdAsync(string steamId, CancellationToken cancellationToken = default)
+    {
+        var normalizedSteamId = steamId.Trim();
+        var user = await _users.FirstOrDefaultAsync(
+            u => u.SteamId == normalizedSteamId,
+            trackChanges: true,
+            cancellationToken);
+
+        if (user is null)
         {
-            AccessToken = _jwtTokenService.GenerateToken(user),
-            TokenType = "Bearer",
-            User = new AuthUserDto
-            {
-                Id = user.Id,
-                Email = user.Email,
-                SteamId = user.SteamId,
-                Role = user.Role,
-                ShowGoals = user.ShowGoals
-            }
-        };
+            return AuthResult.Fail("No account is linked to this Steam ID. Please register first.", 404);
+        }
+
+        if (user.Status == (int)StatusEnum.Inactive)
+        {
+            return AuthResult.Fail("Account is inactive", 403);
+        }
+
+        user.LastLogin = DateTime.UtcNow;
+        await _users.SaveChangesAsync(cancellationToken);
+        return ToLoginResponse(user);
+    }
+
+    public async Task<object> LinkVerifiedSteamIdAsync(int userId, string steamId, CancellationToken cancellationToken = default)
+    {
+        var normalizedSteamId = steamId.Trim();
+        var user = await _users.GetByIdAsync(userId, cancellationToken);
+        if (user is null)
+        {
+            return AuthResult.Fail("User not found", 404);
+        }
+
+        var owner = await _users.FirstOrDefaultAsync(
+            u => u.SteamId == normalizedSteamId,
+            trackChanges: false,
+            cancellationToken);
+
+        if (owner is not null && owner.Id != userId)
+        {
+            return AuthResult.Fail("This Steam account is already linked to another user.", 409);
+        }
+
+        user.SteamId = normalizedSteamId;
+        user.TokenVersion++;
+        await _users.SaveChangesAsync(cancellationToken);
+        return ToLoginResponse(user);
     }
 
     public object ContinueAsGuest(string steamId)
@@ -82,6 +118,20 @@ public class AuthenticationService : IAuthenticationService
             await _users.SaveChangesAsync(cancellationToken);
         }
     }
+
+    private LoginResponseDto ToLoginResponse(User user) => new()
+    {
+        AccessToken = _jwtTokenService.GenerateToken(user),
+        TokenType = "Bearer",
+        User = new AuthUserDto
+        {
+            Id = user.Id,
+            Email = user.Email,
+            SteamId = user.SteamId,
+            Role = user.Role,
+            ShowGoals = user.ShowGoals
+        }
+    };
 }
 
 public static class AuthResult
