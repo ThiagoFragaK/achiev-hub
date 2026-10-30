@@ -40,7 +40,9 @@
                 role="tabpanel"
                 :aria-labelledby="`${activeTab}-tab`"
             >
-                <slot :name="activeTab" />
+                <slot :name="activeTab">
+                    <slot />
+                </slot>
             </div>
         </div>
     </div>
