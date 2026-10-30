@@ -4,12 +4,14 @@ using achiev_hub.Server.Application.Auth.Interfaces;
 using achiev_hub.Server.Infrastructure.Auth;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 
 namespace achiev_hub.Server.Api.Controllers;
 
 [ApiController]
 [Route("api")]
+[EnableRateLimiting("auth")]
 public class AuthenticationController : ControllerBase
 {
     private readonly IAuthenticationService _service;

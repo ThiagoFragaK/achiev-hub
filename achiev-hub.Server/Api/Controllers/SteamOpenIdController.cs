@@ -6,6 +6,7 @@ using achiev_hub.Server.Infrastructure.Auth;
 using achiev_hub.Server.Infrastructure.Options;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
@@ -13,6 +14,7 @@ namespace achiev_hub.Server.Api.Controllers;
 
 [ApiController]
 [Route("api/auth/steam")]
+[EnableRateLimiting("auth")]
 public class SteamOpenIdController : ControllerBase
 {
     private readonly SteamOpenIdValidator _openId;
