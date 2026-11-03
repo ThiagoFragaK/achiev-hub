@@ -1,5 +1,7 @@
 using achiev_hub.Server.Application.Auth.Interfaces;
+using achiev_hub.Server.Application.Common;
 using achiev_hub.Server.Application.Common.Interfaces;
+using achiev_hub.Server.Application.Steam.Interfaces;
 using achiev_hub.Server.Domain.Entities;
 using achiev_hub.Server.Domain.Enums;
 using achiev_hub.Server.Infrastructure.Auth;
@@ -10,13 +12,19 @@ public class AuthenticationService : IAuthenticationService
 {
     private readonly IRepository<User> _users;
     private readonly JwtTokenService _jwtTokenService;
+    private readonly ISteamSyncClient _steamSyncClient;
+    private readonly ILogger<AuthenticationService> _logger;
 
     public AuthenticationService(
         IRepository<User> users,
-        JwtTokenService jwtTokenService)
+        JwtTokenService jwtTokenService,
+        ISteamSyncClient steamSyncClient,
+        ILogger<AuthenticationService> logger)
     {
         _users = users;
         _jwtTokenService = jwtTokenService;
+        _steamSyncClient = steamSyncClient;
+        _logger = logger;
     }
 
     public async Task<object> LoginAsync(string steamId, string password, CancellationToken cancellationToken = default)
@@ -51,9 +59,39 @@ public class AuthenticationService : IAuthenticationService
             trackChanges: true,
             cancellationToken);
 
+        var created = false;
         if (user is null)
         {
-            return AuthResult.Fail("No account is linked to this Steam ID. Please register first.", 404);
+            user = new User
+            {
+                Email = $"steam_{normalizedSteamId}@steam.local",
+                SteamId = normalizedSteamId,
+                Password = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString("N")),
+                Role = "user",
+                Status = (int)StatusEnum.FirstSync,
+                IsEmailVerified = false,
+                TokenVersion = 0
+            };
+
+            await _users.AddAsync(user, cancellationToken);
+            try
+            {
+                await _users.SaveChangesAsync(cancellationToken);
+                created = true;
+            }
+            catch (ConflictException)
+            {
+                _users.Remove(user);
+                user = await _users.FirstOrDefaultAsync(
+                    u => u.SteamId == normalizedSteamId,
+                    trackChanges: true,
+                    cancellationToken);
+
+                if (user is null)
+                {
+                    return AuthResult.Fail("Unable to complete Steam login. Please try again.", 500);
+                }
+            }
         }
 
         if (user.Status == (int)StatusEnum.Inactive)
@@ -63,6 +101,19 @@ public class AuthenticationService : IAuthenticationService
 
         user.LastLogin = DateTime.UtcNow;
         await _users.SaveChangesAsync(cancellationToken);
+
+        if (created)
+        {
+            try
+            {
+                await _steamSyncClient.PublishFirstSyncAsync(user.Id, user.SteamId!, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to enqueue FirstSync for Steam-created user {UserId}", user.Id);
+            }
+        }
+
         return ToLoginResponse(user);
     }
 

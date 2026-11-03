@@ -59,7 +59,7 @@
 
                 <div class="d-grid mb-3">
                     <div class="row g-2">
-                        <div class="col-6">
+                        <div class="col-12">
                             <button 
                                 type="submit" 
                                 class="btn btn-primary btn-lg w-100" 
@@ -68,7 +68,7 @@
                                 {{ loading ? 'Logging in…' : 'Login' }}
                             </button>
                         </div>
-                        <div class="col-6">
+                        <!-- <div class="col-6">
                             <button
                                 type="button"
                                 class="btn btn-dark btn-lg w-100"
@@ -82,9 +82,9 @@
                                     height="22"
                                     aria-hidden="true"
                                 />
-                                Login
+                                Steam Login
                             </button>
-                        </div>
+                        </div> -->
                     </div>
                     <div class="row g-2 mt-2">
                         <div class="col-12">
