@@ -58,29 +58,36 @@
                 </div>
 
                 <div class="d-grid mb-3">
-                    <button type="submit" class="btn btn-primary btn-lg" :disabled="loading">
-                        {{ loading ? 'Logging in…' : 'Login' }}
-                    </button>
-                    <button
-                        type="button"
-                        class="btn btn-dark btn-lg mt-2"
-                        :disabled="loading"
-                        @click="onSteamLogin"
-                    >
-                        Sign in with Steam
-                    </button>
-                    <div class="row g-2 mt-2">
+                    <div class="row g-2">
                         <div class="col-6">
-                            <button
-                                type="button"
-                                class="btn btn-secondary w-100"
+                            <button 
+                                type="submit" 
+                                class="btn btn-primary btn-lg w-100" 
                                 :disabled="loading"
-                                @click="onRegister"
                             >
-                                Register
+                                {{ loading ? 'Logging in…' : 'Login' }}
                             </button>
                         </div>
                         <div class="col-6">
+                            <button
+                                type="button"
+                                class="btn btn-dark btn-lg w-100"
+                                :disabled="loading"
+                                @click="onSteamLogin"
+                            >
+                                <img
+                                    src="/assets/steam-logo.png"
+                                    alt=""
+                                    width="22"
+                                    height="22"
+                                    aria-hidden="true"
+                                />
+                                Login
+                            </button>
+                        </div>
+                    </div>
+                    <div class="row g-2 mt-2">
+                        <div class="col-12">
                             <button
                                 type="button"
                                 class="btn btn-secondary w-100"
@@ -90,11 +97,22 @@
                                 Continue as Guest
                             </button>
                         </div>
+                        <div class="col-12">
+                            <button
+                                type="button"
+                                class="btn btn-info w-100"
+                                :disabled="loading"
+                                @click="onRegister"
+                            >
+                                Register
+                            </button>
+                        </div>
+                        
                     </div>
                 </div>
             </form>
 
-            <div class="text-center">
+            <div v-if="isDevelopment" class="text-center">
                 <RouterLink to="/style-guide" class="small text-secondary">
                     Style Guide
                 </RouterLink>
@@ -115,6 +133,7 @@ export default {
     name: 'LoginComponent',
     data() {
         return {
+            isDevelopment: true,
             steamId: '',
             password: '',
             steamIdError: false,
