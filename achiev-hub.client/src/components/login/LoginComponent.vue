@@ -133,7 +133,7 @@ export default {
     name: 'LoginComponent',
     data() {
         return {
-            isDevelopment: true,
+            isDevelopment: false,
             steamId: '',
             password: '',
             steamIdError: false,
