@@ -65,7 +65,6 @@ public class UsersController : ApiControllerBase
             return denied;
         }
 
-        // Non-admins cannot reassign SteamId via this endpoint (prevents account takeover).
         if (!IsAdmin())
         {
             try

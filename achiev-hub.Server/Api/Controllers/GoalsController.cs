@@ -11,11 +11,11 @@ namespace achiev_hub.Server.Api.Controllers;
 [Route("api/goals")]
 public class GoalsController : ApiControllerBase
 {
-    private readonly IGoalService _goals;
+    private readonly IGoalService _goalService;
 
-    public GoalsController(IGoalService goals)
+    public GoalsController(IGoalService goalService)
     {
-        _goals = goals;
+        _goalService = goalService;
     }
 
     [HttpGet]
@@ -28,7 +28,7 @@ public class GoalsController : ApiControllerBase
             return Ok(Array.Empty<GoalDto>());
         }
 
-        return Ok(await _goals.GetForUserAsync(userId, status, cancellationToken));
+        return Ok(await _goalService.GetForUserAsync(userId, status, cancellationToken));
     }
 
     [HttpGet("eligible-games")]
@@ -41,7 +41,7 @@ public class GoalsController : ApiControllerBase
             return Ok(Array.Empty<EligibleGameDto>());
         }
 
-        return Ok(await _goals.GetEligibleGamesAsync(userId, q, cancellationToken));
+        return Ok(await _goalService.GetEligibleGamesAsync(userId, q, cancellationToken));
     }
 
     [HttpGet("completed-series")]
@@ -52,7 +52,7 @@ public class GoalsController : ApiControllerBase
             return Ok(new GoalsCompletedSeriesDto());
         }
 
-        return Ok(await _goals.GetCompletedSeriesAsync(userId, cancellationToken));
+        return Ok(await _goalService.GetCompletedSeriesAsync(userId, cancellationToken));
     }
 
     [HttpGet("unacknowledged-completed")]
@@ -64,7 +64,7 @@ public class GoalsController : ApiControllerBase
             return Ok(Array.Empty<UnacknowledgedCompletedGoalDto>());
         }
 
-        return Ok(await _goals.GetUnacknowledgedCompletedAsync(userId, cancellationToken));
+        return Ok(await _goalService.GetUnacknowledgedCompletedAsync(userId, cancellationToken));
     }
 
     [HttpPost("acknowledge")]
@@ -77,7 +77,7 @@ public class GoalsController : ApiControllerBase
 
         try
         {
-            await _goals.AcknowledgeCompletedAsync(userId, cancellationToken);
+            await _goalService.AcknowledgeCompletedAsync(userId, cancellationToken);
             return NoContent();
         }
         catch (Exception ex)
@@ -94,7 +94,7 @@ public class GoalsController : ApiControllerBase
             return NotFound(new { message = "No active goal for this game." });
         }
 
-        var goal = await _goals.GetActiveByAppIdAsync(userId, appId, cancellationToken);
+        var goal = await _goalService.GetActiveByAppIdAsync(userId, appId, cancellationToken);
         if (goal is null)
         {
             return NotFound(new { message = "No active goal for this game." });
@@ -113,7 +113,7 @@ public class GoalsController : ApiControllerBase
 
         try
         {
-            return Ok(await _goals.GetByIdAsync(userId, id, cancellationToken));
+            return Ok(await _goalService.GetByIdAsync(userId, id, cancellationToken));
         }
         catch (Exception ex)
         {
@@ -131,7 +131,7 @@ public class GoalsController : ApiControllerBase
 
         try
         {
-            var created = await _goals.CreateAsync(userId, request, cancellationToken);
+            var created = await _goalService.CreateAsync(userId, request, cancellationToken);
             return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
         catch (Exception ex)
@@ -150,7 +150,7 @@ public class GoalsController : ApiControllerBase
 
         try
         {
-            return Ok(await _goals.UpdateAsync(userId, id, request, cancellationToken));
+            return Ok(await _goalService.UpdateAsync(userId, id, request, cancellationToken));
         }
         catch (Exception ex)
         {
@@ -170,7 +170,7 @@ public class GoalsController : ApiControllerBase
 
         try
         {
-            return Ok(await _goals.GetAchievementsAsync(userId, id, cancellationToken));
+            return Ok(await _goalService.GetAchievementsAsync(userId, id, cancellationToken));
         }
         catch (Exception ex)
         {
@@ -191,7 +191,7 @@ public class GoalsController : ApiControllerBase
 
         try
         {
-            return Ok(await _goals.AttachAchievementsAsync(userId, id, request, cancellationToken));
+            return Ok(await _goalService.AttachAchievementsAsync(userId, id, request, cancellationToken));
         }
         catch (Exception ex)
         {
@@ -212,7 +212,7 @@ public class GoalsController : ApiControllerBase
 
         try
         {
-            return Ok(await _goals.ReplaceAchievementsAsync(userId, id, request, cancellationToken));
+            return Ok(await _goalService.ReplaceAchievementsAsync(userId, id, request, cancellationToken));
         }
         catch (Exception ex)
         {
@@ -230,7 +230,7 @@ public class GoalsController : ApiControllerBase
 
         try
         {
-            return Ok(await _goals.AbandonAsync(userId, id, cancellationToken));
+            return Ok(await _goalService.AbandonAsync(userId, id, cancellationToken));
         }
         catch (Exception ex)
         {
@@ -248,7 +248,7 @@ public class GoalsController : ApiControllerBase
 
         try
         {
-            return Ok(await _goals.ReopenAsync(userId, id, cancellationToken));
+            return Ok(await _goalService.ReopenAsync(userId, id, cancellationToken));
         }
         catch (Exception ex)
         {
@@ -266,7 +266,7 @@ public class GoalsController : ApiControllerBase
 
         try
         {
-            await _goals.DeleteAsync(userId, id, cancellationToken);
+            await _goalService.DeleteAsync(userId, id, cancellationToken);
             return NoContent();
         }
         catch (Exception ex)

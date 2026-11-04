@@ -14,12 +14,12 @@ namespace achiev_hub.Server.Api.Controllers;
 [EnableRateLimiting("auth")]
 public class AuthenticationController : ControllerBase
 {
-    private readonly IAuthenticationService _service;
+    private readonly IAuthenticationService _authenticationService;
     private readonly JwtSettings _jwtSettings;
 
-    public AuthenticationController(IAuthenticationService service, IOptions<JwtSettings> jwtSettings)
+    public AuthenticationController(IAuthenticationService AuthenticationService, IOptions<JwtSettings> jwtSettings)
     {
-        _service = service;
+        _authenticationService = AuthenticationService;
         _jwtSettings = jwtSettings.Value;
     }
 
@@ -32,7 +32,7 @@ public class AuthenticationController : ControllerBase
             return UnprocessableEntity(new { message = "Steam ID and password are required" });
         }
 
-        var response = await _service.LoginAsync(request.SteamId, request.Password, cancellationToken);
+        var response = await _authenticationService.LoginAsync(request.SteamId, request.Password, cancellationToken);
         if (AuthResult.IsError(response, out var error))
         {
             return StatusCode(error.HttpStatus, new { message = error.Message });
@@ -50,7 +50,7 @@ public class AuthenticationController : ControllerBase
             return UnprocessableEntity(new { message = "Steam ID is required" });
         }
 
-        var response = _service.ContinueAsGuest(request.SteamId);
+        var response = _authenticationService.ContinueAsGuest(request.SteamId);
         return Ok(IssueSession((LoginResponseDto)response));
     }
 
@@ -68,7 +68,7 @@ public class AuthenticationController : ControllerBase
                 return Unauthorized(new { message = "Invalid token" });
             }
 
-            await _service.LogoutAsync(userId, cancellationToken);
+            await _authenticationService.LogoutAsync(userId, cancellationToken);
         }
 
         AuthCookie.Delete(Response, Request);
@@ -78,7 +78,6 @@ public class AuthenticationController : ControllerBase
     private object IssueSession(LoginResponseDto login)
     {
         AuthCookie.Append(Response, Request, login.AccessToken, _jwtSettings.ExpiryMinutes);
-        // Do not return the raw JWT to JavaScript — cookie is the session credential.
         return new
         {
             success = true,
