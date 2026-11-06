@@ -62,24 +62,24 @@
                         <div class="col-12">
                             <button 
                                 type="submit" 
-                                class="btn btn-primary btn-lg w-100" 
+                                class="btn btn-primary btn-md w-100" 
                                 :disabled="loading"
                             >
                                 {{ loading ? 'Logging in…' : 'Login' }}
                             </button>
                         </div>
-                        <div class="col-6">
+                        <div class="col-12">
                             <button
                                 type="button"
-                                class="btn btn-dark btn-lg w-100"
+                                class="btn btn-info btn-md w-100"
                                 :disabled="loading"
                                 @click="onSteamLogin"
                             >
                                 <img
                                     src="/assets/steam-logo.png"
                                     alt=""
-                                    width="22"
-                                    height="22"
+                                    width="15"
+                                    height="15"
                                     aria-hidden="true"
                                 />
                                 Steam Login
@@ -90,7 +90,7 @@
                         <div class="col-12">
                             <button
                                 type="button"
-                                class="btn btn-info w-100"
+                                class="btn btn-sm btn-secondary w-100"
                                 :disabled="loading"
                                 @click="onRegister"
                             >
