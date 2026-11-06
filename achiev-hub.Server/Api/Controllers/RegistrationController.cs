@@ -1,10 +1,12 @@
 using achiev_hub.Server.Application.Auth;
 using achiev_hub.Server.Application.Auth.Interfaces;
 using achiev_hub.Server.Application.Steam.Interfaces;
+using achiev_hub.Server.Infrastructure.Auth;
 using achiev_hub.Server.Infrastructure.Security;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 
 namespace achiev_hub.Server.Api.Controllers;
 
@@ -15,11 +17,16 @@ public class RegistrationController : ControllerBase
 {
     private readonly IRegistrationService _service;
     private readonly ISyncStatusService _syncStatusService;
+    private readonly JwtSettings _jwtSettings;
 
-    public RegistrationController(IRegistrationService service, ISyncStatusService syncStatusService)
+    public RegistrationController(
+        IRegistrationService service,
+        ISyncStatusService syncStatusService,
+        IOptions<JwtSettings> jwtSettings)
     {
         _service = service;
         _syncStatusService = syncStatusService;
+        _jwtSettings = jwtSettings.Value;
     }
 
     [AllowAnonymous]
@@ -113,11 +120,22 @@ public class RegistrationController : ControllerBase
             return StatusCode(error.HttpStatus, new { message = error.Message });
         }
 
+        var registration = (RegisterResponseDto)result;
+        AuthCookie.Append(Response, Request, registration.AccessToken, _jwtSettings.ExpiryMinutes);
+
         return StatusCode(StatusCodes.Status201Created, new
         {
             success = true,
             message = "Registration successful. Importing your recently played games…",
-            data = result
+            data = new
+            {
+                accessToken = (string?)null,
+                tokenType = "Cookie",
+                user = registration.User,
+                status = registration.Status,
+                statusLabel = registration.StatusLabel,
+                sync = registration.Sync
+            }
         });
     }
 }

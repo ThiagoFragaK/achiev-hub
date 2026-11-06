@@ -29,3 +29,19 @@ public class RegisterRequest
     public string Password { get; set; } = string.Empty;
     public string EmailVerifiedToken { get; set; } = string.Empty;
 }
+
+public class RegisterSyncSummaryDto
+{
+    public string Status { get; set; } = string.Empty;
+    public bool Enqueued { get; set; }
+    public string? LastError { get; set; }
+}
+
+public class RegisterResponseDto
+{
+    public string AccessToken { get; set; } = string.Empty;
+    public AuthUserDto User { get; set; } = null!;
+    public int Status { get; set; }
+    public string StatusLabel { get; set; } = string.Empty;
+    public RegisterSyncSummaryDto Sync { get; set; } = null!;
+}

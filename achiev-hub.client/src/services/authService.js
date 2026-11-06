@@ -46,7 +46,21 @@ export async function confirmCode(email, code) {
 }
 
 export async function register({ steamId, email, password, emailVerifiedToken }) {
-    return postJson('/api/register', { steamId, email, password, emailVerifiedToken })
+    const response = await postJson('/api/register', {
+        steamId,
+        email,
+        password,
+        emailVerifiedToken
+    })
+    const data = response?.data
+    if (!data?.user) {
+        throw new Error(response?.message || 'Registration failed')
+    }
+
+    setSession({ user: data.user })
+    const user = await attachSteamProfile(data.user)
+    setSession({ user })
+    return { ...data, user }
 }
 
 export async function logout() {
