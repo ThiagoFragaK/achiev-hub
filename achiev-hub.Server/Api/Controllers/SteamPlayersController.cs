@@ -22,11 +22,6 @@ public class SteamPlayersController : ApiControllerBase
     [HttpGet("{steamId}")]
     public async Task<ActionResult<PlayerDto>> GetPlayer(string steamId, CancellationToken cancellationToken)
     {
-        if (ForbidGuests("Guests cannot look up Steam players.") is { } guestDenied)
-        {
-            return guestDenied;
-        }
-
         if (TryResolveBoundSteamId(steamId, out var boundSteamId) is { } denied)
         {
             return denied;

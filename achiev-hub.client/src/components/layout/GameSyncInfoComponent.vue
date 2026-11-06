@@ -27,7 +27,7 @@ export default {
     computed: {
         showSyncBanner() {
             const user = getUser()
-            return !!user && user.role !== 'guest' && this.isUpdating
+            return !!user && this.isUpdating
         },
         bannerText() {
             const synced = this.gamesSynced
@@ -70,7 +70,7 @@ export default {
         },
         startSyncPolling() {
             const user = getUser()
-            if (!user || user.role === 'guest') {
+            if (!user) {
                 return
             }
 

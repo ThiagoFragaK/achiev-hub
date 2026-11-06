@@ -43,11 +43,6 @@ public class RegistrationController : ControllerBase
         [FromQuery] string? steamId,
         CancellationToken cancellationToken)
     {
-        if (AccessControl.IsGuest(User))
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Guests cannot query provisioning status." });
-        }
-
         var claimSteamId = AccessControl.TryGetSteamId(User);
         if (!SteamIdBinder.TryResolve(claimSteamId, steamId, out var boundSteamId, out var bindError))
         {

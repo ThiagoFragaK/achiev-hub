@@ -33,11 +33,6 @@ public class SteamGamesController : ApiControllerBase
         [FromQuery] int pageSize = 7,
         CancellationToken cancellationToken = default)
     {
-        if (ForbidGuests() is { } guestDenied)
-        {
-            return guestDenied;
-        }
-
         if (TryResolveBoundSteamId(steamId, out var boundSteamId) is { } denied)
         {
             return denied;
@@ -57,7 +52,7 @@ public class SteamGamesController : ApiControllerBase
         [FromQuery] int pageSize = 10,
         CancellationToken cancellationToken = default)
     {
-        if (ResolveUserIdForDbReads() is not int userId)
+        if (ResolveUserId() is not int userId)
         {
             return Ok(new PagedResultDto<RecentAchievementDto>
             {
@@ -88,11 +83,6 @@ public class SteamGamesController : ApiControllerBase
         [FromQuery] string? sort = null,
         CancellationToken cancellationToken = default)
     {
-        if (ForbidGuests() is { } guestDenied)
-        {
-            return guestDenied;
-        }
-
         if (TryResolveBoundSteamId(steamId, out var boundSteamId) is { } denied)
         {
             return denied;
@@ -110,7 +100,7 @@ public class SteamGamesController : ApiControllerBase
             boundSteamId,
             page,
             pageSize,
-            ResolveUserIdForDbReads(),
+            ResolveUserId(),
             filters,
             cancellationToken);
         return Ok(result);
@@ -135,11 +125,6 @@ public class SteamGamesController : ApiControllerBase
         [FromQuery] string? global = null,
         CancellationToken cancellationToken = default)
     {
-        if (ForbidGuests() is { } guestDenied)
-        {
-            return guestDenied;
-        }
-
         if (TryResolveBoundSteamId(steamId, out var boundSteamId) is { } denied)
         {
             return denied;
@@ -156,7 +141,7 @@ public class SteamGamesController : ApiControllerBase
                 status,
                 sort,
                 global,
-                ResolveUserIdForDbReads(),
+                ResolveUserId(),
                 cancellationToken);
             return Ok(result);
         }
@@ -169,11 +154,6 @@ public class SteamGamesController : ApiControllerBase
     [HttpPost("{appId:int}/sync-achievements")]
     public async Task<IActionResult> SyncGameAchievements(int appId, CancellationToken cancellationToken)
     {
-        if (IsGuest())
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Guests cannot sync achievements to the database." });
-        }
-
         if (ResolveUserId() is not int userId)
         {
             return Unauthorized(new { message = "Invalid token" });
@@ -207,11 +187,6 @@ public class SteamGamesController : ApiControllerBase
     [HttpPost("sync")]
     public async Task<IActionResult> SyncLibrary(CancellationToken cancellationToken)
     {
-        if (IsGuest())
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Guests cannot sync library to the database." });
-        }
-
         if (ResolveUserId() is not int userId)
         {
             return Unauthorized(new { message = "Invalid token" });

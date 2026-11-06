@@ -21,16 +21,9 @@ public abstract class ApiControllerBase : ControllerBase
         };
     }
 
-    protected bool IsGuest() => AccessControl.IsGuest(User);
-
     protected bool IsAdmin() => AccessControl.IsAdmin(User);
 
     protected int? ResolveUserId() => AccessControl.TryGetUserId(User);
-
-    protected int? ResolveUserIdForDbReads()
-    {
-        return IsGuest() ? null : ResolveUserId();
-    }
 
     protected ActionResult? ForbidUnlessAdmin()
     {
@@ -46,11 +39,6 @@ public abstract class ApiControllerBase : ControllerBase
     {
         return ResolveUserId()
             ?? throw new UnauthorizedAccessException("Authenticated user id is required.");
-    }
-
-    protected ActionResult? ForbidGuests(string message = "Guests cannot use this endpoint.")
-    {
-        return IsGuest() ? StatusCode(StatusCodes.Status403Forbidden, new { message }) : null;
     }
 
     protected ActionResult? TryResolveBoundSteamId(string? requestedSteamId, out string steamId)

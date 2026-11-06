@@ -20,11 +20,6 @@ public class SteamSyncController : ApiControllerBase
     [HttpGet("status")]
     public async Task<ActionResult<SyncStatusDto>> GetStatus(CancellationToken cancellationToken)
     {
-        if (IsGuest())
-        {
-            return Unauthorized(new { message = "Sign in to view sync status." });
-        }
-
         var userId = ResolveUserId();
         if (userId is null)
         {

@@ -43,7 +43,7 @@ public class GamesService : IGamesService
         int? userId = null,
         CancellationToken cancellationToken = default)
     {
-        // Recent games always come from Steam (auth + guest), with a short memory cache.
+        // Recent games always come from Steam, with a short memory cache.
         _ = userId;
         var mapped = await GetOrFetchRecentGamesAsync(steamId, cancellationToken);
         return Paginate(mapped, page, pageSize);

@@ -2,7 +2,6 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using achiev_hub.Server.Domain.Entities;
-using achiev_hub.Server.Domain.Interfaces;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -16,10 +15,6 @@ public class JwtTokenService
     {
         _settings = options.Value;
     }
-
-    public const string GuestRole = "guest";
-    public const string TokenKindClaim = "token_kind";
-    public const string GuestTokenKind = "guest";
 
     public string GenerateToken(User user)
     {
@@ -36,20 +31,6 @@ public class JwtTokenService
         {
             claims.Add(new Claim("steam_id", user.SteamId));
         }
-
-        return CreateToken(claims);
-    }
-
-    public string GenerateGuestToken(string steamId)
-    {
-        var normalizedSteamId = steamId.Trim();
-        var claims = new List<Claim>
-        {
-            new(JwtRegisteredClaimNames.Sub, "guest"),
-            new(ClaimTypes.Role, GuestRole),
-            new(TokenKindClaim, GuestTokenKind),
-            new("steam_id", normalizedSteamId)
-        };
 
         return CreateToken(claims);
     }

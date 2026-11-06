@@ -41,36 +41,17 @@ public class AuthenticationController : ControllerBase
         return Ok(IssueSession((LoginResponseDto)response));
     }
 
-    [AllowAnonymous]
-    [HttpPost("guest")]
-    public IActionResult ContinueAsGuest([FromBody] GuestRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.SteamId))
-        {
-            return UnprocessableEntity(new { message = "Steam ID is required" });
-        }
-
-        var response = _authenticationService.ContinueAsGuest(request.SteamId);
-        return Ok(IssueSession((LoginResponseDto)response));
-    }
-
     [Authorize]
     [HttpPost("logout")]
     public async Task<IActionResult> Logout(CancellationToken cancellationToken)
     {
-        var isGuest = User.IsInRole(JwtTokenService.GuestRole)
-            || User.FindFirstValue(JwtTokenService.TokenKindClaim) == JwtTokenService.GuestTokenKind;
-        if (!isGuest)
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdClaim, out var userId))
         {
-            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdClaim, out var userId))
-            {
-                return Unauthorized(new { message = "Invalid token" });
-            }
-
-            await _authenticationService.LogoutAsync(userId, cancellationToken);
+            return Unauthorized(new { message = "Invalid token" });
         }
 
+        await _authenticationService.LogoutAsync(userId, cancellationToken);
         AuthCookie.Delete(Response, Request);
         return Ok(new { success = true, message = "Logged out successfully" });
     }

@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using achiev_hub.Server.Infrastructure.Auth;
 using achiev_hub.Server.Infrastructure.Security;
 
 namespace achiev_hub.Server.Tests.Security;
@@ -37,16 +36,5 @@ public class AccessControlTests
             new Claim(ClaimTypes.Role, AccessControl.AdminRole));
 
         Assert.True(AccessControl.CanAccessOwnedResource(user, resourceUserId: 99));
-    }
-
-    [Fact]
-    public void CanAccessOwnedResource_denies_guest()
-    {
-        var user = Principal(
-            new Claim(ClaimTypes.Role, JwtTokenService.GuestRole),
-            new Claim(JwtTokenService.TokenKindClaim, JwtTokenService.GuestTokenKind),
-            new Claim("steam_id", "76561198000000001"));
-
-        Assert.False(AccessControl.CanAccessOwnedResource(user, resourceUserId: 1));
     }
 }

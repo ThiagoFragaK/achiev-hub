@@ -68,7 +68,7 @@
                                 {{ loading ? 'Logging in…' : 'Login' }}
                             </button>
                         </div>
-                        <!-- <div class="col-6">
+                        <div class="col-6">
                             <button
                                 type="button"
                                 class="btn btn-dark btn-lg w-100"
@@ -84,19 +84,9 @@
                                 />
                                 Steam Login
                             </button>
-                        </div> -->
+                        </div>
                     </div>
                     <div class="row g-2 mt-2">
-                        <div class="col-12">
-                            <button
-                                type="button"
-                                class="btn btn-secondary w-100"
-                                :disabled="loading"
-                                @click="onContinueAsGuest"
-                            >
-                                Continue as Guest
-                            </button>
-                        </div>
                         <div class="col-12">
                             <button
                                 type="button"
@@ -107,7 +97,6 @@
                                 Register
                             </button>
                         </div>
-                        
                     </div>
                 </div>
             </form>
@@ -124,7 +113,6 @@
 <script>
 import {
     beginSteamOpenIdLogin,
-    continueAsGuest,
     exchangeSteamOpenIdCode,
     login
 } from '@/services/authService'
@@ -187,21 +175,6 @@ export default {
                 this.redirectAfterLogin()
             } catch (error) {
                 this.loginError = error.body?.message || error.message || 'Login failed'
-            } finally {
-                this.loading = false
-            }
-        },
-        async onContinueAsGuest() {
-            this.steamIdError = !this.steamId.trim()
-            this.loginError = ''
-            if (this.steamIdError) return
-
-            this.loading = true
-            try {
-                await continueAsGuest(this.steamId.trim())
-                this.redirectAfterLogin()
-            } catch (error) {
-                this.loginError = error.body?.message || error.message || 'Guest session failed'
             } finally {
                 this.loading = false
             }

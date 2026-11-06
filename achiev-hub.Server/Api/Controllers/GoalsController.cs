@@ -23,7 +23,7 @@ public class GoalsController : ApiControllerBase
         [FromQuery] GoalStatus? status,
         CancellationToken cancellationToken)
     {
-        if (ResolveUserId() is not int userId || IsGuest())
+        if (ResolveUserId() is not int userId)
         {
             return Ok(Array.Empty<GoalDto>());
         }
@@ -36,7 +36,7 @@ public class GoalsController : ApiControllerBase
         [FromQuery] string? q,
         CancellationToken cancellationToken)
     {
-        if (ResolveUserId() is not int userId || IsGuest())
+        if (ResolveUserId() is not int userId)
         {
             return Ok(Array.Empty<EligibleGameDto>());
         }
@@ -47,7 +47,7 @@ public class GoalsController : ApiControllerBase
     [HttpGet("completed-series")]
     public async Task<ActionResult<GoalsCompletedSeriesDto>> GetCompletedSeries(CancellationToken cancellationToken)
     {
-        if (ResolveUserId() is not int userId || IsGuest())
+        if (ResolveUserId() is not int userId)
         {
             return Ok(new GoalsCompletedSeriesDto());
         }
@@ -59,7 +59,7 @@ public class GoalsController : ApiControllerBase
     public async Task<ActionResult<IReadOnlyList<UnacknowledgedCompletedGoalDto>>> GetUnacknowledgedCompleted(
         CancellationToken cancellationToken)
     {
-        if (ResolveUserId() is not int userId || IsGuest())
+        if (ResolveUserId() is not int userId)
         {
             return Ok(Array.Empty<UnacknowledgedCompletedGoalDto>());
         }
@@ -70,7 +70,7 @@ public class GoalsController : ApiControllerBase
     [HttpPost("acknowledge")]
     public async Task<IActionResult> Acknowledge(CancellationToken cancellationToken)
     {
-        if (ResolveUserId() is not int userId || IsGuest())
+        if (ResolveUserId() is not int userId)
         {
             return Unauthorized();
         }
@@ -89,7 +89,7 @@ public class GoalsController : ApiControllerBase
     [HttpGet("by-game/{appId:int}")]
     public async Task<ActionResult<GoalDto>> GetActiveByGame(int appId, CancellationToken cancellationToken)
     {
-        if (ResolveUserId() is not int userId || IsGuest())
+        if (ResolveUserId() is not int userId)
         {
             return NotFound(new { message = "No active goal for this game." });
         }
@@ -106,7 +106,7 @@ public class GoalsController : ApiControllerBase
     [HttpGet("{id:int}")]
     public async Task<ActionResult<GoalDto>> GetById(int id, CancellationToken cancellationToken)
     {
-        if (ResolveUserId() is not int userId || IsGuest())
+        if (ResolveUserId() is not int userId)
         {
             return Unauthorized();
         }
@@ -124,7 +124,7 @@ public class GoalsController : ApiControllerBase
     [HttpPost]
     public async Task<ActionResult<GoalDto>> Create(CreateGoalRequest request, CancellationToken cancellationToken)
     {
-        if (ResolveUserId() is not int userId || IsGuest())
+        if (ResolveUserId() is not int userId)
         {
             return Unauthorized();
         }
@@ -143,7 +143,7 @@ public class GoalsController : ApiControllerBase
     [HttpPut("{id:int}")]
     public async Task<ActionResult<GoalDto>> Update(int id, UpdateGoalRequest request, CancellationToken cancellationToken)
     {
-        if (ResolveUserId() is not int userId || IsGuest())
+        if (ResolveUserId() is not int userId)
         {
             return Unauthorized();
         }
@@ -163,7 +163,7 @@ public class GoalsController : ApiControllerBase
         int id,
         CancellationToken cancellationToken)
     {
-        if (ResolveUserId() is not int userId || IsGuest())
+        if (ResolveUserId() is not int userId)
         {
             return Unauthorized();
         }
@@ -184,7 +184,7 @@ public class GoalsController : ApiControllerBase
         AttachGoalAchievementsRequest request,
         CancellationToken cancellationToken)
     {
-        if (ResolveUserId() is not int userId || IsGuest())
+        if (ResolveUserId() is not int userId)
         {
             return Unauthorized();
         }
@@ -205,7 +205,7 @@ public class GoalsController : ApiControllerBase
         ReplaceGoalAchievementsRequest request,
         CancellationToken cancellationToken)
     {
-        if (ResolveUserId() is not int userId || IsGuest())
+        if (ResolveUserId() is not int userId)
         {
             return Unauthorized();
         }
@@ -223,7 +223,7 @@ public class GoalsController : ApiControllerBase
     [HttpPost("{id:int}/abandon")]
     public async Task<ActionResult<GoalDto>> Abandon(int id, CancellationToken cancellationToken)
     {
-        if (ResolveUserId() is not int userId || IsGuest())
+        if (ResolveUserId() is not int userId)
         {
             return Unauthorized();
         }
@@ -241,7 +241,7 @@ public class GoalsController : ApiControllerBase
     [HttpPost("{id:int}/reopen")]
     public async Task<ActionResult<GoalDto>> Reopen(int id, CancellationToken cancellationToken)
     {
-        if (ResolveUserId() is not int userId || IsGuest())
+        if (ResolveUserId() is not int userId)
         {
             return Unauthorized();
         }
@@ -259,7 +259,7 @@ public class GoalsController : ApiControllerBase
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
-        if (ResolveUserId() is not int userId || IsGuest())
+        if (ResolveUserId() is not int userId)
         {
             return Unauthorized();
         }

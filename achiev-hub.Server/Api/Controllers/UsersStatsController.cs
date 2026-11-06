@@ -34,7 +34,7 @@ public class UsersStatsController : ApiControllerBase
     [HttpGet]
     public async Task<ActionResult<UserStatsDto>> GetStats(CancellationToken cancellationToken)
     {
-        if (ResolveUserIdForDbReads() is not int userId)
+        if (ResolveUserId() is not int userId)
         {
             return Ok(_userStatsService.GetEmptyStats());
         }
@@ -45,7 +45,7 @@ public class UsersStatsController : ApiControllerBase
     [HttpGet("games/{appId:int}")]
     public async Task<ActionResult<GameProgressDto>> GetGameProgress(int appId, CancellationToken cancellationToken)
     {
-        if (ResolveUserIdForDbReads() is not int userId)
+        if (ResolveUserId() is not int userId)
         {
             return Ok(_userStatsService.GetEmptyGameProgress());
         }
@@ -56,7 +56,7 @@ public class UsersStatsController : ApiControllerBase
     [HttpGet("achievements-by-month")]
     public async Task<ActionResult<AchievementsByMonthDto>> GetAchievementsByMonth(CancellationToken cancellationToken)
     {
-        if (ResolveUserIdForDbReads() is not int userId)
+        if (ResolveUserId() is not int userId)
         {
             return Ok(_userStatsService.GetEmptyAchievementsByMonth());
         }
@@ -67,7 +67,7 @@ public class UsersStatsController : ApiControllerBase
     [HttpGet("games-percentage-bands")]
     public async Task<ActionResult<GamesPercentageBandsDto>> GetGamesPercentageBands(CancellationToken cancellationToken)
     {
-        if (ResolveUserIdForDbReads() is not int userId)
+        if (ResolveUserId() is not int userId)
         {
             return Ok(_userStatsService.GetEmptyGamesPercentageBands());
         }
@@ -78,7 +78,7 @@ public class UsersStatsController : ApiControllerBase
     [HttpGet("games-for-average")]
     public async Task<ActionResult<GamesForAverageDto>> GetGamesForAverage(CancellationToken cancellationToken)
     {
-        if (ResolveUserIdForDbReads() is not int userId)
+        if (ResolveUserId() is not int userId)
         {
             return Ok(_userStatsService.GetEmptyGamesForAverage());
         }
