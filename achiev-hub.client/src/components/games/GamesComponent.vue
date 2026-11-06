@@ -263,7 +263,7 @@ export default {
         async syncAndReloadAchievements() {
             this.syncError = ''
             const user = getUser()
-            if (user && user.role !== 'guest' && this.gameId) {
+            if (user && this.gameId) {
                 try {
                     await syncGameAchievements(this.gameId)
                 } catch (err) {

@@ -58,43 +58,50 @@
                 </div>
 
                 <div class="d-grid mb-3">
-                    <button type="submit" class="btn btn-primary btn-lg" :disabled="loading">
-                        {{ loading ? 'Logging in…' : 'Login' }}
-                    </button>
-                    <button
-                        type="button"
-                        class="btn btn-dark btn-lg mt-2"
-                        :disabled="loading"
-                        @click="onSteamLogin"
-                    >
-                        Sign in with Steam
-                    </button>
-                    <div class="row g-2 mt-2">
-                        <div class="col-6">
+                    <div class="row g-2">
+                        <div class="col-12">
+                            <button 
+                                type="submit" 
+                                class="btn btn-primary btn-md w-100" 
+                                :disabled="loading"
+                            >
+                                {{ loading ? 'Logging in…' : 'Login' }}
+                            </button>
+                        </div>
+                        <div class="col-12">
                             <button
                                 type="button"
-                                class="btn btn-secondary w-100"
+                                class="btn btn-info btn-md w-100"
+                                :disabled="loading"
+                                @click="onSteamLogin"
+                            >
+                                <img
+                                    src="/assets/steam-logo.png"
+                                    alt=""
+                                    width="15"
+                                    height="15"
+                                    aria-hidden="true"
+                                />
+                                Steam Login
+                            </button>
+                        </div>
+                    </div>
+                    <div class="row g-2 mt-2">
+                        <div class="col-12">
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-secondary w-100"
                                 :disabled="loading"
                                 @click="onRegister"
                             >
                                 Register
                             </button>
                         </div>
-                        <div class="col-6">
-                            <button
-                                type="button"
-                                class="btn btn-secondary w-100"
-                                :disabled="loading"
-                                @click="onContinueAsGuest"
-                            >
-                                Continue as Guest
-                            </button>
-                        </div>
                     </div>
                 </div>
             </form>
 
-            <div class="text-center">
+            <div v-if="isDevelopment" class="text-center">
                 <RouterLink to="/style-guide" class="small text-secondary">
                     Style Guide
                 </RouterLink>
@@ -106,7 +113,6 @@
 <script>
 import {
     beginSteamOpenIdLogin,
-    continueAsGuest,
     exchangeSteamOpenIdCode,
     login
 } from '@/services/authService'
@@ -115,6 +121,7 @@ export default {
     name: 'LoginComponent',
     data() {
         return {
+            isDevelopment: false,
             steamId: '',
             password: '',
             steamIdError: false,
@@ -168,21 +175,6 @@ export default {
                 this.redirectAfterLogin()
             } catch (error) {
                 this.loginError = error.body?.message || error.message || 'Login failed'
-            } finally {
-                this.loading = false
-            }
-        },
-        async onContinueAsGuest() {
-            this.steamIdError = !this.steamId.trim()
-            this.loginError = ''
-            if (this.steamIdError) return
-
-            this.loading = true
-            try {
-                await continueAsGuest(this.steamId.trim())
-                this.redirectAfterLogin()
-            } catch (error) {
-                this.loginError = error.body?.message || error.message || 'Guest session failed'
             } finally {
                 this.loading = false
             }

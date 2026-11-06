@@ -24,66 +24,65 @@ namespace achiev_hub.Server.Api.Controllers;
 [Route("api/users/stats")]
 public class UsersStatsController : ApiControllerBase
 {
-    private readonly IUserStatsService _stats;
+    private readonly IUserStatsService _userStatsService;
 
-    public UsersStatsController(IUserStatsService stats)
+    public UsersStatsController(IUserStatsService UserStatsService)
     {
-        _stats = stats;
+        _userStatsService = UserStatsService;
     }
 
     [HttpGet]
     public async Task<ActionResult<UserStatsDto>> GetStats(CancellationToken cancellationToken)
     {
-        // Guests have no rows in the database, so they get an empty (zeroed) set.
-        if (ResolveUserIdForDbReads() is not int userId)
+        if (ResolveUserId() is not int userId)
         {
-            return Ok(_stats.GetEmptyStats());
+            return Ok(_userStatsService.GetEmptyStats());
         }
 
-        return Ok(await _stats.GetStatsAsync(userId, cancellationToken));
+        return Ok(await _userStatsService.GetStatsAsync(userId, cancellationToken));
     }
 
     [HttpGet("games/{appId:int}")]
     public async Task<ActionResult<GameProgressDto>> GetGameProgress(int appId, CancellationToken cancellationToken)
     {
-        if (ResolveUserIdForDbReads() is not int userId)
+        if (ResolveUserId() is not int userId)
         {
-            return Ok(_stats.GetEmptyGameProgress());
+            return Ok(_userStatsService.GetEmptyGameProgress());
         }
 
-        return Ok(await _stats.GetGameProgressAsync(userId, appId, cancellationToken));
+        return Ok(await _userStatsService.GetGameProgressAsync(userId, appId, cancellationToken));
     }
 
     [HttpGet("achievements-by-month")]
     public async Task<ActionResult<AchievementsByMonthDto>> GetAchievementsByMonth(CancellationToken cancellationToken)
     {
-        if (ResolveUserIdForDbReads() is not int userId)
+        if (ResolveUserId() is not int userId)
         {
-            return Ok(_stats.GetEmptyAchievementsByMonth());
+            return Ok(_userStatsService.GetEmptyAchievementsByMonth());
         }
 
-        return Ok(await _stats.GetAchievementsByMonthAsync(userId, cancellationToken));
+        return Ok(await _userStatsService.GetAchievementsByMonthAsync(userId, cancellationToken));
     }
 
     [HttpGet("games-percentage-bands")]
     public async Task<ActionResult<GamesPercentageBandsDto>> GetGamesPercentageBands(CancellationToken cancellationToken)
     {
-        if (ResolveUserIdForDbReads() is not int userId)
+        if (ResolveUserId() is not int userId)
         {
-            return Ok(_stats.GetEmptyGamesPercentageBands());
+            return Ok(_userStatsService.GetEmptyGamesPercentageBands());
         }
 
-        return Ok(await _stats.GetGamesPercentageBandsAsync(userId, cancellationToken));
+        return Ok(await _userStatsService.GetGamesPercentageBandsAsync(userId, cancellationToken));
     }
 
     [HttpGet("games-for-average")]
     public async Task<ActionResult<GamesForAverageDto>> GetGamesForAverage(CancellationToken cancellationToken)
     {
-        if (ResolveUserIdForDbReads() is not int userId)
+        if (ResolveUserId() is not int userId)
         {
-            return Ok(_stats.GetEmptyGamesForAverage());
+            return Ok(_userStatsService.GetEmptyGamesForAverage());
         }
 
-        return Ok(await _stats.GetGamesForAverageAsync(userId, cancellationToken));
+        return Ok(await _userStatsService.GetGamesForAverageAsync(userId, cancellationToken));
     }
 }

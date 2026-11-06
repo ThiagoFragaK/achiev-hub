@@ -25,7 +25,6 @@ async function request(url, options = {}) {
     if (
         response.status === 401 &&
         !url.includes('/api/login') &&
-        !url.includes('/api/guest') &&
         !url.includes('/api/register') &&
         !url.includes('/api/auth/steam/exchange')
     ) {

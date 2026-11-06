@@ -120,13 +120,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             },
             OnTokenValidated = async context =>
             {
-                var isGuest = context.Principal?.IsInRole(JwtTokenService.GuestRole) == true
-                    || context.Principal?.FindFirstValue(JwtTokenService.TokenKindClaim) == JwtTokenService.GuestTokenKind;
-                if (isGuest)
-                {
-                    return;
-                }
-
                 var userIdClaim = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier)
                     ?? context.Principal?.FindFirstValue(JwtRegisteredClaimNames.Sub);
                 var tokenVersionClaim = context.Principal?.FindFirstValue("token_version");

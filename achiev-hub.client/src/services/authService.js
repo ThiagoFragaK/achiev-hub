@@ -1,5 +1,5 @@
 import { postJson } from '@/services/http'
-import { clearSession, getUser, setSession } from '@/lib/session'
+import { clearSession, setSession } from '@/lib/session'
 import { getPlayer } from '@/services/playersService'
 
 async function attachSteamProfile(user) {
@@ -33,19 +33,6 @@ export async function login(steamId, password) {
     return { ...data, user }
 }
 
-export async function continueAsGuest(steamId) {
-    const response = await postJson('/api/guest', { steamId })
-    const data = response?.data
-    if (!data?.user) {
-        throw new Error(response?.message || 'Guest session failed')
-    }
-
-    setSession({ user: data.user })
-    const user = await attachSteamProfile(data.user)
-    setSession({ user })
-    return { ...data, user }
-}
-
 export async function validateSteam(steamId) {
     return postJson('/api/register/validate-steam', { steamId })
 }
@@ -63,11 +50,8 @@ export async function register({ steamId, email, password, emailVerifiedToken })
 }
 
 export async function logout() {
-    const user = getUser()
     try {
-        if (user?.role !== 'guest') {
-            await postJson('/api/logout', {})
-        }
+        await postJson('/api/logout', {})
     } catch {
         // Always clear local session even if revoke fails.
     } finally {
