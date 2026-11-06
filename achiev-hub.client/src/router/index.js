@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { isAuthenticated } from '@/lib/session'
+import Calculator from '@/pages/Calculator.vue'
 import Games from '@/pages/Games.vue'
 import Home from '@/pages/Home.vue'
 import Login from '@/pages/Login.vue'
@@ -56,7 +57,11 @@ const router = createRouter({
             name: 'goals-form',
             component: GoalsForm
         },
-
+        {
+            path: '/calculator',
+            name: 'calculator',
+            component: Calculator
+        },
         {
             path: '/steam',
             name: 'steam',

@@ -87,6 +87,7 @@ export default {
                 { to: '/', label: 'Home', name: 'home' },
                 { to: '/games', label: 'My games', name: 'games' },
                 { to: '/stats', label: 'Stats', name: 'stats' },
+                { to: '/calculator', label: 'Calculator', name: 'calculator' },
                 { to: '/goals', label: 'Goals', name: 'goals' },
                 // { to: '/steam', label: 'Steam', name: 'steam' }
             ]
