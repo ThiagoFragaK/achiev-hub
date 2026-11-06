@@ -374,10 +374,7 @@ export default {
 
                     if (status?.statusLabel === 'Active' || status?.isReady) {
                         this.clearPrepareTimer()
-                        this.$router.push({
-                            name: 'login',
-                            query: { steamId: this.steamId.trim(), ready: '1' }
-                        })
+                        this.$router.push({ name: 'home' })
                     }
                 } catch {
                     // Keep polling; worker may still be starting.
@@ -506,7 +503,7 @@ export default {
             this.formSuccess = ''
             this.loading = true
             try {
-                const response = await register({
+                const data = await register({
                     steamId: this.steamId.trim(),
                     email: this.email.trim(),
                     password: this.password,
@@ -514,7 +511,6 @@ export default {
                         ? ''
                         : this.emailVerifiedToken
                 })
-                const data = response?.data ?? response
                 if (data?.sync?.enqueued === false) {
                     this.preparing = true
                     this.prepareError =

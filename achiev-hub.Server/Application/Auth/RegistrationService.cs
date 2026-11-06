@@ -8,6 +8,7 @@ using achiev_hub.Server.Application.Users;
 using achiev_hub.Server.Domain.Entities;
 using achiev_hub.Server.Domain.Enums;
 using achiev_hub.Server.Domain.Interfaces;
+using achiev_hub.Server.Infrastructure.Auth;
 using achiev_hub.Server.Infrastructure.Steam.Models;
 
 namespace achiev_hub.Server.Application.Auth;
@@ -24,6 +25,7 @@ public class RegistrationService : IRegistrationService
     private readonly IHostEnvironment _environment;
     private readonly ISteamApiClient _steamApiClient;
     private readonly ISteamSyncClient _steamSyncClient;
+    private readonly JwtTokenService _jwtTokenService;
     private readonly ILogger<RegistrationService> _logger;
 
     public RegistrationService(
@@ -33,6 +35,7 @@ public class RegistrationService : IRegistrationService
         IHostEnvironment environment,
         ISteamApiClient steamApiClient,
         ISteamSyncClient steamSyncClient,
+        JwtTokenService jwtTokenService,
         ILogger<RegistrationService> logger)
     {
         _users = users;
@@ -41,6 +44,7 @@ public class RegistrationService : IRegistrationService
         _environment = environment;
         _steamApiClient = steamApiClient;
         _steamSyncClient = steamSyncClient;
+        _jwtTokenService = jwtTokenService;
         _logger = logger;
     }
 
@@ -263,18 +267,24 @@ public class RegistrationService : IRegistrationService
             _logger.LogWarning(ex, "Failed to enqueue FirstSync for user {UserId}", user.Id);
         }
 
-        return new
+        return new RegisterResponseDto
         {
-            id = user.Id,
-            email = user.Email,
-            steamId = user.SteamId,
-            status = user.Status,
-            statusLabel = StatusEnum.FirstSync.ToString(),
-            sync = new
+            AccessToken = _jwtTokenService.GenerateToken(user),
+            User = new AuthUserDto
             {
-                status = syncEnqueued ? "Pending" : "failed_enqueue",
-                enqueued = syncEnqueued,
-                lastError = syncEnqueueError
+                Id = user.Id,
+                Email = user.Email,
+                SteamId = user.SteamId,
+                Role = user.Role,
+                ShowGoals = user.ShowGoals
+            },
+            Status = user.Status,
+            StatusLabel = StatusEnum.FirstSync.ToString(),
+            Sync = new RegisterSyncSummaryDto
+            {
+                Status = syncEnqueued ? "Pending" : "failed_enqueue",
+                Enqueued = syncEnqueued,
+                LastError = syncEnqueueError
             }
         };
     }
