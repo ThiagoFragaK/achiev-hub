@@ -6,10 +6,6 @@
         size="lg"
         :scrollable="true"
         :isLoading="saving"
-        :saveDisabled="!canSave"
-        save-text="Save"
-        cancel-text="Cancel"
-        @save="onSave"
         @cancel="onCancel"
     >
         <p v-if="loadError" class="alert alert-danger py-2" role="alert">{{ loadError }}</p>
@@ -17,23 +13,33 @@
 
         <div v-else class="mb-3">
             <label class="form-label" for="goal-modal-percentage">End goal %</label>
-            <input
-                id="goal-modal-percentage"
-                :value="percentageGoal"
-                type="number"
-                class="form-control"
-                :class="{ 'is-invalid': percentageInvalid }"
-                min="0"
-                max="100"
-                step="0.1"
-                readonly
-                :disabled="saving"
-            />
-            <div class="form-text">
+            <div class="d-flex align-items-center gap-2">
+                <input
+                    id="goal-modal-percentage"
+                    :value="percentageGoal"
+                    type="number"
+                    class="form-control"
+                    :class="{ 'is-invalid': isEditing && percentageInvalid }"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    readonly
+                    :disabled="saving || !isEditing"
+                />
+                <button
+                    v-if="canEdit && !isEditing"
+                    type="button"
+                    class="btn btn-primary flex-shrink-0"
+                    @click="startEditing"
+                >
+                    Edit
+                </button>
+            </div>
+            <div v-if="isEditing" class="form-text">
                 Auto-set from selected achievements
                 ({{ gameInfo.unlocked }} unlocked + {{ selectedIds.size }} selected) / {{ gameInfo.total }}.
             </div>
-            <div v-if="percentageInvalid" class="invalid-feedback d-block">
+            <div v-if="isEditing && percentageInvalid" class="invalid-feedback d-block">
                 Goal % must be above current progress ({{ formatPercentage(gameInfo.percentage) }}) and at most 100.
             </div>
         </div>
@@ -45,7 +51,7 @@
             <table v-else class="table table-sm table-bordered align-middle mb-0">
                 <thead class="table-primary">
                     <tr>
-                        <th style="width: 2.5rem">
+                        <th v-if="isEditing" style="width: 2.5rem">
                             <input
                                 type="checkbox"
                                 class="form-check-input"
@@ -61,7 +67,7 @@
                 </thead>
                 <tbody>
                     <tr v-for="row in rows" :key="row.achievementId">
-                        <td>
+                        <td v-if="isEditing">
                             <input
                                 type="checkbox"
                                 class="form-check-input"
@@ -109,6 +115,46 @@
         </div>
 
         <p v-if="saveError" class="text-danger small mt-3 mb-0">{{ saveError }}</p>
+
+        <template #footer>
+            <div class="modal-footer justify-content-center">
+                <button
+                    v-if="isEditing"
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    :disabled="saving"
+                    @click="cancelEditing"
+                >
+                    Cancel
+                </button>
+                <button
+                    v-else
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    data-bs-dismiss="modal"
+                    :disabled="saving"
+                    @click="onCancel"
+                >
+                    Close
+                </button>
+                <button
+                    v-if="isEditing"
+                    type="button"
+                    class="btn btn-primary"
+                    :disabled="saving || !canSave"
+                    @click="onSave"
+                >
+                    <div style="min-width: 80px" class="text-center">
+                        <span
+                            v-if="saving"
+                            class="spinner-grow spinner-grow-sm"
+                            role="status"
+                        ></span>
+                        <span v-else>Save</span>
+                    </div>
+                </button>
+            </div>
+        </template>
     </ModalComponent>
 </template>
 
@@ -118,6 +164,12 @@ import { formatGlobalPercentage, globalPercentageColorClass } from '@/lib/global
 import { getGoalAchievements, replaceGoalAchievements } from '@/services/goalsService'
 import { getGameProgress } from '@/services/statsService'
 import { formatPercentage } from '@/utils/NumberFormat'
+
+const STATUS = {
+    Active: 0,
+    Completed: 1,
+    Abandoned: 2
+}
 
 function roundPercent(value) {
     return Math.round(value * 100) / 100
@@ -137,6 +189,7 @@ export default {
             percentageGoal: null,
             loading: false,
             saving: false,
+            isEditing: false,
             loadError: '',
             saveError: '',
             gameInfo: {
@@ -152,6 +205,10 @@ export default {
                 ? `Goal achievements — ${this.goal.gameName}`
                 : 'Goal achievements'
         },
+        canEdit() {
+            const status = this.goal?.status
+            return status === STATUS.Active || status === 'Active'
+        },
         allSelected() {
             return this.rows.length > 0 && this.selectedIds.size === this.rows.length
         },
@@ -165,7 +222,12 @@ export default {
                 || value > 100
         },
         canSave() {
-            return !!this.goal?.id && !this.loading && !this.percentageInvalid && !this.saving
+            return !!this.goal?.id
+                && this.isEditing
+                && this.canEdit
+                && !this.loading
+                && !this.percentageInvalid
+                && !this.saving
         }
     },
     methods: {
@@ -193,12 +255,29 @@ export default {
             }
             this.percentageGoal = Math.min(100, roundPercent(((unlocked + selected) / total) * 100))
         },
+        resetSelectionFromRows() {
+            this.selectedIds = new Set(this.rows.map((r) => r.achievementId))
+            this.syncPercentageGoal()
+        },
+        startEditing() {
+            if (!this.canEdit) {
+                return
+            }
+            this.saveError = ''
+            this.isEditing = true
+        },
+        cancelEditing() {
+            this.saveError = ''
+            this.resetSelectionFromRows()
+            this.isEditing = false
+        },
         async open(goal) {
             this.goal = goal
             this.rows = []
             this.selectedIds = new Set()
             this.percentageGoal = goal?.percentageGoal ?? null
             this.gameInfo = { total: 0, unlocked: 0, percentage: 0 }
+            this.isEditing = false
             this.loadError = ''
             this.saveError = ''
             this.$refs.modal?.open()
@@ -237,6 +316,9 @@ export default {
             }
         },
         toggleRow(achievementId) {
+            if (!this.isEditing) {
+                return
+            }
             const next = new Set(this.selectedIds)
             if (next.has(achievementId)) {
                 next.delete(achievementId)
@@ -247,6 +329,9 @@ export default {
             this.syncPercentageGoal()
         },
         toggleAll(event) {
+            if (!this.isEditing) {
+                return
+            }
             if (event.target.checked) {
                 this.selectedIds = new Set(this.rows.map((r) => r.achievementId))
             } else {
@@ -256,6 +341,7 @@ export default {
         },
         onCancel() {
             this.saveError = ''
+            this.isEditing = false
         },
         async onSave() {
             if (!this.canSave) {
