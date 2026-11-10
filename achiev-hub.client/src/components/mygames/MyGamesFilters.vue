@@ -5,7 +5,7 @@
                 <label class="form-label" for="filter-game-name">Game</label>
                 <input
                     id="filter-game-name"
-                    v-model="filters.name"
+                    v-model="localFilters.name"
                     type="search"
                     class="form-control"
                     placeholder="Search by name"
@@ -16,7 +16,7 @@
                 <label class="form-label" for="filter-min-hours">Min hours</label>
                 <input
                     id="filter-min-hours"
-                    v-model="filters.minHours"
+                    v-model="localFilters.minHours"
                     type="number"
                     min="0"
                     class="form-control"
@@ -27,7 +27,7 @@
                 <label class="form-label" for="filter-has-achievements">Has achievements</label>
                 <select
                     id="filter-has-achievements"
-                    v-model="filters.hasAchievements"
+                    v-model="localFilters.hasAchievements"
                     class="form-select"
                 >
                     <option value="">All</option>
@@ -44,18 +44,46 @@
 <script>
 import CollapseComponent from '@/components/global/CollapseComponent.vue';
 
+function toLocalFilters(filters = {}) {
+    return {
+        name: filters.name ?? '',
+        minHours: filters.minHours === '' || filters.minHours == null
+            ? ''
+            : filters.minHours,
+        hasAchievements: filters.hasAchievements === true
+            ? 'true'
+            : filters.hasAchievements === false
+                ? 'false'
+                : ''
+    }
+}
+
 export default {
     name: 'MyGamesFilters',
     components: {
         CollapseComponent
     },
-    emits: ['apply-filters'],
-    data() {
-        return {
-            filters: {
+    props: {
+        filters: {
+            type: Object,
+            default: () => ({
                 name: '',
                 minHours: '',
                 hasAchievements: ''
+            })
+        }
+    },
+    emits: ['apply-filters'],
+    data() {
+        return {
+            localFilters: toLocalFilters(this.filters)
+        }
+    },
+    watch: {
+        filters: {
+            deep: true,
+            handler(filters) {
+                this.localFilters = toLocalFilters(filters)
             }
         }
     },
@@ -65,13 +93,13 @@ export default {
         },
         applyFilters() {
             const payload = {
-                name: this.filters.name?.trim() || '',
-                minHours: this.filters.minHours === '' || this.filters.minHours == null
+                name: this.localFilters.name?.trim() || '',
+                minHours: this.localFilters.minHours === '' || this.localFilters.minHours == null
                     ? ''
-                    : Number(this.filters.minHours),
-                hasAchievements: this.filters.hasAchievements === ''
+                    : Number(this.localFilters.minHours),
+                hasAchievements: this.localFilters.hasAchievements === ''
                     ? ''
-                    : this.filters.hasAchievements === 'true'
+                    : this.localFilters.hasAchievements === 'true'
             }
             this.$emit('apply-filters', payload);
         }
