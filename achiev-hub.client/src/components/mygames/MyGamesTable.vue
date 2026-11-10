@@ -35,8 +35,8 @@
 </template>
 <script>
 import { getSessionSteamId, steamAppIconUrl } from '@/lib/steam'
-import { getLibrary } from '@/services/gamesService';
-import TableComponent from '@/components/global/TableComponent.vue';
+import { getLibrary } from '@/services/gamesService'
+import TableComponent from '@/components/global/TableComponent.vue'
 
 export default {
     name: 'MyGamesTable',
@@ -47,8 +47,13 @@ export default {
         filters: {
             type: Object,
             required: true
+        },
+        page: {
+            type: Number,
+            default: 1
         }
     },
+    emits: ['page-change'],
     data() {
         return {
             steamId: null,
@@ -70,13 +75,22 @@ export default {
                     }
                 ],
                 pagination:{
-                    currentPage: 1,
+                    currentPage: this.page,
                     perPage: 15,
                     totalPages: 1,
                     totalCount: 0,
                 },
                 isLoading: true
             }
+        }
+    },
+    watch: {
+        page(page) {
+            if (this.table.pagination.currentPage === page) {
+                return
+            }
+            this.table.pagination.currentPage = page
+            this.getUsersLibrary()
         }
     },
     methods: {
@@ -88,6 +102,7 @@ export default {
         },
         async onPageChange(page) {
             this.table.pagination.currentPage = page
+            this.$emit('page-change', page)
             await this.getUsersLibrary()
         },
         async getUsersLibrary() {
