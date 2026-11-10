@@ -35,7 +35,7 @@
                     <button
                         type="button"
                         class="btn btn-sm btn-outline-warning"
-                        aria-label="Edit goal achievements"
+                        aria-label="Show goal achievements"
                         @click="openAchievementsModal(data.row)"
                     >
                         Show
