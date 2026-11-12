@@ -55,7 +55,7 @@ The backend talks to the Steam Web API and persists users, games, achievements, 
 
 ## Auth
 
-Login uses Steam ID + password and returns a JWT Bearer token.
+Login supports Steam OpenID and Steam ID + password. OpenID callback URLs are derived from `SteamOpenId:PublicOrigin` when set, otherwise from the incoming request host (with forwarded headers enabled for Railway/proxies). In Development, `PublicOrigin` defaults to `https://localhost:7254`. In production, set `SteamOpenId__PublicOrigin` to your public HTTPS origin if the request host is unreliable.
 
 Seed users (password ``):
 

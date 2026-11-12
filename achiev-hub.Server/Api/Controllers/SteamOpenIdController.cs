@@ -71,7 +71,7 @@ public class SteamOpenIdController : ControllerBase
                 Path = "/"
             });
 
-        return Redirect(_openId.BuildLoginRedirectUri(state).ToString());
+        return Redirect(_openId.BuildLoginRedirectUri(state, Request).ToString());
     }
 
     [AllowAnonymous]

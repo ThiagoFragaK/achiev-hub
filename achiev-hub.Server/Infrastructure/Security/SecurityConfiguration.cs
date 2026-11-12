@@ -43,6 +43,22 @@ public static class SecurityConfiguration
                 throw new InvalidOperationException(
                     "Jwt:Key must not use a development placeholder outside Development.");
             }
+
+            var openId = configuration.GetSection(SteamOpenIdOptions.SectionName);
+            var returnTo = openId.GetValue<string>("ReturnTo");
+            var realm = openId.GetValue<string>("Realm");
+            var publicOrigin = openId.GetValue<string>("PublicOrigin");
+            if (ContainsLocalhost(returnTo) || ContainsLocalhost(realm) || ContainsLocalhost(publicOrigin))
+            {
+                throw new InvalidOperationException(
+                    "SteamOpenId ReturnTo/Realm/PublicOrigin must not use localhost outside Development. " +
+                    "Set SteamOpenId__PublicOrigin to your public HTTPS origin (e.g. https://your-app.example), " +
+                    "or leave them empty to derive from the incoming request host.");
+            }
         }
     }
+
+    private static bool ContainsLocalhost(string? value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && value.Contains("localhost", StringComparison.OrdinalIgnoreCase);
 }

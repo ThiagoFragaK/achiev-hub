@@ -33,6 +33,7 @@ using achiev_hub.Server.Infrastructure.Security;
 using achiev_hub.Server.Infrastructure.Steam;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -159,6 +160,14 @@ builder.Services.AddRateLimiter(options =>
 });
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+        | ForwardedHeaders.XForwardedProto
+        | ForwardedHeaders.XForwardedHost;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 var app = builder.Build();
 
@@ -184,6 +193,8 @@ catch (Exception ex) when (ex is Npgsql.NpgsqlException or InvalidOperationExcep
         "Database, Username, and Password.");
     throw;
 }
+
+app.UseForwardedHeaders();
 
 app.UseDefaultFiles();
 app.MapStaticAssets();
