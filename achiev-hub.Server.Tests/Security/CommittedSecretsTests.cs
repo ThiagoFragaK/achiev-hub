@@ -76,6 +76,25 @@ public class CommittedSecretsTests
         Assert.Contains("Jwt:Key", ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Validate_throws_on_localhost_steam_openid_outside_development()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["SteamApi:ApiKey"] = "0123456789ABCDEF0123456789ABCDEF",
+                ["Jwt:Key"] = "ThisIsAStrongEnoughJwtSigningKey_32b+",
+                ["SteamOpenId:ReturnTo"] = "https://localhost:7254/api/auth/steam/callback"
+            })
+            .Build();
+
+        var env = new FakeHostEnvironment { EnvironmentName = Environments.Production };
+
+        var ex = Assert.Throws<InvalidOperationException>(() => SecurityConfiguration.Validate(config, env));
+        Assert.Contains("SteamOpenId", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("localhost", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class FakeHostEnvironment : IHostEnvironment
     {
         public string EnvironmentName { get; set; } = Environments.Development;

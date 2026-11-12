@@ -25,6 +25,23 @@ public class SteamOpenIdValidatorTests
         return new SteamOpenIdValidator(new HttpClient(handler), cache, opts);
     }
 
+    private static HttpRequest FakeRequest(string host = "app.example", string scheme = "https")
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Scheme = scheme;
+        context.Request.Host = new HostString(host);
+        return context.Request;
+    }
+
+    private static (string State, string ReturnTo) BeginLogin(SteamOpenIdValidator validator, HttpRequest? request = null)
+    {
+        var state = validator.CreateState();
+        var uri = validator.BuildLoginRedirectUri(state, request ?? FakeRequest());
+        var returnTo = Microsoft.AspNetCore.WebUtilities.QueryHelpers
+            .ParseQuery(uri.Query)["openid.return_to"].ToString();
+        return (state, returnTo);
+    }
+
     [Fact]
     public async Task ValidateCallback_rejects_forged_params_without_check_authentication()
     {
@@ -33,8 +50,7 @@ public class SteamOpenIdValidatorTests
             Content = new StringContent("ns:http://specs.openid.net/auth/2.0\nis_valid:false\n")
         });
         var validator = Create(handler, out _);
-        var state = validator.CreateState();
-        var returnTo = validator.BuildReturnTo(state);
+        var (state, returnTo) = BeginLogin(validator);
 
         var query = new QueryCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
         {
@@ -60,8 +76,7 @@ public class SteamOpenIdValidatorTests
             Content = new StringContent("ns:http://specs.openid.net/auth/2.0\nis_valid:true\n")
         });
         var validator = Create(handler, out _);
-        var state = validator.CreateState();
-        var returnTo = validator.BuildReturnTo(state);
+        var (state, returnTo) = BeginLogin(validator);
         const string nonce = "2026-01-01T00:00:00Zunique2";
 
         var query = new QueryCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
@@ -80,8 +95,7 @@ public class SteamOpenIdValidatorTests
         Assert.Equal("76561198000000001", first.SteamId);
 
         // State already consumed — replay with same state fails even before nonce.
-        var state2 = validator.CreateState();
-        var returnTo2 = validator.BuildReturnTo(state2);
+        var (state2, returnTo2) = BeginLogin(validator);
         var queryReplay = new QueryCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
         {
             ["openid.mode"] = "id_res",
@@ -106,13 +120,13 @@ public class SteamOpenIdValidatorTests
             Content = new StringContent("is_valid:true\n")
         });
         var validator = Create(handler, out _);
-        var state = validator.CreateState();
+        var (state, returnTo) = BeginLogin(validator);
 
         var query = new QueryCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
         {
             ["openid.mode"] = "id_res",
             ["openid.op_endpoint"] = "https://evil.example/openid",
-            ["openid.return_to"] = validator.BuildReturnTo(state),
+            ["openid.return_to"] = returnTo,
             ["openid.claimed_id"] = "https://steamcommunity.com/openid/id/76561198000000001",
             ["openid.identity"] = "https://steamcommunity.com/openid/id/76561198000000001",
             ["openid.response_nonce"] = "n",
@@ -122,6 +136,53 @@ public class SteamOpenIdValidatorTests
         var result = await validator.ValidateCallbackAsync(query, state);
         Assert.False(result.Success);
         Assert.Contains("op_endpoint", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuildLoginRedirectUri_uses_request_host_when_config_empty()
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage());
+        var validator = Create(handler, out _, new SteamOpenIdOptions
+        {
+            PublicOrigin = "",
+            ReturnTo = "",
+            Realm = "",
+            OpEndpoint = "https://steamcommunity.com/openid/login",
+            ClaimedIdPrefix = "https://steamcommunity.com/openid/id/"
+        });
+
+        var state = validator.CreateState();
+        var uri = validator.BuildLoginRedirectUri(state, FakeRequest("prod.example"));
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        Assert.Equal(
+            $"https://prod.example/api/auth/steam/callback?state={state}",
+            query["openid.return_to"].ToString());
+        Assert.Equal("https://prod.example/", query["openid.realm"].ToString());
+    }
+
+    [Fact]
+    public void BuildLoginRedirectUri_prefers_PublicOrigin_over_request_host()
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage());
+        var validator = Create(handler, out _, new SteamOpenIdOptions
+        {
+            PublicOrigin = "https://canonical.example",
+            ReturnTo = "",
+            Realm = "",
+            OpEndpoint = "https://steamcommunity.com/openid/login",
+            ClaimedIdPrefix = "https://steamcommunity.com/openid/id/"
+        });
+
+        var state = validator.CreateState();
+        var uri = validator.BuildLoginRedirectUri(state, FakeRequest("internal.example"));
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        Assert.StartsWith(
+            "https://canonical.example/api/auth/steam/callback?",
+            query["openid.return_to"].ToString(),
+            StringComparison.Ordinal);
+        Assert.Equal("https://canonical.example/", query["openid.realm"].ToString());
     }
 
     private sealed class StubHandler : HttpMessageHandler
