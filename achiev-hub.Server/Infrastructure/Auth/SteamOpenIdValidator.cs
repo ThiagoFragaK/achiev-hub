@@ -9,6 +9,7 @@ namespace achiev_hub.Server.Infrastructure.Auth;
 public sealed class SteamOpenIdValidator
 {
     public const string StateCookieName = "achiev_hub_oid_state";
+    private const string CallbackPath = "/api/auth/steam/callback";
     private static readonly Regex SteamId64Regex = new(@"^7656119\d{10}$", RegexOptions.Compiled);
 
     private readonly HttpClient _httpClient;
@@ -27,43 +28,30 @@ public sealed class SteamOpenIdValidator
 
     public string CreateState()
     {
-        var state = Convert.ToBase64String(Guid.NewGuid().ToByteArray())
+        return Convert.ToBase64String(Guid.NewGuid().ToByteArray())
             .TrimEnd('=')
             .Replace('+', '-')
             .Replace('/', '_');
-        _cache.Set(StateCacheKey(state), true, TimeSpan.FromMinutes(10));
-        return state;
     }
 
-    public bool ConsumeState(string? state)
-    {
-        if (string.IsNullOrWhiteSpace(state))
-        {
-            return false;
-        }
-
-        var key = StateCacheKey(state);
-        if (!_cache.TryGetValue(key, out _))
-        {
-            return false;
-        }
-
-        _cache.Remove(key);
-        return true;
-    }
-
+    /// <summary>Builds return_to for tests or when ReturnTo is configured explicitly.</summary>
     public string BuildReturnTo(string state) =>
-        QueryHelpers.AddQueryString(_options.ReturnTo, "state", state);
+        QueryHelpers.AddQueryString(ResolveReturnToBase(request: null), "state", state);
 
-    public Uri BuildLoginRedirectUri(string state)
+    public Uri BuildLoginRedirectUri(string state, HttpRequest request)
     {
-        var returnTo = BuildReturnTo(state);
+        var returnToBase = ResolveReturnToBase(request);
+        var realm = ResolveRealm(request);
+        var returnTo = QueryHelpers.AddQueryString(returnToBase, "state", state);
+
+        _cache.Set(StateCacheKey(state), returnTo, TimeSpan.FromMinutes(10));
+
         var query = new Dictionary<string, string?>
         {
             ["openid.ns"] = "http://specs.openid.net/auth/2.0",
             ["openid.mode"] = "checkid_setup",
             ["openid.return_to"] = returnTo,
-            ["openid.realm"] = _options.Realm,
+            ["openid.realm"] = realm,
             ["openid.identity"] = "http://specs.openid.net/auth/2.0/identifier_select",
             ["openid.claimed_id"] = "http://specs.openid.net/auth/2.0/identifier_select"
         };
@@ -88,12 +76,11 @@ public sealed class SteamOpenIdValidator
 
         if (string.IsNullOrWhiteSpace(stateFromCookie)
             || !string.Equals(query["state"], stateFromCookie, StringComparison.Ordinal)
-            || !ConsumeState(stateFromCookie))
+            || !TryConsumeExpectedReturnTo(stateFromCookie, out var expectedReturnTo))
         {
             return SteamOpenIdResult.Fail("Invalid or reused OpenID state.");
         }
 
-        var expectedReturnTo = BuildReturnTo(stateFromCookie);
         var returnTo = query["openid.return_to"].ToString();
         if (!string.Equals(returnTo, expectedReturnTo, StringComparison.Ordinal))
         {
@@ -137,6 +124,57 @@ public sealed class SteamOpenIdValidator
 
         _cache.Set(nonceKey, true, TimeSpan.FromHours(24));
         return SteamOpenIdResult.Ok(steamId);
+    }
+
+    internal string ResolveReturnToBase(HttpRequest? request)
+    {
+        if (!string.IsNullOrWhiteSpace(_options.ReturnTo))
+        {
+            return _options.ReturnTo.Trim();
+        }
+
+        return $"{ResolveOrigin(request)}{CallbackPath}";
+    }
+
+    internal string ResolveRealm(HttpRequest? request)
+    {
+        if (!string.IsNullOrWhiteSpace(_options.Realm))
+        {
+            var realm = _options.Realm.Trim();
+            return realm.EndsWith('/') ? realm : realm + "/";
+        }
+
+        return ResolveOrigin(request) + "/";
+    }
+
+    private string ResolveOrigin(HttpRequest? request)
+    {
+        if (!string.IsNullOrWhiteSpace(_options.PublicOrigin))
+        {
+            return _options.PublicOrigin.Trim().TrimEnd('/');
+        }
+
+        if (request is null)
+        {
+            throw new InvalidOperationException(
+                "SteamOpenId:ReturnTo or SteamOpenId:PublicOrigin must be configured when no HTTP request is available.");
+        }
+
+        return $"{request.Scheme}://{request.Host.Value}".TrimEnd('/');
+    }
+
+    private bool TryConsumeExpectedReturnTo(string state, out string expectedReturnTo)
+    {
+        expectedReturnTo = "";
+        var key = StateCacheKey(state);
+        if (!_cache.TryGetValue(key, out string? stored) || string.IsNullOrEmpty(stored))
+        {
+            return false;
+        }
+
+        _cache.Remove(key);
+        expectedReturnTo = stored;
+        return true;
     }
 
     private async Task<bool> CheckAuthenticationAsync(IQueryCollection query, CancellationToken cancellationToken)
