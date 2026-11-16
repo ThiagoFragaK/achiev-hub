@@ -100,7 +100,7 @@
                                 step="1"
                                 placeholder="0"
                                 :value="minPercentage"
-                                :disabled="loading || !!loadError"
+                                :disabled="loading || !!loadError || onlyZeroPercent"
                                 @input="onMinPercentageInput"
                             />
                         </div>
@@ -108,18 +108,31 @@
                             <label class="form-label small text-secondary mb-1" for="whatIfMaxPercent">
                                 Max %
                             </label>
-                            <input
-                                id="whatIfMaxPercent"
-                                type="number"
-                                class="form-control"
-                                min="0"
-                                max="100"
-                                step="1"
-                                placeholder="100"
-                                :value="maxPercentage"
-                                :disabled="loading || !!loadError"
-                                @input="onMaxPercentageInput"
-                            />
+                            <div class="d-flex gap-2">
+                                <input
+                                    id="whatIfMaxPercent"
+                                    type="number"
+                                    class="form-control"
+                                    min="0"
+                                    max="100"
+                                    step="1"
+                                    placeholder="100"
+                                    :value="maxPercentage"
+                                    :disabled="loading || !!loadError || onlyZeroPercent"
+                                    @input="onMaxPercentageInput"
+                                />
+                                <button
+                                    type="button"
+                                    class="btn flex-shrink-0"
+                                    :class="onlyZeroPercent ? 'btn-primary' : 'btn-outline-secondary'"
+                                    :disabled="loading || !!loadError"
+                                    :aria-pressed="onlyZeroPercent"
+                                    title="Show only 0% games"
+                                    @click="toggleOnlyZeroPercent"
+                                >
+                                    0%
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -295,6 +308,7 @@ export default {
             searchText: '',
             minPercentage: '',
             maxPercentage: '',
+            onlyZeroPercent: false,
             dropdownOpen: false,
             highlightIndex: 0,
             selectedAppId: null,
@@ -325,6 +339,12 @@ export default {
                         return false
                     }
                     const p = Number(g.achievementsPercentage) || 0
+                    if (this.onlyZeroPercent) {
+                        return p === 0
+                    }
+                    if (p === 0) {
+                        return false
+                    }
                     if (min != null && Number.isFinite(min) && p < min) {
                         return false
                     }
@@ -406,6 +426,7 @@ export default {
                 || this.searchText !== ''
                 || this.minPercentage !== ''
                 || this.maxPercentage !== ''
+                || this.onlyZeroPercent
                 || this.overridePercentage !== ''
             )
         }
@@ -448,6 +469,11 @@ export default {
         onMaxPercentageInput(event) {
             this.maxPercentage = this.normalizeBoundInput(event.target.value)
             this.highlightIndex = 0
+        },
+        toggleOnlyZeroPercent() {
+            this.onlyZeroPercent = !this.onlyZeroPercent
+            this.highlightIndex = 0
+            this.dropdownOpen = true
         },
         normalizeBoundInput(raw) {
             if (raw === '') {
@@ -527,6 +553,7 @@ export default {
             this.searchText = ''
             this.minPercentage = ''
             this.maxPercentage = ''
+            this.onlyZeroPercent = false
             this.overridePercentage = ''
             this.changes = []
             this.dropdownOpen = false
