@@ -26,10 +26,12 @@ public class UserStatsService : IUserStatsService
     private static readonly TimeZoneInfo DateTimeZone = TimeZoneInfo.Local;
 
     private readonly ApplicationDbContext _db;
+    private readonly IUsersGameRepository _usersGames;
 
-    public UserStatsService(ApplicationDbContext db)
+    public UserStatsService(ApplicationDbContext db, IUsersGameRepository usersGames)
     {
         _db = db;
+        _usersGames = usersGames;
     }
 
     public async Task<UserStatsDto> GetStatsAsync(int userId, CancellationToken cancellationToken = default)
@@ -213,20 +215,14 @@ public class UserStatsService : IUserStatsService
         int userId,
         CancellationToken cancellationToken = default)
     {
-        var rows = await _db.UsersGames
-            .AsNoTracking()
-            .Where(ug =>
-                ug.UserId == userId
-                && ug.Game.HasCommunityVisibleStats == true
-                && ug.Game.Achievements.Any())
-            .OrderBy(ug => ug.Game.Name)
-            .Select(ug => new
-            {
-                ug.Game.GameSteamId,
-                ug.Game.Name,
-                ug.AchievementsPercentage
-            })
-            .ToListAsync(cancellationToken);
+        var (currentAverage, gamesInAverage) = await _usersGames.GetAveragePercentageStatsAsync(
+            userId,
+            cancellationToken);
+
+        var rows = await _usersGames.GetGamesWithAchievementStatsAsync(
+            userId,
+            excludeCompleted: true,
+            cancellationToken: cancellationToken);
 
         var games = new List<GameForAverageDto>();
         foreach (var row in rows)
@@ -244,12 +240,22 @@ public class UserStatsService : IUserStatsService
             });
         }
 
-        return new GamesForAverageDto { Games = games };
+        return new GamesForAverageDto
+        {
+            CurrentAverage = currentAverage,
+            GamesInAverage = gamesInAverage,
+            Games = games
+        };
     }
 
     public GamesForAverageDto GetEmptyGamesForAverage()
     {
-        return new GamesForAverageDto { Games = [] };
+        return new GamesForAverageDto
+        {
+            CurrentAverage = 0,
+            GamesInAverage = 0,
+            Games = []
+        };
     }
 
     private static IReadOnlyList<GameProgressPointDto> BuildProgressPoints(

@@ -27,6 +27,7 @@ using achiev_hub.Server.Infrastructure.HealthChecks.Interfaces;
 using achiev_hub.Server.Infrastructure.Messaging;
 using achiev_hub.Server.Infrastructure.Messaging.Interfaces;
 using achiev_hub.Server.Infrastructure.Persistence;
+using achiev_hub.Server.Infrastructure.Persistence.Repository;
 using achiev_hub.Server.Infrastructure.Startup;
 using achiev_hub.Server.Infrastructure.Startup.Interfaces;
 using achiev_hub.Server.Infrastructure.Security;
@@ -73,6 +74,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+builder.Services.AddScoped<IUsersGameRepository, UsersGameRepository>();
 builder.Services.AddScoped<IPlayersService, PlayersService>();
 builder.Services.AddScoped<IGamesService, GamesService>();
 builder.Services.AddScoped<ISteamSyncService, SteamSyncService>();

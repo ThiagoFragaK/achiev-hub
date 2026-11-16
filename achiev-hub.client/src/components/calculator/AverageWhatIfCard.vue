@@ -232,15 +232,6 @@
 import { getGamesForAverage } from '@/services/statsService'
 import { formatPercentage } from '@/utils/NumberFormat'
 
-function averageOf(percentages) {
-    const values = percentages.filter((p) => p > 0)
-    if (!values.length) {
-        return 0
-    }
-    const sum = values.reduce((a, b) => a + b, 0)
-    return Math.round((sum / values.length) * 100) / 100
-}
-
 function clampPercent(n) {
     if (!Number.isFinite(n)) {
         return null
@@ -254,13 +245,42 @@ function clampPercent(n) {
     return n
 }
 
-function percentagesWithOverrides(games, overrideMap) {
-    return games.map((g) => {
-        if (Object.prototype.hasOwnProperty.call(overrideMap, g.appId)) {
-            return Number(overrideMap[g.appId]) || 0
+function roundAverage(sum, count) {
+    if (count <= 0) {
+        return 0
+    }
+    return Math.round((sum / count) * 100) / 100
+}
+
+/**
+ * Completed (100%) games are excluded from `games` but still count toward the real average.
+ * Rebuild the mean from the server baseline plus incomplete-game overrides.
+ */
+function averageWithBaseline(games, overrideMap, baselineAverage, baselineCount) {
+    let incompleteOriginalSum = 0
+    let incompleteOriginalCount = 0
+    let incompleteNewSum = 0
+    let incompleteNewCount = 0
+
+    for (const game of games) {
+        const original = Number(game.achievementsPercentage) || 0
+        const next = Object.prototype.hasOwnProperty.call(overrideMap, game.appId)
+            ? Number(overrideMap[game.appId]) || 0
+            : original
+
+        if (original > 0) {
+            incompleteOriginalSum += original
+            incompleteOriginalCount += 1
         }
-        return Number(g.achievementsPercentage) || 0
-    })
+        if (next > 0) {
+            incompleteNewSum += next
+            incompleteNewCount += 1
+        }
+    }
+
+    const excludedSum = baselineAverage * baselineCount - incompleteOriginalSum
+    const excludedCount = baselineCount - incompleteOriginalCount
+    return roundAverage(excludedSum + incompleteNewSum, excludedCount + incompleteNewCount)
 }
 
 export default {
@@ -270,6 +290,8 @@ export default {
             loading: false,
             loadError: '',
             games: [],
+            baselineAverage: 0,
+            baselineGamesInAverage: 0,
             searchText: '',
             minPercentage: '',
             maxPercentage: '',
@@ -314,10 +336,10 @@ export default {
                 .slice(0, 50)
         },
         currentAverage() {
-            return averageOf(this.games.map((g) => Number(g.achievementsPercentage) || 0))
+            return this.baselineAverage
         },
         gamesInAverage() {
-            return this.games.filter((g) => Number(g.achievementsPercentage) > 0).length
+            return this.baselineGamesInAverage
         },
         overrideMap() {
             const map = {}
@@ -330,7 +352,12 @@ export default {
             if (!this.changes.length) {
                 return this.currentAverage
             }
-            return averageOf(percentagesWithOverrides(this.games, this.overrideMap))
+            return averageWithBaseline(
+                this.games,
+                this.overrideMap,
+                this.baselineAverage,
+                this.baselineGamesInAverage
+            )
         },
         delta() {
             return Math.round((this.projectedAverage - this.currentAverage) * 100) / 100
@@ -345,7 +372,12 @@ export default {
 
             for (const change of this.changes) {
                 applied[change.appId] = change.newPercentage
-                const avgAfter = averageOf(percentagesWithOverrides(this.games, applied))
+                const avgAfter = averageWithBaseline(
+                    this.games,
+                    applied,
+                    this.baselineAverage,
+                    this.baselineGamesInAverage
+                )
                 const avgImpact = Math.round((avgAfter - avgBefore) * 100) / 100
                 log.push({
                     ...change,
@@ -519,9 +551,13 @@ export default {
             try {
                 const data = await getGamesForAverage()
                 this.games = data?.games ?? []
+                this.baselineAverage = Number(data?.currentAverage) || 0
+                this.baselineGamesInAverage = Number(data?.gamesInAverage) || 0
             } catch (err) {
                 this.loadError = err?.message || 'Failed to load games for the calculator.'
                 this.games = []
+                this.baselineAverage = 0
+                this.baselineGamesInAverage = 0
             } finally {
                 this.loading = false
             }

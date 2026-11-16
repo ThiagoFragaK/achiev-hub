@@ -47,6 +47,8 @@ public class PercentageBandCountDto
 
 public class GamesForAverageDto
 {
+    public decimal CurrentAverage { get; set; }
+    public int GamesInAverage { get; set; }
     public IReadOnlyList<GameForAverageDto> Games { get; set; } = [];
 }
 

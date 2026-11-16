@@ -1,6 +1,7 @@
 using achiev_hub.Server.Application.Common;
 using achiev_hub.Server.Application.Common.Interfaces;
 using achiev_hub.Server.Application.Goals.Interfaces;
+using achiev_hub.Server.Application.Users.Interfaces;
 using achiev_hub.Server.Domain.Entities;
 using achiev_hub.Server.Domain.Enums;
 using achiev_hub.Server.Infrastructure.Persistence;
@@ -11,10 +12,12 @@ namespace achiev_hub.Server.Application.Goals;
 public class GoalService : IGoalService
 {
     private readonly ApplicationDbContext _db;
+    private readonly IUsersGameRepository _usersGames;
 
-    public GoalService(ApplicationDbContext db)
+    public GoalService(ApplicationDbContext db, IUsersGameRepository usersGames)
     {
         _db = db;
+        _usersGames = usersGames;
     }
 
     public async Task<IReadOnlyList<GoalDto>> GetForUserAsync(
@@ -381,34 +384,13 @@ public class GoalService : IGoalService
             .Select(g => g.GameId)
             .ToListAsync(cancellationToken);
 
-        var activeSet = activeGameIds.ToHashSet();
-
-        var rowsQuery = _db.UsersGames
-            .AsNoTracking()
-            .Where(ug =>
-                ug.UserId == userId
-                && ug.AchievementsPercentage < 100m
-                && ug.Game.HasCommunityVisibleStats == true
-                && ug.Game.Achievements.Any()
-                && !activeSet.Contains(ug.GameId));
-
-        if (!string.IsNullOrWhiteSpace(query))
-        {
-            var q = query.Trim().ToLowerInvariant();
-            rowsQuery = rowsQuery.Where(ug => ug.Game.Name.ToLower().Contains(q));
-        }
-
-        var rows = await rowsQuery
-            .OrderBy(ug => ug.Game.Name)
-            .Select(ug => new
-            {
-                ug.Game.GameSteamId,
-                ug.Game.Name,
-                ug.Game.ImageUrl,
-                ug.AchievementsPercentage
-            })
-            .Take(50)
-            .ToListAsync(cancellationToken);
+        var rows = await _usersGames.GetGamesWithAchievementStatsAsync(
+            userId,
+            excludeCompleted: true,
+            nameQuery: query,
+            excludeGameIds: activeGameIds,
+            take: 50,
+            cancellationToken: cancellationToken);
 
         var games = new List<EligibleGameDto>();
         foreach (var row in rows)
