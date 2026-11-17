@@ -1,22 +1,11 @@
-using achiev_hub.Server.Infrastructure.Persistence;
-using achiev_hub.Server.Application.Games;
-using achiev_hub.Server.Application.Games.Interfaces;
 using achiev_hub.Server.Application.Achievements;
 using achiev_hub.Server.Application.Achievements.Interfaces;
+using achiev_hub.Server.Application.Common;
+using achiev_hub.Server.Application.Games.Interfaces;
 using achiev_hub.Server.Application.Steam;
 using achiev_hub.Server.Application.Steam.Interfaces;
-using achiev_hub.Server.Application.Stats;
-using achiev_hub.Server.Application.Stats.Interfaces;
-using achiev_hub.Server.Application.Users;
 using achiev_hub.Server.Application.Users.Interfaces;
-using achiev_hub.Server.Application.Goals;
-using achiev_hub.Server.Application.Goals.Interfaces;
-using achiev_hub.Server.Application.Auth;
-using achiev_hub.Server.Application.Auth.Interfaces;
-using achiev_hub.Server.Application.Common;
-using achiev_hub.Server.Application.Common.Interfaces;
 using achiev_hub.Server.Infrastructure.Auth;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace achiev_hub.Server.Application.Games;
@@ -26,13 +15,25 @@ public class GamesService : IGamesService
     private static readonly TimeZoneInfo DateTimeZone = TimeZoneInfo.Local;
 
     private readonly ISteamApiClient _steamApiClient;
-    private readonly ApplicationDbContext _db;
+    private readonly IUsersGameRepository _usersGames;
+    private readonly IUsersAchievementRepository _usersAchievements;
+    private readonly IGameRepository _games;
+    private readonly IAchievementRepository _achievements;
     private readonly IMemoryCache _cache;
 
-    public GamesService(ISteamApiClient steamApiClient, ApplicationDbContext db, IMemoryCache cache)
+    public GamesService(
+        ISteamApiClient steamApiClient,
+        IUsersGameRepository usersGames,
+        IUsersAchievementRepository usersAchievements,
+        IGameRepository games,
+        IAchievementRepository achievements,
+        IMemoryCache cache)
     {
         _steamApiClient = steamApiClient;
-        _db = db;
+        _usersGames = usersGames;
+        _usersAchievements = usersAchievements;
+        _games = games;
+        _achievements = achievements;
         _cache = cache;
     }
 
@@ -46,7 +47,7 @@ public class GamesService : IGamesService
         // Recent games always come from Steam, with a short memory cache.
         _ = userId;
         var mapped = await GetOrFetchRecentGamesAsync(steamId, cancellationToken);
-        return Paginate(mapped, page, pageSize);
+        return PaginationHelper.Paginate(mapped, page, pageSize);
     }
 
     public async Task<PagedResultDto<LibraryGameDto>> GetLibraryAsync(
@@ -148,7 +149,7 @@ public class GamesService : IGamesService
             });
         }
 
-        return Paginate(FilterAndSortAchievements(rows, name, status, sort, global), page, pageSize);
+        return PaginationHelper.Paginate(FilterAndSortAchievements(rows, name, status, sort, global), page, pageSize);
     }
 
     public async Task<PagedResultDto<RecentAchievementDto>> GetRecentAchievementsAsync(
@@ -158,53 +159,15 @@ public class GamesService : IGamesService
         CancellationToken cancellationToken = default)
     {
         const int maxRecent = 100;
-        if (pageSize <= 0)
-        {
-            pageSize = 10;
-        }
 
-        pageSize = Math.Min(pageSize, 10);
+        var pageResult = await _usersAchievements.GetRecentUnlockedPageAsync(
+            userId,
+            page,
+            pageSize,
+            maxRecent,
+            cancellationToken);
 
-        var unlockQuery = _db.UsersAchievements
-            .AsNoTracking()
-            .Where(ua => ua.UserId == userId && ua.UnlockDate != null);
-
-        var unlockedCount = await unlockQuery.CountAsync(cancellationToken);
-        var totalCount = Math.Min(unlockedCount, maxRecent);
-        if (totalCount == 0)
-        {
-            return new PagedResultDto<RecentAchievementDto>
-            {
-                Data = [],
-                CurrentPage = 1,
-                LastPage = 1,
-                PerPage = pageSize,
-                TotalCount = 0
-            };
-        }
-
-        var lastPage = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
-        var currentPage = page <= 0 ? 1 : Math.Min(page, lastPage);
-        var skip = (currentPage - 1) * pageSize;
-        var take = Math.Min(pageSize, totalCount - skip);
-
-        var rows = await unlockQuery
-            .OrderByDescending(ua => ua.UnlockDate)
-            .Skip(skip)
-            .Take(take)
-            .Select(ua => new
-            {
-                AchievementName = ua.Achievement.Name,
-                ua.Achievement.Description,
-                ua.Achievement.ImageUrlUnlock,
-                ua.Achievement.GlobalPercentage,
-                ua.UnlockDate,
-                GameName = ua.Game.Name,
-                ua.Game.GameSteamId
-            })
-            .ToListAsync(cancellationToken);
-
-        var data = rows.Select(row =>
+        var data = pageResult.Data.Select(row =>
         {
             var appId = int.TryParse(row.GameSteamId, out var parsed) ? parsed : 0;
             return new RecentAchievementDto
@@ -221,14 +184,7 @@ public class GamesService : IGamesService
             };
         }).ToList();
 
-        return new PagedResultDto<RecentAchievementDto>
-        {
-            Data = data,
-            CurrentPage = currentPage,
-            LastPage = lastPage,
-            PerPage = pageSize,
-            TotalCount = totalCount
-        };
+        return PagedResultDto<RecentAchievementDto>.From(data, pageResult.Pagination);
     }
 
     private async Task<PagedResultDto<AchievementDto>> GetAchievementsFromDbAsync(
@@ -243,47 +199,29 @@ public class GamesService : IGamesService
         CancellationToken cancellationToken)
     {
         var steamAppId = appId.ToString();
-        var gameId = await _db.Games
-            .AsNoTracking()
-            .Where(g => g.GameSteamId == steamAppId)
-            .Select(g => (int?)g.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        var gameId = await _games.GetIdBySteamIdAsync(steamAppId, cancellationToken);
 
         if (gameId is not int id)
         {
-            return Paginate(Array.Empty<AchievementDto>(), page, pageSize);
+            return PaginationHelper.Paginate(Array.Empty<AchievementDto>(), page, pageSize);
         }
 
-        var unlocks = await _db.UsersAchievements
-            .AsNoTracking()
-            .Where(ua => ua.UserId == userId && ua.GameId == id)
-            .Select(ua => new { ua.AchievementId, ua.UnlockDate })
-            .ToDictionaryAsync(ua => ua.AchievementId, cancellationToken);
-
-        var catalog = await _db.Achievements
-            .AsNoTracking()
-            .Where(a => a.GameId == id)
-            .Select(a => new
-            {
-                a.Id,
-                a.Name,
-                a.Description,
-                a.ImageUrlLock,
-                a.ImageUrlUnlock,
-                a.GlobalPercentage
-            })
-            .ToListAsync(cancellationToken);
+        var unlocks = await _usersAchievements.GetUnlockDatesByAchievementIdAsync(
+            userId,
+            id,
+            cancellationToken);
+        var catalog = await _achievements.GetCatalogAsync(id, cancellationToken);
 
         var rows = new List<AchievementSortRow>(catalog.Count);
         foreach (var achievement in catalog)
         {
-            var unlocked = unlocks.TryGetValue(achievement.Id, out var usersUnlock);
+            var unlocked = unlocks.TryGetValue(achievement.Id, out var unlockDateValue);
             DateTime? unlockUtc = null;
             var unlockDate = "-";
-            if (unlocked && usersUnlock is not null && usersUnlock.UnlockDate.HasValue)
+            if (unlocked && unlockDateValue.HasValue)
             {
-                unlockUtc = DateTime.SpecifyKind(usersUnlock.UnlockDate.Value, DateTimeKind.Utc);
-                unlockDate = FormatDateTimeFromUtc(usersUnlock.UnlockDate.Value);
+                unlockUtc = DateTime.SpecifyKind(unlockDateValue.Value, DateTimeKind.Utc);
+                unlockDate = FormatDateTimeFromUtc(unlockDateValue.Value);
             }
 
             var iconHash = unlocked ? achievement.ImageUrlUnlock : achievement.ImageUrlLock;
@@ -305,7 +243,7 @@ public class GamesService : IGamesService
             });
         }
 
-        return Paginate(FilterAndSortAchievements(rows, name, status, sort, global), page, pageSize);
+        return PaginationHelper.Paginate(FilterAndSortAchievements(rows, name, status, sort, global), page, pageSize);
     }
 
     private static List<AchievementDto> FilterAndSortAchievements(
@@ -482,7 +420,7 @@ public class GamesService : IGamesService
             });
         }
 
-        return Paginate(ApplyLibrarySort(ApplyLibraryFilters(mapped, filters), filters), page, pageSize);
+        return PaginationHelper.Paginate(ApplyLibrarySort(ApplyLibraryFilters(mapped, filters), filters), page, pageSize);
     }
 
     private async Task<PagedResultDto<LibraryGameDto>> GetLibraryFromDbAsync(
@@ -492,70 +430,21 @@ public class GamesService : IGamesService
         LibraryGameFilterDto? filters,
         CancellationToken cancellationToken)
     {
-        if (pageSize <= 0)
-        {
-            pageSize = 25;
-        }
-
-        var query = _db.UsersGames
-            .AsNoTracking()
-            .Where(ug => ug.UserId == userId && ug.Game.ImageUrl != null && ug.Game.ImageUrl != "");
-
-        if (filters is not null)
-        {
-            if (!string.IsNullOrWhiteSpace(filters.Name))
+        var pageResult = await _usersGames.GetLibraryPageAsync(
+            userId,
+            new LibraryGameQuery
             {
-                var name = filters.Name.Trim().ToLowerInvariant();
-                query = query.Where(ug => ug.Game.Name.ToLower().Contains(name));
-            }
+                Name = filters?.Name,
+                MinHours = filters?.MinHours,
+                HasAchievements = filters?.HasAchievements,
+                Sort = filters?.Sort,
+                Page = page,
+                PageSize = pageSize
+            },
+            cancellationToken);
 
-            if (filters.MinHours is double minHours)
-            {
-                var minMinutes = (int)Math.Ceiling(minHours * 60);
-                query = query.Where(ug => ug.PlaytimeMinutes >= minMinutes);
-            }
-
-            if (filters.HasAchievements is bool hasAchievements)
-            {
-                query = query.Where(ug => ug.Game.HasCommunityVisibleStats == hasAchievements);
-            }
-        }
-
-        var sort = filters?.Sort?.Trim().ToLowerInvariant() ?? "playtime";
-        query = sort switch
-        {
-            "name" => query.OrderBy(ug => ug.Game.Name),
-            "achievements" => query
-                .OrderByDescending(ug => ug.Game.HasCommunityVisibleStats == true)
-                .ThenByDescending(ug => ug.AchievementsPercentage)
-                .ThenBy(ug => ug.Game.Name),
-            _ => query
-                .OrderByDescending(ug => ug.PlaytimeMinutes)
-                .ThenBy(ug => ug.Game.Name)
-        };
-
-        var totalCount = await query.CountAsync(cancellationToken);
-        var lastPage = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
-        var currentPage = page <= 0 ? 1 : Math.Min(page, lastPage);
-        var skip = (currentPage - 1) * pageSize;
-
-        var rows = await query
-            .Skip(skip)
-            .Take(pageSize)
-            .Select(ug => new
-            {
-                ug.Game.GameSteamId,
-                ug.Game.Name,
-                ug.Game.ImageUrl,
-                ug.PlaytimeMinutes,
-                ug.LastPlayedUnix,
-                HasAchievements = ug.Game.HasCommunityVisibleStats == true,
-                ug.AchievementsPercentage
-            })
-            .ToListAsync(cancellationToken);
-
-        var mapped = new List<LibraryGameDto>(rows.Count);
-        foreach (var ug in rows)
+        var mapped = new List<LibraryGameDto>(pageResult.Data.Count);
+        foreach (var ug in pageResult.Data)
         {
             if (!int.TryParse(ug.GameSteamId, out var appId))
             {
@@ -576,14 +465,7 @@ public class GamesService : IGamesService
             });
         }
 
-        return new PagedResultDto<LibraryGameDto>
-        {
-            Data = mapped,
-            CurrentPage = currentPage,
-            LastPage = lastPage,
-            PerPage = pageSize,
-            TotalCount = totalCount
-        };
+        return PagedResultDto<LibraryGameDto>.From(mapped, pageResult.Pagination);
     }
 
     private static List<LibraryGameDto> ApplyLibraryFilters(
@@ -659,28 +541,6 @@ public class GamesService : IGamesService
             Locked = total - unlocked,
             Total = total,
             Percentage = percentage
-        };
-    }
-
-    private static PagedResultDto<T> Paginate<T>(IReadOnlyList<T> items, int page, int pageSize)
-    {
-        if (pageSize <= 0)
-        {
-            pageSize = 25;
-        }
-
-        var totalCount = items.Count;
-        var lastPage = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
-        var currentPage = page <= 0 ? 1 : Math.Min(page, lastPage);
-        var skip = (currentPage - 1) * pageSize;
-
-        return new PagedResultDto<T>
-        {
-            Data = items.Skip(skip).Take(pageSize).ToList(),
-            CurrentPage = currentPage,
-            LastPage = lastPage,
-            PerPage = pageSize,
-            TotalCount = totalCount
         };
     }
 

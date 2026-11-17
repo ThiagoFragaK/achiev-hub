@@ -54,14 +54,8 @@ public class SteamGamesController : ApiControllerBase
     {
         if (ResolveUserId() is not int userId)
         {
-            return Ok(new PagedResultDto<RecentAchievementDto>
-            {
-                Data = [],
-                CurrentPage = 1,
-                LastPage = 1,
-                PerPage = pageSize <= 0 ? 10 : Math.Min(pageSize, 10),
-                TotalCount = 0
-            });
+            var size = pageSize <= 0 ? 10 : Math.Min(pageSize, 10);
+            return Ok(PagedResultDto<RecentAchievementDto>.Empty(size));
         }
 
         var result = await _gamesService.GetRecentAchievementsAsync(

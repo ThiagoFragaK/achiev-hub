@@ -45,6 +45,11 @@
 import { formatGlobalPercentage, globalPercentageColorClass } from '@/lib/globalPercentage'
 import { getRecentAchievements } from '@/services/gamesService'
 import TableComponent from '@/components/global/TableComponent.vue'
+import {
+    applyPagedResult,
+    createPagination,
+    resetPagination
+} from '@/utils/PaginationHelper'
 
 export default {
     name: 'RecentAchievementsTable',
@@ -63,12 +68,7 @@ export default {
                     { key: 'globalPercentage', label: 'Global %' },
                     { key: 'unlocked', label: 'Unlocked' },
                 ],
-                pagination: {
-                    currentPage: 1,
-                    perPage: 10,
-                    totalPages: 1,
-                    totalCount: 0,
-                },
+                pagination: createPagination({ perPage: 10 }),
             },
         }
     },
@@ -87,14 +87,10 @@ export default {
                     this.table.pagination.currentPage,
                     this.table.pagination.perPage
                 )
-                this.table.data = result?.data ?? []
-                this.table.pagination.currentPage = result?.currentPage ?? this.table.pagination.currentPage
-                this.table.pagination.totalPages = Math.max(1, result?.lastPage ?? 1)
-                this.table.pagination.totalCount = result?.totalCount ?? this.table.data.length
+                this.table.data = applyPagedResult(this.table.pagination, result)
             } catch (err) {
                 this.table.data = []
-                this.table.pagination.totalCount = 0
-                this.table.pagination.totalPages = 1
+                resetPagination(this.table.pagination)
                 this.error = err?.message || 'Failed to load recent achievements.'
             } finally {
                 this.table.isLoading = false

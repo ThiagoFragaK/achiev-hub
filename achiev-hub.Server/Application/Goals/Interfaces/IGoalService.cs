@@ -1,4 +1,4 @@
-using achiev_hub.Server.Application.Games;
+using achiev_hub.Server.Application.Common;
 using achiev_hub.Server.Domain.Enums;
 
 namespace achiev_hub.Server.Application.Goals.Interfaces;

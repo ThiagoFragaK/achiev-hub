@@ -1,7 +1,18 @@
 import { deleteJson, getJson, postJson, putJson, toQuery } from './http'
 
-export function getGoals(status) {
-    return getJson(`/api/goals${toQuery({ status })}`)
+export function getGoals(status, page = 1, pageSize = 15, filters = {}) {
+    return getJson(`/api/goals${toQuery({
+        status,
+        page,
+        pageSize,
+        appId: filters.appId,
+        minCompletion: filters.minCompletion,
+        minEndGoal: filters.minEndGoal
+    })}`)
+}
+
+export function getGoalFilterGames(status) {
+    return getJson(`/api/goals/filter-games${toQuery({ status })}`)
 }
 
 export function getGoal(id) {

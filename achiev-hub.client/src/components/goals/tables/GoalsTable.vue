@@ -139,6 +139,12 @@ import GoalsFilters from '@/components/goals/GoalsFilters.vue'
 import GoalAchievementsModal from '@/components/goals/modals/GoalAchievementsModal.vue'
 import { abandonGoal, getGoalFilterGames, getGoals, reopenGoal } from '@/services/goalsService'
 import { formatPercentage } from '@/utils/NumberFormat'
+import {
+    applyPagedResult,
+    createPagination,
+    resetPagination,
+    setPage
+} from '@/utils/PaginationHelper'
 
 const STATUS = {
     Active: 0,
@@ -202,12 +208,7 @@ export default {
                     { key: 'endGoal', label: 'End goal' },
                     { key: 'actions', label: '' }
                 ],
-                pagination: {
-                    currentPage: 1,
-                    perPage: 15,
-                    totalPages: 1,
-                    totalCount: 0
-                }
+                pagination: createPagination({ perPage: 15 })
             }
         }
     },
@@ -247,11 +248,9 @@ export default {
             this.load()
         },
         async onPageChange(page) {
-            const next = Math.max(1, Number(page) || 1)
-            if (this.table.pagination.currentPage === next) {
+            if (!setPage(this.table.pagination, page)) {
                 return
             }
-            this.table.pagination.currentPage = next
             await this.load()
         },
         isActive(status) {
@@ -289,14 +288,10 @@ export default {
                     this.table.pagination.perPage,
                     this.filters
                 )
-                this.table.data = result?.data ?? []
-                this.table.pagination.currentPage = result?.currentPage ?? 1
-                this.table.pagination.totalPages = Math.max(1, result?.lastPage ?? 1)
-                this.table.pagination.totalCount = result?.totalCount ?? 0
+                this.table.data = applyPagedResult(this.table.pagination, result)
             } catch (err) {
                 this.table.data = []
-                this.table.pagination.totalCount = 0
-                this.table.pagination.totalPages = 1
+                resetPagination(this.table.pagination)
                 this.error = err?.message || 'Failed to load goals.'
             } finally {
                 this.table.isLoading = false

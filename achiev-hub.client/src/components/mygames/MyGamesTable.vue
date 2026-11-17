@@ -37,6 +37,7 @@
 import { getSessionSteamId, steamAppIconUrl } from '@/lib/steam'
 import { getLibrary } from '@/services/gamesService'
 import TableComponent from '@/components/global/TableComponent.vue'
+import { applyPagedResult, createPagination, setPage } from '@/utils/PaginationHelper'
 
 export default {
     name: 'MyGamesTable',
@@ -74,22 +75,16 @@ export default {
                         key: 'notPlayedSince'
                     }
                 ],
-                pagination:{
-                    currentPage: this.page,
-                    perPage: 15,
-                    totalPages: 1,
-                    totalCount: 0,
-                },
+                pagination: createPagination({ currentPage: this.page, perPage: 15 }),
                 isLoading: true
             }
         }
     },
     watch: {
         page(page) {
-            if (this.table.pagination.currentPage === page) {
+            if (!setPage(this.table.pagination, page)) {
                 return
             }
-            this.table.pagination.currentPage = page
             this.getUsersLibrary()
         }
     },
@@ -121,10 +116,7 @@ export default {
                     this.table.pagination.perPage,
                     this.filters
                 )
-                this.table.data = result?.data ?? []
-                this.table.pagination.currentPage = result?.currentPage ?? 1
-                this.table.pagination.totalPages = Math.max(1, result?.lastPage ?? 1)
-                this.table.pagination.totalCount = result?.totalCount ?? 0
+                this.table.data = applyPagedResult(this.table.pagination, result)
             } catch (err) {
                 this.table.data = []
                 this.error = err?.message || 'Failed to load library.'

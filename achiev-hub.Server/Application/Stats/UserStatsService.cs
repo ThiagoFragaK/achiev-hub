@@ -1,21 +1,8 @@
-using achiev_hub.Server.Infrastructure.Persistence;
+using achiev_hub.Server.Application.Achievements.Interfaces;
 using achiev_hub.Server.Application.Games;
 using achiev_hub.Server.Application.Games.Interfaces;
-using achiev_hub.Server.Application.Achievements;
-using achiev_hub.Server.Application.Achievements.Interfaces;
-using achiev_hub.Server.Application.Steam;
-using achiev_hub.Server.Application.Steam.Interfaces;
-using achiev_hub.Server.Application.Stats;
 using achiev_hub.Server.Application.Stats.Interfaces;
-using achiev_hub.Server.Application.Users;
 using achiev_hub.Server.Application.Users.Interfaces;
-using achiev_hub.Server.Application.Goals;
-using achiev_hub.Server.Application.Goals.Interfaces;
-using achiev_hub.Server.Application.Auth;
-using achiev_hub.Server.Application.Auth.Interfaces;
-using achiev_hub.Server.Application.Common;
-using achiev_hub.Server.Application.Common.Interfaces;
-using Microsoft.EntityFrameworkCore;
 
 namespace achiev_hub.Server.Application.Stats;
 
@@ -25,48 +12,42 @@ public class UserStatsService : IUserStatsService
 
     private static readonly TimeZoneInfo DateTimeZone = TimeZoneInfo.Local;
 
-    private readonly ApplicationDbContext _db;
     private readonly IUsersGameRepository _usersGames;
+    private readonly IUsersAchievementRepository _usersAchievements;
+    private readonly IGameRepository _games;
+    private readonly IAchievementRepository _achievements;
+    private readonly IUserRepository _users;
 
-    public UserStatsService(ApplicationDbContext db, IUsersGameRepository usersGames)
+    public UserStatsService(
+        IUsersGameRepository usersGames,
+        IUsersAchievementRepository usersAchievements,
+        IGameRepository games,
+        IAchievementRepository achievements,
+        IUserRepository users)
     {
-        _db = db;
         _usersGames = usersGames;
+        _usersAchievements = usersAchievements;
+        _games = games;
+        _achievements = achievements;
+        _users = users;
     }
 
     public async Task<UserStatsDto> GetStatsAsync(int userId, CancellationToken cancellationToken = default)
     {
         var sinceUtc = DateTime.UtcNow.Date.AddDays(-(DaysWindow - 1));
 
-        var recentDayCounts = await _db.UsersAchievements
-            .AsNoTracking()
-            .Where(ua => ua.UserId == userId && ua.UnlockDate != null && ua.UnlockDate >= sinceUtc)
-            .GroupBy(ua => ua.UnlockDate!.Value.Date)
-            .Select(g => new { Day = g.Key, Count = g.Count() })
-            .ToListAsync(cancellationToken);
+        var recentDayCounts = await _usersAchievements.GetDailyUnlockCountsAsync(
+            userId,
+            sinceUtc,
+            cancellationToken);
 
-        var yearCounts = await _db.UsersAchievements
-            .AsNoTracking()
-            .Where(ua => ua.UserId == userId && ua.UnlockDate != null)
-            .GroupBy(ua => ua.UnlockDate!.Value.Year)
-            .Select(g => new { Year = g.Key, Count = g.Count() })
-            .ToListAsync(cancellationToken);
+        var yearCounts = await _usersAchievements.GetYearlyUnlockCountsAsync(userId, cancellationToken);
 
-        var averagePercentage = await _db.Users
-            .AsNoTracking()
-            .Where(u => u.Id == userId)
-            .Select(u => (decimal?)u.AvgPercentage)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        var totalAchievements = await _db.UsersAchievements
-            .AsNoTracking()
-            .CountAsync(ua => ua.UserId == userId, cancellationToken);
-
-        var gamesWithAchievements = await _db.UsersGames
-            .AsNoTracking()
-            .CountAsync(
-                ug => ug.UserId == userId && ug.Game.HasCommunityVisibleStats == true,
-                cancellationToken);
+        var averagePercentage = await _users.GetAveragePercentageAsync(userId, cancellationToken);
+        var totalAchievements = await _usersAchievements.CountForUserAsync(userId, cancellationToken);
+        var gamesWithAchievements = await _usersGames.CountCommunityVisibleGamesAsync(
+            userId,
+            cancellationToken);
 
         return new UserStatsDto
         {
@@ -94,27 +75,15 @@ public class UserStatsService : IUserStatsService
 
     public async Task<GameProgressDto> GetGameProgressAsync(int userId, int appId, CancellationToken cancellationToken = default)
     {
-        var steamAppId = appId.ToString();
-        var gameId = await _db.Games
-            .AsNoTracking()
-            .Where(g => g.GameSteamId == steamAppId)
-            .Select(g => (int?)g.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        var gameId = await _games.GetIdBySteamIdAsync(appId.ToString(), cancellationToken);
 
         if (gameId is not int id)
         {
             return GetEmptyGameProgress();
         }
 
-        var totalCount = await _db.Achievements
-            .AsNoTracking()
-            .CountAsync(a => a.GameId == id, cancellationToken);
-
-        var unlockDates = await _db.UsersAchievements
-            .AsNoTracking()
-            .Where(ua => ua.UserId == userId && ua.GameId == id)
-            .Select(ua => ua.UnlockDate)
-            .ToListAsync(cancellationToken);
+        var totalCount = await _achievements.CountForGameAsync(id, cancellationToken);
+        var unlockDates = await _usersAchievements.GetUnlockDatesListAsync(userId, id, cancellationToken);
 
         var unlockedCount = unlockDates.Count;
         var isCompleted = totalCount > 0 && unlockedCount >= totalCount;
@@ -173,12 +142,7 @@ public class UserStatsService : IUserStatsService
         int userId,
         CancellationToken cancellationToken = default)
     {
-        var monthCounts = await _db.UsersAchievements
-            .AsNoTracking()
-            .Where(ua => ua.UserId == userId && ua.UnlockDate != null)
-            .GroupBy(ua => new { ua.UnlockDate!.Value.Year, ua.UnlockDate!.Value.Month })
-            .Select(g => new { g.Key.Year, g.Key.Month, Count = g.Count() })
-            .ToListAsync(cancellationToken);
+        var monthCounts = await _usersAchievements.GetMonthlyUnlockCountsAsync(userId, cancellationToken);
 
         return BuildAchievementsByMonthFromCounts(
             monthCounts.ToDictionary(r => (r.Year, r.Month), r => r.Count));
@@ -197,12 +161,7 @@ public class UserStatsService : IUserStatsService
         int userId,
         CancellationToken cancellationToken = default)
     {
-        var percentages = await _db.UsersGames
-            .AsNoTracking()
-            .Where(ug => ug.UserId == userId && ug.Game.HasCommunityVisibleStats == true)
-            .Select(ug => ug.AchievementsPercentage)
-            .ToListAsync(cancellationToken);
-
+        var percentages = await _usersGames.GetCommunityVisiblePercentagesAsync(userId, cancellationToken);
         return BuildPercentageBands(percentages);
     }
 

@@ -1,4 +1,4 @@
-using achiev_hub.Server.Application.Games;
+using achiev_hub.Server.Application.Common;
 using achiev_hub.Server.Application.Goals;
 using achiev_hub.Server.Application.Goals.Interfaces;
 using achiev_hub.Server.Domain.Enums;
@@ -31,14 +31,7 @@ public class GoalsController : ApiControllerBase
     {
         if (ResolveUserId() is not int userId)
         {
-            return Ok(new PagedResultDto<GoalDto>
-            {
-                Data = [],
-                CurrentPage = 1,
-                LastPage = 1,
-                PerPage = pageSize <= 0 ? 15 : pageSize,
-                TotalCount = 0
-            });
+            return Ok(PagedResultDto<GoalDto>.Empty(pageSize <= 0 ? 15 : pageSize));
         }
 
         var filters = new GoalListFilterDto
