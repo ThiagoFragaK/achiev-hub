@@ -458,7 +458,7 @@ public class GamesService : IGamesService
         LibraryGameFilterDto? filters,
         CancellationToken cancellationToken)
     {
-        var games = await _steamApiClient.GetOwnedGamesAsync(steamId, cancellationToken);
+        var games = await _steamApiClient.GetOwnedGamesAsync(steamId, cancellationToken: cancellationToken);
         var mapped = new List<LibraryGameDto>();
 
         foreach (var game in games)

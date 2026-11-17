@@ -24,7 +24,12 @@ public interface ISteamSyncService
         LibrarySyncScope scope = LibrarySyncScope.Full,
         CancellationToken cancellationToken = default);
 
-    Task SyncGameAchievementsAsync(int userId, string steamId, int appId, CancellationToken cancellationToken = default);
+    Task SyncGameAchievementsAsync(
+        int userId,
+        string steamId,
+        int appId,
+        bool isManualRefresh = false,
+        CancellationToken cancellationToken = default);
 
     Task SyncAchievementsForUserAsync(
         int userId,

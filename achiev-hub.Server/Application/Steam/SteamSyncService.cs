@@ -26,12 +26,15 @@ namespace achiev_hub.Server.Application.Steam;
 public class SteamSyncService : ISteamSyncService
 {
     private const int AchievementSyncCooldownMinutes = 60;
+    private const int ManualSyncCooldownMinutes = 30;
+    private const int ManualSyncMaxPerDay = 10;
     private const int GlobalPercentTtlHours = 24;
 
     private readonly ApplicationDbContext _db;
     private readonly ISteamApiClient _steamApiClient;
     private readonly IMemoryCache _cache;
     private readonly IGoalService _goals;
+    private readonly IHostEnvironment _environment;
     private readonly ILogger<SteamSyncService> _logger;
 
     public SteamSyncService(
@@ -39,12 +42,14 @@ public class SteamSyncService : ISteamSyncService
         ISteamApiClient steamApiClient,
         IMemoryCache cache,
         IGoalService goals,
+        IHostEnvironment environment,
         ILogger<SteamSyncService> logger)
     {
         _db = db;
         _steamApiClient = steamApiClient;
         _cache = cache;
         _goals = goals;
+        _environment = environment;
         _logger = logger;
     }
 
@@ -67,7 +72,7 @@ public class SteamSyncService : ISteamSyncService
 
         if (scope == LibrarySyncScope.Full)
         {
-            var ownedGames = await _steamApiClient.GetOwnedGamesAsync(steamId, cancellationToken);
+            var ownedGames = await _steamApiClient.GetOwnedGamesAsync(steamId, cancellationToken: cancellationToken);
             foreach (var owned in ownedGames)
             {
                 if (owned.AppId <= 0)
@@ -219,6 +224,7 @@ public class SteamSyncService : ISteamSyncService
         int userId,
         string steamId,
         int appId,
+        bool isManualRefresh = false,
         CancellationToken cancellationToken = default)
     {
         if (appId <= 0)
@@ -250,7 +256,11 @@ public class SteamSyncService : ISteamSyncService
             return;
         }
 
-        if (usersGame.AchievementsSyncedAt is DateTimeOffset lastSynced)
+        if (isManualRefresh)
+        {
+            EnforceManualSyncRateLimits(userId);
+        }
+        else if (usersGame.AchievementsSyncedAt is DateTimeOffset lastSynced)
         {
             var elapsed = DateTimeOffset.UtcNow - lastSynced;
             var cooldown = TimeSpan.FromMinutes(AchievementSyncCooldownMinutes);
@@ -259,6 +269,11 @@ public class SteamSyncService : ISteamSyncService
                 var remaining = (int)Math.Ceiling((cooldown - elapsed).TotalSeconds);
                 throw new SteamSyncCooldownException(Math.Max(1, remaining));
             }
+        }
+
+        if (isManualRefresh)
+        {
+            await RefreshPlaytimeForGameAsync(usersGame, steamId, appId, cancellationToken);
         }
 
         var schema = await _steamApiClient.GetGameSchemaAsync(appId, cancellationToken);
@@ -378,6 +393,11 @@ public class SteamSyncService : ISteamSyncService
         await RecalculateUserAvgPercentageAsync(userId, cancellationToken);
         await _goals.RefreshForGameAsync(userId, game.Id, cancellationToken);
 
+        if (isManualRefresh)
+        {
+            RecordManualSync(userId);
+        }
+
         _logger.LogInformation(
             "Synced achievements for user {UserId} app {AppId}: {Unlocked}/{Total}",
             userId,
@@ -403,7 +423,7 @@ public class SteamSyncService : ISteamSyncService
         {
             try
             {
-                await SyncGameAchievementsAsync(userId, steamId, appId, cancellationToken);
+                await SyncGameAchievementsAsync(userId, steamId, appId, cancellationToken: cancellationToken);
             }
             catch (SteamSyncCooldownException)
             {
@@ -568,6 +588,89 @@ public class SteamSyncService : ISteamSyncService
 
         return result;
     }
+
+    private void EnforceManualSyncRateLimits(int userId)
+    {
+        if (_environment.IsDevelopment())
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        var state = _cache.Get<ManualSyncState>(ManualSyncCacheKey(userId));
+
+        if (state is null || state.Day != today)
+        {
+            return;
+        }
+
+        if (state.Count >= ManualSyncMaxPerDay)
+        {
+            var nextMidnight = new DateTimeOffset(today.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            var retryAfter = (int)Math.Ceiling((nextMidnight - now).TotalSeconds);
+            throw SteamSyncCooldownException.DailyLimitReached(Math.Max(1, retryAfter));
+        }
+
+        var cooldown = TimeSpan.FromMinutes(ManualSyncCooldownMinutes);
+        var elapsed = now - state.LastSyncAt;
+        if (elapsed < cooldown)
+        {
+            var remaining = (int)Math.Ceiling((cooldown - elapsed).TotalSeconds);
+            throw SteamSyncCooldownException.SpacingNotElapsed(Math.Max(1, remaining));
+        }
+    }
+
+    private void RecordManualSync(int userId)
+    {
+        if (_environment.IsDevelopment())
+        {
+            return;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+        var key = ManualSyncCacheKey(userId);
+        var existing = _cache.Get<ManualSyncState>(key);
+        var count = existing is not null && existing.Day == today
+            ? existing.Count + 1
+            : 1;
+
+        var state = new ManualSyncState(today, count, now);
+        var untilMidnight = new DateTimeOffset(today.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) - now;
+        _cache.Set(key, state, untilMidnight > TimeSpan.Zero ? untilMidnight : TimeSpan.FromDays(1));
+    }
+
+    private async Task RefreshPlaytimeForGameAsync(
+        UsersGame usersGame,
+        string steamId,
+        int appId,
+        CancellationToken cancellationToken)
+    {
+        var ownedGames = await _steamApiClient.GetOwnedGamesAsync(
+            steamId,
+            appIdsFilter: [appId],
+            cancellationToken: cancellationToken);
+
+        var owned = ownedGames.FirstOrDefault(g => g.AppId == appId);
+        if (owned is null)
+        {
+            _logger.LogDebug(
+                "Playtime refresh skipped for app {AppId}: not returned by GetOwnedGames",
+                appId);
+            return;
+        }
+
+        usersGame.PlaytimeMinutes = owned.PlaytimeForeverMinutes;
+        if (owned.LastPlayedUnix.HasValue)
+        {
+            usersGame.LastPlayedUnix = owned.LastPlayedUnix;
+        }
+    }
+
+    private static string ManualSyncCacheKey(int userId) => $"manual-game-sync:{userId}";
+
+    private sealed record ManualSyncState(DateOnly Day, int Count, DateTimeOffset LastSyncAt);
 
     private sealed record SyncGameInput(
         int AppId,
