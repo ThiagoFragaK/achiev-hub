@@ -26,6 +26,8 @@ public class UnitOfWork : IUnitOfWork
         }
     }
 
+    public void ClearChangeTracker() => _db.ChangeTracker.Clear();
+
     private static bool IsUniqueViolation(DbUpdateException exception)
     {
         return exception.InnerException is PostgresException postgres

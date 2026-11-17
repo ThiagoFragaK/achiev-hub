@@ -23,7 +23,7 @@ public sealed class SteamSyncClient : ISteamSyncClient, IAsyncDisposable
         _logger = logger;
     }
 
-    public async Task PublishFirstSyncAsync(int userId, string steamId, CancellationToken cancellationToken = default)
+    public Task PublishFirstSyncAsync(int userId, string steamId, CancellationToken cancellationToken = default)
     {
         var job = new FirstSyncJob
         {
@@ -31,56 +31,82 @@ public sealed class SteamSyncClient : ISteamSyncClient, IAsyncDisposable
             SteamId = steamId
         };
 
-        var channel = await EnsureChannelAsync(cancellationToken);
-        var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(job, JsonOptions));
-        var props = new BasicProperties
-        {
-            ContentType = "application/json",
-            DeliveryMode = DeliveryModes.Persistent
-        };
-
-        await channel.BasicPublishAsync(
-            exchange: string.Empty,
-            routingKey: SteamSyncQueueNames.FirstSync,
-            mandatory: false,
-            basicProperties: props,
-            body: body,
-            cancellationToken: cancellationToken);
-
-        _logger.LogInformation(
-            "Published FirstSync job {JobId} for user {UserId} steam {SteamId}",
-            job.JobId,
-            userId,
-            steamId);
+        return PublishAsync(SteamSyncQueueNames.FirstSync, job, cancellationToken, () =>
+            _logger.LogInformation(
+                "Published FirstSync job {JobId} for user {UserId} steam {SteamId}",
+                job.JobId,
+                userId,
+                steamId));
     }
 
-    private async Task<IChannel> EnsureChannelAsync(CancellationToken cancellationToken)
+    public async Task<Guid> PublishSyncLibraryAsync(
+        int userId,
+        string steamId,
+        CancellationToken cancellationToken = default)
+    {
+        var job = new SyncLibraryJob
+        {
+            UserId = userId,
+            SteamId = steamId
+        };
+
+        await PublishAsync(SteamSyncQueueNames.SyncLibrary, job, cancellationToken, () =>
+            _logger.LogInformation(
+                "Published SyncLibrary job {JobId} for user {UserId} steam {SteamId}",
+                job.JobId,
+                userId,
+                steamId));
+
+        return job.JobId;
+    }
+
+    private async Task PublishAsync<T>(
+        string routingKey,
+        T job,
+        CancellationToken cancellationToken,
+        Action onPublished)
+    {
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            var channel = await EnsureChannelUnlockedAsync(cancellationToken);
+            var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(job, JsonOptions));
+            var props = new BasicProperties
+            {
+                ContentType = "application/json",
+                DeliveryMode = DeliveryModes.Persistent
+            };
+
+            await channel.BasicPublishAsync(
+                exchange: string.Empty,
+                routingKey: routingKey,
+                mandatory: false,
+                basicProperties: props,
+                body: body,
+                cancellationToken: cancellationToken);
+
+            onPublished();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async Task<IChannel> EnsureChannelUnlockedAsync(CancellationToken cancellationToken)
     {
         if (_channel is { IsOpen: true })
         {
             return _channel;
         }
 
-        await _gate.WaitAsync(cancellationToken);
-        try
-        {
-            if (_channel is { IsOpen: true })
-            {
-                return _channel;
-            }
+        _connection?.Dispose();
+        _channel?.Dispose();
 
-            _connection?.Dispose();
-            _channel?.Dispose();
-
-            // Topology is declared once at startup by RabbitMqTopologyInitializer.
-            _connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
-            _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
-            return _channel;
-        }
-        finally
-        {
-            _gate.Release();
-        }
+        // Topology is declared once at startup by RabbitMqTopologyInitializer.
+        _connection = await _connectionFactory.CreateConnectionAsync(cancellationToken);
+        _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
+        return _channel;
     }
 
     public async ValueTask DisposeAsync()

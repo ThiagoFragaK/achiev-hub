@@ -203,47 +203,47 @@ public class GamesService : IGamesService
 
         if (gameId is not int id)
         {
-            return PaginationHelper.Paginate(Array.Empty<AchievementDto>(), page, pageSize);
+            return PagedResultDto<AchievementDto>.Empty(PaginationDto.ClampPageSize(pageSize));
         }
 
-        var unlocks = await _usersAchievements.GetUnlockDatesByAchievementIdAsync(
+        var pageResult = await _achievements.GetPagedForUserAsync(
             userId,
             id,
-            cancellationToken);
-        var catalog = await _achievements.GetCatalogAsync(id, cancellationToken);
-
-        var rows = new List<AchievementSortRow>(catalog.Count);
-        foreach (var achievement in catalog)
-        {
-            var unlocked = unlocks.TryGetValue(achievement.Id, out var unlockDateValue);
-            DateTime? unlockUtc = null;
-            var unlockDate = "-";
-            if (unlocked && unlockDateValue.HasValue)
+            new AchievementPageQuery
             {
-                unlockUtc = DateTime.SpecifyKind(unlockDateValue.Value, DateTimeKind.Utc);
-                unlockDate = FormatDateTimeFromUtc(unlockDateValue.Value);
+                Name = name,
+                Status = status,
+                Sort = sort,
+                Global = global,
+                Page = page,
+                PageSize = pageSize
+            },
+            cancellationToken);
+
+        var mapped = new List<AchievementDto>(pageResult.Data.Count);
+        foreach (var row in pageResult.Data)
+        {
+            var unlockDate = "-";
+            if (row.IsUnlocked && row.UnlockUtc.HasValue)
+            {
+                unlockDate = FormatDateTimeFromUtc(row.UnlockUtc.Value);
             }
 
-            var iconHash = unlocked ? achievement.ImageUrlUnlock : achievement.ImageUrlLock;
-            rows.Add(new AchievementSortRow
+            var iconHash = row.IsUnlocked ? row.ImageUrlUnlock : row.ImageUrlLock;
+            mapped.Add(new AchievementDto
             {
-                IsUnlocked = unlocked,
-                UnlockUtc = unlockUtc,
-                Dto = new AchievementDto
-                {
-                    Id = achievement.Id,
-                    Name = achievement.Name,
-                    Description = string.IsNullOrWhiteSpace(achievement.Description) && !unlocked
-                        ? "Secret achievement: without description"
-                        : achievement.Description,
-                    Icon = SteamMediaUrls.AppIconUrl(steamAppId, iconHash),
-                    Unlocked = unlockDate,
-                    GlobalPercentage = achievement.GlobalPercentage
-                }
+                Id = row.Id,
+                Name = row.Name,
+                Description = string.IsNullOrWhiteSpace(row.Description) && !row.IsUnlocked
+                    ? "Secret achievement: without description"
+                    : row.Description,
+                Icon = SteamMediaUrls.AppIconUrl(steamAppId, iconHash),
+                Unlocked = unlockDate,
+                GlobalPercentage = row.GlobalPercentage
             });
         }
 
-        return PaginationHelper.Paginate(FilterAndSortAchievements(rows, name, status, sort, global), page, pageSize);
+        return PagedResultDto<AchievementDto>.From(mapped, pageResult.Pagination);
     }
 
     private static List<AchievementDto> FilterAndSortAchievements(
@@ -383,7 +383,8 @@ public class GamesService : IGamesService
             (IReadOnlyList<RecentGameDto>)mapped,
             new MemoryCacheEntryOptions
             {
-                AbsoluteExpirationRelativeToNow = RecentGamesCacheKeys.AbsoluteExpiration
+                AbsoluteExpirationRelativeToNow = RecentGamesCacheKeys.AbsoluteExpiration,
+                Size = 1
             });
 
         return mapped;
@@ -406,7 +407,7 @@ public class GamesService : IGamesService
                 continue;
             }
 
-            mapped.Add(new LibraryGameDto
+            var dto = new LibraryGameDto
             {
                 AppId = game.AppId,
                 Name = game.Name,
@@ -417,10 +418,47 @@ public class GamesService : IGamesService
                     : FormatDate(game.LastPlayedUnix.Value),
                 HasAchievements = game.HasCommunityVisibleStats,
                 AchievementsPercentage = 0
-            });
+            };
+
+            if (!MatchesLibraryFilters(dto, filters))
+            {
+                continue;
+            }
+
+            mapped.Add(dto);
         }
 
-        return PaginationHelper.Paginate(ApplyLibrarySort(ApplyLibraryFilters(mapped, filters), filters), page, pageSize);
+        return PaginationHelper.Paginate(ApplyLibrarySort(mapped, filters), page, pageSize);
+    }
+
+    private static bool MatchesLibraryFilters(LibraryGameDto game, LibraryGameFilterDto? filters)
+    {
+        if (filters is null)
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(filters.Name))
+        {
+            var name = filters.Name.Trim();
+            if (string.IsNullOrWhiteSpace(game.Name)
+                || !game.Name.Contains(name, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        if (filters.MinHours is double minHours && game.Playtime < minHours)
+        {
+            return false;
+        }
+
+        if (filters.HasAchievements is bool hasAchievements && game.HasAchievements != hasAchievements)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private async Task<PagedResultDto<LibraryGameDto>> GetLibraryFromDbAsync(
@@ -466,38 +504,6 @@ public class GamesService : IGamesService
         }
 
         return PagedResultDto<LibraryGameDto>.From(mapped, pageResult.Pagination);
-    }
-
-    private static List<LibraryGameDto> ApplyLibraryFilters(
-        IEnumerable<LibraryGameDto> games,
-        LibraryGameFilterDto? filters)
-    {
-        var query = games.AsEnumerable();
-
-        if (filters is null)
-        {
-            return query.ToList();
-        }
-
-        if (!string.IsNullOrWhiteSpace(filters.Name))
-        {
-            var name = filters.Name.Trim();
-            query = query.Where(g =>
-                !string.IsNullOrWhiteSpace(g.Name) &&
-                g.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
-        }
-
-        if (filters.MinHours is double minHours)
-        {
-            query = query.Where(g => g.Playtime >= minHours);
-        }
-
-        if (filters.HasAchievements is bool hasAchievements)
-        {
-            query = query.Where(g => g.HasAchievements == hasAchievements);
-        }
-
-        return query.ToList();
     }
 
     private static List<LibraryGameDto> ApplyLibrarySort(

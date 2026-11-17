@@ -44,8 +44,8 @@ public class UsersGameRepository : IUsersGameRepository
 
         if (!string.IsNullOrWhiteSpace(nameQuery))
         {
-            var q = nameQuery.Trim().ToLowerInvariant();
-            query = query.Where(ug => ug.Game.Name.ToLower().Contains(q));
+            var pattern = $"%{nameQuery.Trim()}%";
+            query = query.Where(ug => EF.Functions.ILike(ug.Game.Name, pattern));
         }
 
         query = query.OrderBy(ug => ug.Game.Name);
@@ -71,22 +71,21 @@ public class UsersGameRepository : IUsersGameRepository
         int userId,
         CancellationToken cancellationToken = default)
     {
-        var percentages = await _db.UsersGames
+        var query = _db.UsersGames
             .AsNoTracking()
             .Where(ug =>
                 ug.UserId == userId
                 && ug.Game.HasCommunityVisibleStats == true
-                && ug.AchievementsPercentage > 0)
-            .Select(ug => ug.AchievementsPercentage)
-            .ToListAsync(cancellationToken);
+                && ug.AchievementsPercentage > 0);
 
-        if (percentages.Count == 0)
+        var gamesInAverage = await query.CountAsync(cancellationToken);
+        if (gamesInAverage == 0)
         {
             return (0m, 0);
         }
 
-        var average = Math.Round(percentages.Average(), 2);
-        return (average, percentages.Count);
+        var average = await query.AverageAsync(ug => ug.AchievementsPercentage, cancellationToken);
+        return (Math.Round(average, 2), gamesInAverage);
     }
 
     public Task<decimal?> GetAchievementPercentageAsync(
@@ -139,6 +138,40 @@ public class UsersGameRepository : IUsersGameRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<PercentageBandCountRow>> GetPercentageBandCountsAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        var totals = await _db.UsersGames
+            .AsNoTracking()
+            .Where(ug => ug.UserId == userId && ug.Game.HasCommunityVisibleStats == true)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                C100 = g.Count(ug => ug.AchievementsPercentage == 100m),
+                Gt80 = g.Count(ug => ug.AchievementsPercentage > 80m && ug.AchievementsPercentage < 100m),
+                Gt60 = g.Count(ug => ug.AchievementsPercentage > 60m && ug.AchievementsPercentage <= 80m),
+                Gt50 = g.Count(ug => ug.AchievementsPercentage > 50m && ug.AchievementsPercentage <= 60m),
+                Gt30 = g.Count(ug => ug.AchievementsPercentage > 30m && ug.AchievementsPercentage <= 50m),
+                Gt10 = g.Count(ug => ug.AchievementsPercentage > 10m && ug.AchievementsPercentage <= 30m),
+                Gt0 = g.Count(ug => ug.AchievementsPercentage > 0m && ug.AchievementsPercentage <= 10m),
+                C0 = g.Count(ug => ug.AchievementsPercentage == 0m)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return
+        [
+            new PercentageBandCountRow { Key = "100", Label = "100%", Count = totals?.C100 ?? 0 },
+            new PercentageBandCountRow { Key = "gt80", Label = "> 80%", Count = totals?.Gt80 ?? 0 },
+            new PercentageBandCountRow { Key = "gt60", Label = "> 60%", Count = totals?.Gt60 ?? 0 },
+            new PercentageBandCountRow { Key = "gt50", Label = "> 50%", Count = totals?.Gt50 ?? 0 },
+            new PercentageBandCountRow { Key = "gt30", Label = "> 30%", Count = totals?.Gt30 ?? 0 },
+            new PercentageBandCountRow { Key = "gt10", Label = "> 10%", Count = totals?.Gt10 ?? 0 },
+            new PercentageBandCountRow { Key = "gt0", Label = "> 0%", Count = totals?.Gt0 ?? 0 },
+            new PercentageBandCountRow { Key = "0", Label = "0%", Count = totals?.C0 ?? 0 }
+        ];
+    }
+
     public async Task<PagedResultDto<LibraryGameRow>> GetLibraryPageAsync(
         int userId,
         LibraryGameQuery query,
@@ -150,8 +183,8 @@ public class UsersGameRepository : IUsersGameRepository
 
         if (!string.IsNullOrWhiteSpace(query.Name))
         {
-            var name = query.Name.Trim().ToLowerInvariant();
-            dbQuery = dbQuery.Where(ug => ug.Game.Name.ToLower().Contains(name));
+            var pattern = $"%{query.Name.Trim()}%";
+            dbQuery = dbQuery.Where(ug => EF.Functions.ILike(ug.Game.Name, pattern));
         }
 
         if (query.MinHours is double minHours)
@@ -218,9 +251,20 @@ public class UsersGameRepository : IUsersGameRepository
             return [];
         }
 
-        return await _db.UsersGames
-            .Where(ug => ug.UserId == userId && gameIds.Contains(ug.GameId))
-            .ToListAsync(cancellationToken);
+        const int chunkSize = 500;
+        var list = gameIds as IList<int> ?? gameIds.ToList();
+        var result = new List<UsersGame>();
+
+        for (var i = 0; i < list.Count; i += chunkSize)
+        {
+            var chunk = list.Skip(i).Take(chunkSize).ToList();
+            var rows = await _db.UsersGames
+                .Where(ug => ug.UserId == userId && chunk.Contains(ug.GameId))
+                .ToListAsync(cancellationToken);
+            result.AddRange(rows);
+        }
+
+        return result;
     }
 
     public async Task<IReadOnlyList<string>> GetOwnedWithStatsSteamIdsAsync(

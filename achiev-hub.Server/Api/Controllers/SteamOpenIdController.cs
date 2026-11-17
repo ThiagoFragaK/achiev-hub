@@ -55,7 +55,14 @@ public class SteamOpenIdController : ControllerBase
                 return Unauthorized();
             }
 
-            _cache.Set(LinkCacheKey(state), id, TimeSpan.FromMinutes(10));
+            _cache.Set(
+                LinkCacheKey(state),
+                id,
+                new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10),
+                    Size = 1
+                });
         }
 
         Response.Cookies.Append(
@@ -114,7 +121,11 @@ public class SteamOpenIdController : ControllerBase
         _cache.Set(
             ExchangeCacheKey(code),
             JsonSerializer.Serialize(login),
-            TimeSpan.FromMinutes(2));
+            new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(2),
+                Size = 1
+            });
 
         return Redirect($"/login?steam_code={Uri.EscapeDataString(code)}");
     }

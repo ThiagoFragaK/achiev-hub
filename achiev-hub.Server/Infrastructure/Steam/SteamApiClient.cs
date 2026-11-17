@@ -350,7 +350,10 @@ public class SteamApiClient : ISteamApiClient
 
     private async Task<JsonDocument?> GetJsonAsync(string url, CancellationToken cancellationToken, bool requireSuccessStatusCode = true)
     {
-        using var response = await _httpClient.GetAsync(url, cancellationToken);
+        using var response = await _httpClient.GetAsync(
+            url,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
         if (requireSuccessStatusCode && !response.IsSuccessStatusCode)
         {
             _logger.LogWarning("Steam request failed with {StatusCode}", response.StatusCode);
@@ -359,13 +362,8 @@ public class SteamApiClient : ISteamApiClient
 
         try
         {
-            var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                return null;
-            }
-
-            return JsonDocument.Parse(json);
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            return await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
         }
         catch (JsonException ex)
         {

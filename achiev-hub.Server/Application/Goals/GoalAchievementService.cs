@@ -35,10 +35,10 @@ public class GoalAchievementService : IGoalAchievementService
         _achievements = achievements;
     }
 
-    public async Task<IReadOnlyList<GoalAchievementDto>> GetAllAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<GoalAchievementDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        var items = await _goalAchievements.GetAllAsync(cancellationToken);
-        return items.Select(Map).ToList();
+        throw new InvalidOperationException(
+            "Listing all goal-achievements is disabled. Query by goal id.");
     }
 
     public async Task<GoalAchievementDto> GetByIdAsync(int id, CancellationToken cancellationToken = default)
