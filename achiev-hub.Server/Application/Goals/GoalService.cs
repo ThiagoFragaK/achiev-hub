@@ -1,24 +1,41 @@
+using achiev_hub.Server.Application.Achievements.Interfaces;
 using achiev_hub.Server.Application.Common;
 using achiev_hub.Server.Application.Common.Interfaces;
 using achiev_hub.Server.Application.Games;
+using achiev_hub.Server.Application.Games.Interfaces;
 using achiev_hub.Server.Application.Goals.Interfaces;
 using achiev_hub.Server.Application.Users.Interfaces;
 using achiev_hub.Server.Domain.Entities;
 using achiev_hub.Server.Domain.Enums;
-using achiev_hub.Server.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 
 namespace achiev_hub.Server.Application.Goals;
 
 public class GoalService : IGoalService
 {
-    private readonly ApplicationDbContext _db;
+    private readonly IGoalRepository _goals;
     private readonly IUsersGameRepository _usersGames;
+    private readonly IUsersAchievementRepository _usersAchievements;
+    private readonly IGameRepository _games;
+    private readonly IAchievementRepository _achievements;
+    private readonly IUserRepository _users;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public GoalService(ApplicationDbContext db, IUsersGameRepository usersGames)
+    public GoalService(
+        IGoalRepository goals,
+        IUsersGameRepository usersGames,
+        IUsersAchievementRepository usersAchievements,
+        IGameRepository games,
+        IAchievementRepository achievements,
+        IUserRepository users,
+        IUnitOfWork unitOfWork)
     {
-        _db = db;
+        _goals = goals;
         _usersGames = usersGames;
+        _usersAchievements = usersAchievements;
+        _games = games;
+        _achievements = achievements;
+        _users = users;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<PagedResultDto<GoalDto>> GetForUserAsync(
@@ -28,61 +45,25 @@ public class GoalService : IGoalService
         GoalListFilterDto? filters = null,
         CancellationToken cancellationToken = default)
     {
-        if (pageSize <= 0)
-        {
-            pageSize = 15;
-        }
-
-        var query = _db.Goals
-            .AsNoTracking()
-            .Include(g => g.Game)
-            .Include(g => g.GoalAchievements)
-            .Where(g => g.UserId == userId);
-
-        if (filters?.Status is GoalStatus status)
-        {
-            query = query.Where(g => g.Status == status);
-        }
-
+        string? gameSteamId = null;
         if (filters?.AppId is int appId && appId > 0)
         {
-            var steamAppId = appId.ToString();
-            query = query.Where(g => g.Game.GameSteamId == steamAppId);
+            gameSteamId = appId.ToString();
         }
 
-        if (filters?.MinEndGoal is decimal minEndGoal)
-        {
-            query = query.Where(g => g.PercentageGoal >= minEndGoal);
-        }
+        var pageResult = await _goals.GetPageForUserAsync(
+            userId,
+            filters?.Status,
+            gameSteamId,
+            filters?.MinEndGoal,
+            filters?.MinCompletion,
+            page,
+            pageSize,
+            cancellationToken);
 
-        if (filters?.MinCompletion is decimal minCompletion && minCompletion > 0)
-        {
-            query = query.Where(g =>
-                g.GoalAchievements.Count > 0
-                && (g.GoalAchievements.Count - g.AchievementsMissing) * 100m / g.GoalAchievements.Count
-                    >= minCompletion);
-        }
-
-        query = query.OrderByDescending(g => g.CreatedAt);
-
-        var totalCount = await query.CountAsync(cancellationToken);
-        var lastPage = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
-        var currentPage = page <= 0 ? 1 : Math.Min(page, lastPage);
-        var skip = (currentPage - 1) * pageSize;
-
-        var goals = await query
-            .Skip(skip)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
-
-        return new PagedResultDto<GoalDto>
-        {
-            Data = goals.Select(Map).ToList(),
-            CurrentPage = currentPage,
-            LastPage = lastPage,
-            PerPage = pageSize,
-            TotalCount = totalCount
-        };
+        return PagedResultDto<GoalDto>.From(
+            pageResult.Data.Select(Map).ToList(),
+            pageResult.Pagination);
     }
 
     public async Task<IReadOnlyList<GoalFilterGameDto>> GetFilterGamesAsync(
@@ -90,20 +71,7 @@ public class GoalService : IGoalService
         GoalStatus? status = null,
         CancellationToken cancellationToken = default)
     {
-        var query = _db.Goals
-            .AsNoTracking()
-            .Where(g => g.UserId == userId);
-
-        if (status.HasValue)
-        {
-            query = query.Where(g => g.Status == status.Value);
-        }
-
-        var rows = await query
-            .Select(g => new { g.Game.GameSteamId, g.Game.Name })
-            .Distinct()
-            .OrderBy(g => g.Name)
-            .ToListAsync(cancellationToken);
+        var rows = await _goals.GetFilterGamesAsync(userId, status, cancellationToken);
 
         var games = new List<GoalFilterGameDto>();
         foreach (var row in rows)
@@ -130,17 +98,7 @@ public class GoalService : IGoalService
 
     public async Task<GoalDto?> GetActiveByAppIdAsync(int userId, int appId, CancellationToken cancellationToken = default)
     {
-        var steamAppId = appId.ToString();
-        var goal = await _db.Goals
-            .AsNoTracking()
-            .Include(g => g.Game)
-            .Include(g => g.GoalAchievements)
-            .FirstOrDefaultAsync(
-                g => g.UserId == userId
-                     && g.Status == GoalStatus.Active
-                     && g.Game.GameSteamId == steamAppId,
-                cancellationToken);
-
+        var goal = await _goals.GetActiveBySteamAppIdAsync(userId, appId.ToString(), cancellationToken);
         return goal is null ? null : Map(goal);
     }
 
@@ -152,29 +110,24 @@ public class GoalService : IGoalService
         }
 
         var steamAppId = request.AppId.ToString();
-        var game = await _db.Games
-            .FirstOrDefaultAsync(g => g.GameSteamId == steamAppId, cancellationToken)
+        var gameId = await _games.GetIdBySteamIdAsync(steamAppId, cancellationToken)
             ?? throw new NotFoundException($"Game {request.AppId} was not found.");
 
-        var usersGame = await _db.UsersGames
-            .FirstOrDefaultAsync(ug => ug.UserId == userId && ug.GameId == game.Id, cancellationToken)
+        var percentage = await _usersGames.GetAchievementPercentageAsync(userId, gameId, cancellationToken)
             ?? throw new NotFoundException($"Game {request.AppId} is not in your library.");
 
-        if (usersGame.AchievementsPercentage >= 100m)
+        if (percentage >= 100m)
         {
             throw new BadRequestException("Cannot create a goal for a fully completed game.");
         }
 
-        if (request.PercentageGoal <= usersGame.AchievementsPercentage || request.PercentageGoal > 100m)
+        if (request.PercentageGoal <= percentage || request.PercentageGoal > 100m)
         {
             throw new BadRequestException(
-                $"Percentage goal must be greater than current progress ({usersGame.AchievementsPercentage}%) and at most 100.");
+                $"Percentage goal must be greater than current progress ({percentage}%) and at most 100.");
         }
 
-        var hasActive = await _db.Goals.AnyAsync(
-            g => g.UserId == userId && g.GameId == game.Id && g.Status == GoalStatus.Active,
-            cancellationToken);
-        if (hasActive)
+        if (await _goals.HasActiveAsync(userId, gameId, cancellationToken: cancellationToken))
         {
             throw new ConflictException("This game already has an active goal.");
         }
@@ -184,12 +137,12 @@ public class GoalService : IGoalService
             .Distinct()
             .ToList();
 
-        await ValidateLockedAchievementsAsync(userId, game.Id, achievementIds, cancellationToken);
+        await ValidateLockedAchievementsAsync(userId, gameId, achievementIds, cancellationToken);
 
         var goal = new Goal
         {
             UserId = userId,
-            GameId = game.Id,
+            GameId = gameId,
             PercentageGoal = request.PercentageGoal,
             AchievementsMissing = achievementIds.Count,
             Status = GoalStatus.Active,
@@ -205,11 +158,11 @@ public class GoalService : IGoalService
             });
         }
 
-        _db.Goals.Add(goal);
-        await _db.SaveChangesAsync(cancellationToken);
+        _goals.Add(goal);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        await RefreshGoalEntityAsync(goal, usersGame.AchievementsPercentage, cancellationToken);
-        await _db.SaveChangesAsync(cancellationToken);
+        await RefreshGoalEntityAsync(goal, percentage, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return await GetByIdAsync(userId, goal.Id, cancellationToken);
     }
@@ -222,11 +175,7 @@ public class GoalService : IGoalService
             throw new ConflictException("Only active goals can be updated.");
         }
 
-        var usersGame = await _db.UsersGames
-            .AsNoTracking()
-            .FirstOrDefaultAsync(ug => ug.UserId == userId && ug.GameId == goal.GameId, cancellationToken);
-
-        var currentPercent = usersGame?.AchievementsPercentage ?? 0m;
+        var currentPercent = await _usersGames.GetAchievementPercentageAsync(userId, goal.GameId, cancellationToken) ?? 0m;
         if (request.PercentageGoal <= currentPercent || request.PercentageGoal > 100m)
         {
             throw new BadRequestException(
@@ -235,7 +184,7 @@ public class GoalService : IGoalService
 
         goal.PercentageGoal = request.PercentageGoal;
         await RefreshGoalEntityAsync(goal, currentPercent, cancellationToken);
-        await _db.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return await GetByIdAsync(userId, goal.Id, cancellationToken);
     }
 
@@ -292,7 +241,7 @@ public class GoalService : IGoalService
             currentPercent);
 
         await RefreshGoalEntityAsync(goal, currentPercent, cancellationToken);
-        await _db.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return await GetByIdAsync(userId, id, cancellationToken);
     }
 
@@ -301,23 +250,15 @@ public class GoalService : IGoalService
         int id,
         CancellationToken cancellationToken = default)
     {
-        var goal = await _db.Goals
-            .AsNoTracking()
-            .Include(g => g.Game)
-            .Include(g => g.GoalAchievements)
-            .ThenInclude(ga => ga.Achievement)
-            .FirstOrDefaultAsync(g => g.Id == id && g.UserId == userId, cancellationToken)
+        var goal = await _goals.GetByIdWithAchievementDetailsAsync(userId, id, cancellationToken)
             ?? throw new NotFoundException($"Goal {id} was not found.");
 
         var achievementIds = goal.GoalAchievements.Select(ga => ga.AchievementId).ToList();
-        var unlockedIds = achievementIds.Count == 0
-            ? new HashSet<int>()
-            : (await _db.UsersAchievements
-                    .AsNoTracking()
-                    .Where(ua => ua.UserId == userId && ua.GameId == goal.GameId && achievementIds.Contains(ua.AchievementId))
-                    .Select(ua => ua.AchievementId)
-                    .ToListAsync(cancellationToken))
-                .ToHashSet();
+        var unlockedIds = await _usersAchievements.GetUnlockedAchievementIdsAsync(
+            userId,
+            goal.GameId,
+            achievementIds,
+            cancellationToken);
 
         var steamAppId = goal.Game.GameSteamId;
         return goal.GoalAchievements
@@ -378,12 +319,12 @@ public class GoalService : IGoalService
         foreach (var row in toRemove)
         {
             goal.GoalAchievements.Remove(row);
-            _db.GoalAchievements.Remove(row);
+            _goals.RemoveGoalAchievement(row);
         }
 
         goal.PercentageGoal = request.PercentageGoal;
         await RefreshGoalEntityAsync(goal, currentPercent, cancellationToken);
-        await _db.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return await GetByIdAsync(userId, id, cancellationToken);
     }
 
@@ -396,7 +337,7 @@ public class GoalService : IGoalService
         }
 
         goal.Status = GoalStatus.Abandoned;
-        await _db.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return await GetByIdAsync(userId, id, cancellationToken);
     }
 
@@ -408,13 +349,7 @@ public class GoalService : IGoalService
             throw new ConflictException("Only abandoned goals can be reopened.");
         }
 
-        var hasActive = await _db.Goals.AnyAsync(
-            g => g.UserId == userId
-                 && g.GameId == goal.GameId
-                 && g.Status == GoalStatus.Active
-                 && g.Id != goal.Id,
-            cancellationToken);
-        if (hasActive)
+        if (await _goals.HasActiveAsync(userId, goal.GameId, excludeGoalId: goal.Id, cancellationToken))
         {
             throw new ConflictException("This game already has an active goal.");
         }
@@ -424,25 +359,20 @@ public class GoalService : IGoalService
 
         var currentPercent = await GetUserPercentageAsync(userId, goal.GameId, cancellationToken);
         await RefreshGoalEntityAsync(goal, currentPercent, cancellationToken);
-        await _db.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         return await GetByIdAsync(userId, id, cancellationToken);
     }
 
     public async Task DeleteAsync(int userId, int id, CancellationToken cancellationToken = default)
     {
         var goal = await GetOwnedGoalAsync(userId, id, track: true, cancellationToken);
-        _db.Goals.Remove(goal);
-        await _db.SaveChangesAsync(cancellationToken);
+        _goals.Remove(goal);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     public async Task RefreshForGameAsync(int userId, int gameId, CancellationToken cancellationToken = default)
     {
-        var goal = await _db.Goals
-            .Include(g => g.GoalAchievements)
-            .FirstOrDefaultAsync(
-                g => g.UserId == userId && g.GameId == gameId && g.Status == GoalStatus.Active,
-                cancellationToken);
-
+        var goal = await _goals.GetActiveForUpdateAsync(userId, gameId, cancellationToken);
         if (goal is null)
         {
             return;
@@ -450,7 +380,7 @@ public class GoalService : IGoalService
 
         var currentPercent = await GetUserPercentageAsync(userId, gameId, cancellationToken);
         await RefreshGoalEntityAsync(goal, currentPercent, cancellationToken, notifyUser: true);
-        await _db.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<EligibleGameDto>> GetEligibleGamesAsync(
@@ -458,11 +388,7 @@ public class GoalService : IGoalService
         string? query = null,
         CancellationToken cancellationToken = default)
     {
-        var activeGameIds = await _db.Goals
-            .AsNoTracking()
-            .Where(g => g.UserId == userId && g.Status == GoalStatus.Active)
-            .Select(g => g.GameId)
-            .ToListAsync(cancellationToken);
+        var activeGameIds = await _goals.GetActiveGameIdsAsync(userId, cancellationToken);
 
         var rows = await _usersGames.GetGamesWithAchievementStatsAsync(
             userId,
@@ -499,15 +425,7 @@ public class GoalService : IGoalService
         var now = DateTimeOffset.UtcNow;
         var start = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, TimeSpan.Zero).AddMonths(-11);
 
-        var completed = await _db.Goals
-            .AsNoTracking()
-            .Where(g =>
-                g.UserId == userId
-                && g.Status == GoalStatus.Completed
-                && g.CompletedAt != null
-                && g.CompletedAt >= start)
-            .Select(g => g.CompletedAt!.Value)
-            .ToListAsync(cancellationToken);
+        var completed = await _goals.GetCompletedDatesSinceAsync(userId, start, cancellationToken);
 
         var labels = new List<string>(12);
         var counts = new List<int>(12);
@@ -529,23 +447,8 @@ public class GoalService : IGoalService
         int userId,
         CancellationToken cancellationToken = default)
     {
-        var acknowledgedAt = await _db.Users
-            .AsNoTracking()
-            .Where(u => u.Id == userId)
-            .Select(u => u.GoalsAcknowledgedAt)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        var goals = await _db.Goals
-            .AsNoTracking()
-            .Include(g => g.Game)
-            .Include(g => g.GoalAchievements)
-            .Where(g =>
-                g.UserId == userId
-                && g.Status == GoalStatus.Completed
-                && g.CompletedAt != null
-                && (acknowledgedAt == null || g.CompletedAt > acknowledgedAt))
-            .OrderByDescending(g => g.CompletedAt)
-            .ToListAsync(cancellationToken);
+        var acknowledgedAt = await _users.GetGoalsAcknowledgedAtAsync(userId, cancellationToken);
+        var goals = await _goals.GetCompletedAfterAsync(userId, acknowledgedAt, cancellationToken);
 
         if (goals.Count == 0)
         {
@@ -553,17 +456,14 @@ public class GoalService : IGoalService
         }
 
         var gameIds = goals.Select(g => g.GameId).Distinct().ToList();
-        var percentagesByGameId = await _db.UsersGames
-            .AsNoTracking()
-            .Where(ug => ug.UserId == userId && gameIds.Contains(ug.GameId))
-            .ToDictionaryAsync(ug => ug.GameId, ug => ug.AchievementsPercentage, cancellationToken);
-
-        var unlockedCountsByGameId = await _db.UsersAchievements
-            .AsNoTracking()
-            .Where(ua => ua.UserId == userId && gameIds.Contains(ua.GameId))
-            .GroupBy(ua => ua.GameId)
-            .Select(g => new { GameId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.GameId, x => x.Count, cancellationToken);
+        var percentagesByGameId = await _usersGames.GetAchievementPercentagesAsync(
+            userId,
+            gameIds,
+            cancellationToken);
+        var unlockedCountsByGameId = await _usersAchievements.GetCountsByGameIdsAsync(
+            userId,
+            gameIds,
+            cancellationToken);
 
         return goals.Select(goal =>
         {
@@ -584,12 +484,12 @@ public class GoalService : IGoalService
 
     public async Task AcknowledgeCompletedAsync(int userId, CancellationToken cancellationToken = default)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
+        var user = await _users.GetTrackedByIdAsync(userId, cancellationToken)
             ?? throw new NotFoundException($"User {userId} was not found.");
 
         user.ShowGoals = false;
         user.GoalsAcknowledgedAt = DateTimeOffset.UtcNow;
-        await _db.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     private async Task ValidateLockedAchievementsAsync(
@@ -603,11 +503,7 @@ public class GoalService : IGoalService
             return;
         }
 
-        var achievements = await _db.Achievements
-            .AsNoTracking()
-            .Where(a => achievementIds.Contains(a.Id))
-            .Select(a => new { a.Id, a.GameId })
-            .ToListAsync(cancellationToken);
+        var achievements = await _achievements.GetIdentityRowsAsync(achievementIds, cancellationToken);
 
         if (achievements.Count != achievementIds.Count)
         {
@@ -619,11 +515,11 @@ public class GoalService : IGoalService
             throw new BadRequestException("All achievements must belong to the selected game.");
         }
 
-        var unlockedIds = await _db.UsersAchievements
-            .AsNoTracking()
-            .Where(ua => ua.UserId == userId && ua.GameId == gameId && achievementIds.Contains(ua.AchievementId))
-            .Select(ua => ua.AchievementId)
-            .ToListAsync(cancellationToken);
+        var unlockedIds = await _usersAchievements.GetUnlockedAchievementIdsAsync(
+            userId,
+            gameId,
+            achievementIds,
+            cancellationToken);
 
         if (unlockedIds.Count > 0)
         {
@@ -643,15 +539,14 @@ public class GoalService : IGoalService
         }
 
         var achievementIds = goal.GoalAchievements.Select(ga => ga.AchievementId).ToList();
-        HashSet<int> unlockedIds = [];
+        IReadOnlySet<int> unlockedIds = new HashSet<int>();
         if (achievementIds.Count > 0)
         {
-            unlockedIds = (await _db.UsersAchievements
-                    .AsNoTracking()
-                    .Where(ua => ua.UserId == goal.UserId && ua.GameId == goal.GameId && achievementIds.Contains(ua.AchievementId))
-                    .Select(ua => ua.AchievementId)
-                    .ToListAsync(cancellationToken))
-                .ToHashSet();
+            unlockedIds = await _usersAchievements.GetUnlockedAchievementIdsAsync(
+                goal.UserId,
+                goal.GameId,
+                achievementIds,
+                cancellationToken);
         }
 
         foreach (var row in goal.GoalAchievements)
@@ -679,7 +574,7 @@ public class GoalService : IGoalService
 
             if (notifyUser)
             {
-                var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == goal.UserId, cancellationToken);
+                var user = await _users.GetTrackedByIdAsync(goal.UserId, cancellationToken);
                 if (user is not null)
                 {
                     user.ShowGoals = true;
@@ -690,12 +585,7 @@ public class GoalService : IGoalService
 
     private async Task<decimal> GetUserPercentageAsync(int userId, int gameId, CancellationToken cancellationToken)
     {
-        var percent = await _db.UsersGames
-            .AsNoTracking()
-            .Where(ug => ug.UserId == userId && ug.GameId == gameId)
-            .Select(ug => (decimal?)ug.AchievementsPercentage)
-            .FirstOrDefaultAsync(cancellationToken);
-        return percent ?? 0m;
+        return await _usersGames.GetAchievementPercentageAsync(userId, gameId, cancellationToken) ?? 0m;
     }
 
     private async Task<(int Unlocked, int Total)> GetUserAchievementCountsAsync(
@@ -703,12 +593,8 @@ public class GoalService : IGoalService
         int gameId,
         CancellationToken cancellationToken)
     {
-        var total = await _db.Achievements
-            .AsNoTracking()
-            .CountAsync(a => a.GameId == gameId, cancellationToken);
-        var unlocked = await _db.UsersAchievements
-            .AsNoTracking()
-            .CountAsync(ua => ua.UserId == userId && ua.GameId == gameId, cancellationToken);
+        var total = await _achievements.CountForGameAsync(gameId, cancellationToken);
+        var unlocked = await _usersAchievements.CountForGameAsync(userId, gameId, cancellationToken);
         return (unlocked, total);
     }
 
@@ -742,11 +628,7 @@ public class GoalService : IGoalService
 
     private async Task<Goal> GetOwnedGoalAsync(int userId, int id, bool track, CancellationToken cancellationToken)
     {
-        var query = track
-            ? _db.Goals.Include(g => g.Game).Include(g => g.GoalAchievements)
-            : _db.Goals.AsNoTracking().Include(g => g.Game).Include(g => g.GoalAchievements);
-
-        var goal = await query.FirstOrDefaultAsync(g => g.Id == id && g.UserId == userId, cancellationToken);
+        var goal = await _goals.GetByIdForUserAsync(userId, id, track, cancellationToken);
         return goal ?? throw new NotFoundException($"Goal {id} was not found.");
     }
 

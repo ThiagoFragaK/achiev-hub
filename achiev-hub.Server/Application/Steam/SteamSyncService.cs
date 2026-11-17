@@ -1,24 +1,13 @@
-using achiev_hub.Server.Infrastructure.Persistence;
-using achiev_hub.Server.Domain.Entities;
-using achiev_hub.Server.Domain.Interfaces;
+using achiev_hub.Server.Application.Achievements.Interfaces;
 using achiev_hub.Server.Application.Common;
 using achiev_hub.Server.Application.Common.Interfaces;
-using achiev_hub.Server.Application.Steam;
-using achiev_hub.Server.Application.Steam.Interfaces;
-using achiev_hub.Server.Application.Auth;
-using achiev_hub.Server.Application.Auth.Interfaces;
-using achiev_hub.Server.Application.Users;
-using achiev_hub.Server.Application.Users.Interfaces;
 using achiev_hub.Server.Application.Games;
 using achiev_hub.Server.Application.Games.Interfaces;
-using achiev_hub.Server.Application.Achievements;
-using achiev_hub.Server.Application.Achievements.Interfaces;
-using achiev_hub.Server.Application.Goals;
 using achiev_hub.Server.Application.Goals.Interfaces;
-using achiev_hub.Server.Application.Stats;
-using achiev_hub.Server.Application.Stats.Interfaces;
+using achiev_hub.Server.Application.Steam.Interfaces;
+using achiev_hub.Server.Application.Users.Interfaces;
+using achiev_hub.Server.Domain.Entities;
 using achiev_hub.Server.Infrastructure.Auth;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace achiev_hub.Server.Application.Steam;
@@ -30,7 +19,12 @@ public class SteamSyncService : ISteamSyncService
     private const int ManualSyncMaxPerDay = 10;
     private const int GlobalPercentTtlHours = 24;
 
-    private readonly ApplicationDbContext _db;
+    private readonly IUserRepository _users;
+    private readonly IGameRepository _games;
+    private readonly IUsersGameRepository _usersGames;
+    private readonly IAchievementRepository _achievements;
+    private readonly IUsersAchievementRepository _usersAchievements;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ISteamApiClient _steamApiClient;
     private readonly IMemoryCache _cache;
     private readonly IGoalService _goals;
@@ -38,14 +32,24 @@ public class SteamSyncService : ISteamSyncService
     private readonly ILogger<SteamSyncService> _logger;
 
     public SteamSyncService(
-        ApplicationDbContext db,
+        IUserRepository users,
+        IGameRepository games,
+        IUsersGameRepository usersGames,
+        IAchievementRepository achievements,
+        IUsersAchievementRepository usersAchievements,
+        IUnitOfWork unitOfWork,
         ISteamApiClient steamApiClient,
         IMemoryCache cache,
         IGoalService goals,
         IHostEnvironment environment,
         ILogger<SteamSyncService> logger)
     {
-        _db = db;
+        _users = users;
+        _games = games;
+        _usersGames = usersGames;
+        _achievements = achievements;
+        _usersAchievements = usersAchievements;
+        _unitOfWork = unitOfWork;
         _steamApiClient = steamApiClient;
         _cache = cache;
         _goals = goals;
@@ -64,7 +68,7 @@ public class SteamSyncService : ISteamSyncService
             throw new ArgumentException("steamId is required.", nameof(steamId));
         }
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
+        var user = await _users.GetTrackedByIdAsync(userId, cancellationToken)
             ?? throw new InvalidOperationException($"User {userId} was not found.");
 
         var recentGames = await _steamApiClient.GetRecentlyPlayedGamesAsync(steamId, cancellationToken);
@@ -123,7 +127,7 @@ public class SteamSyncService : ISteamSyncService
         if (byAppId.Count == 0)
         {
             user.Playtime2WeeksMinutes = recentGames.Sum(g => g.Playtime2WeeksMinutes);
-            await _db.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
             _cache.Remove(RecentGamesCacheKeys.ForSteamId(steamId));
             _logger.LogInformation(
                 "Synced library ({Scope}) for user {UserId}: 0 games",
@@ -133,7 +137,7 @@ public class SteamSyncService : ISteamSyncService
         }
 
         var steamIds = byAppId.Keys.Select(id => id.ToString()).ToList();
-        var existingGames = await LoadGamesBySteamIdsAsync(steamIds, cancellationToken);
+        var existingGames = await _games.GetTrackedBySteamIdsAsync(steamIds, cancellationToken);
 
         var gamesBySteamId = existingGames
             .ToDictionary(g => g.GameSteamId, StringComparer.Ordinal);
@@ -151,7 +155,7 @@ public class SteamSyncService : ISteamSyncService
                     ImageUrl = iconHash,
                     HasCommunityVisibleStats = input.HasCommunityVisibleStats
                 };
-                _db.Games.Add(game);
+                _games.Add(game);
                 gamesBySteamId[steamAppId] = game;
             }
             else
@@ -173,12 +177,13 @@ public class SteamSyncService : ISteamSyncService
             }
         }
 
-        await _db.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         var persistedGameIds = gamesBySteamId.Values.Select(g => g.Id).ToList();
-        var existingUsersGames = await _db.UsersGames
-            .Where(ug => ug.UserId == userId && persistedGameIds.Contains(ug.GameId))
-            .ToListAsync(cancellationToken);
+        var existingUsersGames = await _usersGames.GetTrackedByUserAndGameIdsAsync(
+            userId,
+            persistedGameIds,
+            cancellationToken);
 
         var usersGamesByGameId = existingUsersGames.ToDictionary(ug => ug.GameId);
 
@@ -195,7 +200,7 @@ public class SteamSyncService : ISteamSyncService
                     GameId = game.Id,
                     AchievementsPercentage = 0
                 };
-                _db.UsersGames.Add(usersGame);
+                _usersGames.Add(usersGame);
                 usersGamesByGameId[game.Id] = usersGame;
             }
 
@@ -208,7 +213,7 @@ public class SteamSyncService : ISteamSyncService
 
         user.Playtime2WeeksMinutes = recentGames.Sum(g => g.Playtime2WeeksMinutes);
 
-        await _db.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         _cache.Remove(RecentGamesCacheKeys.ForSteamId(steamId));
 
@@ -233,8 +238,7 @@ public class SteamSyncService : ISteamSyncService
         }
 
         var steamAppId = appId.ToString();
-        var game = await _db.Games
-            .FirstOrDefaultAsync(g => g.GameSteamId == steamAppId, cancellationToken);
+        var game = await _games.GetTrackedBySteamIdAsync(steamAppId, cancellationToken);
 
         if (game is null || game.HasCommunityVisibleStats != true)
         {
@@ -244,8 +248,7 @@ public class SteamSyncService : ISteamSyncService
             return;
         }
 
-        var usersGame = await _db.UsersGames
-            .FirstOrDefaultAsync(ug => ug.UserId == userId && ug.GameId == game.Id, cancellationToken);
+        var usersGame = await _usersGames.GetTrackedByUserAndGameAsync(userId, game.Id, cancellationToken);
 
         if (usersGame is null)
         {
@@ -283,9 +286,7 @@ public class SteamSyncService : ISteamSyncService
             .Select(g => g.First())
             .ToList();
 
-        var existingCatalog = await _db.Achievements
-            .Where(a => a.GameId == game.Id)
-            .ToListAsync(cancellationToken);
+        var existingCatalog = await _achievements.GetTrackedByGameIdAsync(game.Id, cancellationToken);
 
         var catalogByApiName = existingCatalog
             .ToDictionary(a => a.ApiName, StringComparer.OrdinalIgnoreCase);
@@ -305,7 +306,7 @@ public class SteamSyncService : ISteamSyncService
                     GameId = game.Id,
                     ApiName = apiName
                 };
-                _db.Achievements.Add(achievement);
+                _achievements.Add(achievement);
                 catalogByApiName[apiName] = achievement;
             }
 
@@ -319,7 +320,7 @@ public class SteamSyncService : ISteamSyncService
             achievement.ImageUrlUnlock = SteamMediaUrls.ToStorageHash(schemaRow.Icon);
         }
 
-        await _db.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         await SyncGlobalPercentagesAsync(game, appId, cancellationToken);
 
         var playerResult = await _steamApiClient.GetPlayerAchievementsAsync(steamId, appId, cancellationToken);
@@ -337,16 +338,15 @@ public class SteamSyncService : ISteamSyncService
             .Where(a => a.Achieved == 1 && !string.IsNullOrWhiteSpace(a.ApiName))
             .ToDictionary(a => a.ApiName!, a => a, StringComparer.OrdinalIgnoreCase);
 
-        var refreshedCatalog = await _db.Achievements
-            .Where(a => a.GameId == game.Id)
-            .ToListAsync(cancellationToken);
+        var refreshedCatalog = await _achievements.GetTrackedByGameIdAsync(game.Id, cancellationToken);
 
         var achievementIdsByApiName = refreshedCatalog
             .ToDictionary(a => a.ApiName, a => a.Id, StringComparer.OrdinalIgnoreCase);
 
-        var existingUnlocks = await _db.UsersAchievements
-            .Where(ua => ua.UserId == userId && ua.GameId == game.Id)
-            .ToListAsync(cancellationToken);
+        var existingUnlocks = await _usersAchievements.GetTrackedByUserAndGameAsync(
+            userId,
+            game.Id,
+            cancellationToken);
 
         var unlocksByAchievementId = existingUnlocks.ToDictionary(ua => ua.AchievementId);
 
@@ -369,7 +369,7 @@ public class SteamSyncService : ISteamSyncService
                     GameId = game.Id,
                     AchievementId = achievementId
                 };
-                _db.UsersAchievements.Add(usersAchievement);
+                _usersAchievements.Add(usersAchievement);
             }
 
             usersAchievement.UnlockDate = playerRow.UnlockTimeUnix > 0
@@ -379,7 +379,7 @@ public class SteamSyncService : ISteamSyncService
 
         foreach (var stale in existingUnlocks.Where(ua => !unlockedAchievementIds.Contains(ua.AchievementId)))
         {
-            _db.UsersAchievements.Remove(stale);
+            _usersAchievements.Remove(stale);
         }
 
         var totalAchievements = refreshedCatalog.Count;
@@ -389,7 +389,7 @@ public class SteamSyncService : ISteamSyncService
             : (decimal)Math.Round(unlockedCount / (double)totalAchievements * 100, 2);
         usersGame.AchievementsSyncedAt = DateTimeOffset.UtcNow;
 
-        await _db.SaveChangesAsync(cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
         await RecalculateUserAvgPercentageAsync(userId, cancellationToken);
         await _goals.RefreshForGameAsync(userId, game.Id, cancellationToken);
 
@@ -451,14 +451,12 @@ public class SteamSyncService : ISteamSyncService
 
         try
         {
-            var catalog = await _db.Achievements
-                .Where(a => a.GameId == game.Id)
-                .ToListAsync(cancellationToken);
+            var catalog = await _achievements.GetTrackedByGameIdAsync(game.Id, cancellationToken);
 
             if (catalog.Count == 0)
             {
                 game.GlobalPercentSyncedAt = DateTimeOffset.UtcNow;
-                await _db.SaveChangesAsync(cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return;
             }
 
@@ -488,7 +486,7 @@ public class SteamSyncService : ISteamSyncService
             }
 
             game.GlobalPercentSyncedAt = DateTimeOffset.UtcNow;
-            await _db.SaveChangesAsync(cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation(
                 "Updated global percentages for app {AppId}: {Updated}/{Catalog}",
@@ -520,34 +518,21 @@ public class SteamSyncService : ISteamSyncService
 
     private async Task RecalculateUserAvgPercentageAsync(int userId, CancellationToken cancellationToken)
     {
-        var average = await _db.UsersGames
-            .AsNoTracking()
-            .Where(ug =>
-                ug.UserId == userId
-                && ug.Game.HasCommunityVisibleStats == true
-                && ug.AchievementsPercentage > 0)
-            .Select(ug => (decimal?)ug.AchievementsPercentage)
-            .AverageAsync(cancellationToken);
+        var (average, gamesInAverage) = await _usersGames.GetAveragePercentageStatsAsync(userId, cancellationToken);
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+        var user = await _users.GetTrackedByIdAsync(userId, cancellationToken);
         if (user is null)
         {
             return;
         }
 
-        user.AvgPercentage = average is null
-            ? 0
-            : Math.Round(average.Value, 2);
-        await _db.SaveChangesAsync(cancellationToken);
+        user.AvgPercentage = gamesInAverage == 0 ? 0 : average;
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
     }
 
     private async Task<List<int>> GetAllOwnedWithStatsAppIdsAsync(int userId, CancellationToken cancellationToken)
     {
-        var steamIds = await _db.UsersGames
-            .AsNoTracking()
-            .Where(ug => ug.UserId == userId && ug.Game.HasCommunityVisibleStats == true)
-            .Select(ug => ug.Game.GameSteamId)
-            .ToListAsync(cancellationToken);
+        var steamIds = await _usersGames.GetOwnedWithStatsSteamIdsAsync(userId, cancellationToken);
 
         var appIds = new List<int>();
         foreach (var id in steamIds)
@@ -569,24 +554,6 @@ public class SteamSyncService : ISteamSyncService
             .Select(g => g.AppId)
             .Distinct()
             .ToList();
-    }
-
-    private async Task<List<Game>> LoadGamesBySteamIdsAsync(
-        IReadOnlyList<string> steamIds,
-        CancellationToken cancellationToken)
-    {
-        const int chunkSize = 500;
-        var result = new List<Game>();
-        for (var i = 0; i < steamIds.Count; i += chunkSize)
-        {
-            var chunk = steamIds.Skip(i).Take(chunkSize).ToList();
-            var rows = await _db.Games
-                .Where(g => chunk.Contains(g.GameSteamId))
-                .ToListAsync(cancellationToken);
-            result.AddRange(rows);
-        }
-
-        return result;
     }
 
     private void EnforceManualSyncRateLimits(int userId)

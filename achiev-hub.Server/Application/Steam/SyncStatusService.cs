@@ -1,35 +1,33 @@
 using achiev_hub.Server.Application.Steam.Interfaces;
+using achiev_hub.Server.Application.Users.Interfaces;
 using achiev_hub.Server.Domain.Entities;
 using achiev_hub.Server.Domain.Enums;
-using achiev_hub.Server.Infrastructure.Persistence;
 using achiev_hub.Server.Infrastructure.Steam.Contracts;
-using Microsoft.EntityFrameworkCore;
 
 namespace achiev_hub.Server.Application.Steam;
 
 public class SyncStatusService : ISyncStatusService
 {
-    private readonly ApplicationDbContext _db;
+    private readonly IUserRepository _users;
+    private readonly IUserSyncStatusRepository _syncStatuses;
 
-    public SyncStatusService(ApplicationDbContext db)
+    public SyncStatusService(IUserRepository users, IUserSyncStatusRepository syncStatuses)
     {
-        _db = db;
+        _users = users;
+        _syncStatuses = syncStatuses;
     }
 
     public async Task<SyncStatusDto?> GetStatusForUserAsync(
         int userId,
         CancellationToken cancellationToken = default)
     {
-        var user = await _db.Users.AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+        var user = await _users.GetByIdAsync(userId, cancellationToken);
         if (user is null)
         {
             return null;
         }
 
-        var syncRow = await _db.UserSyncStatuses.AsNoTracking()
-            .FirstOrDefaultAsync(s => s.UserId == user.Id, cancellationToken);
-
+        var syncRow = await _syncStatuses.GetByUserIdAsync(user.Id, cancellationToken);
         return BuildStatus(user, syncRow);
     }
 
@@ -38,16 +36,13 @@ public class SyncStatusService : ISyncStatusService
         CancellationToken cancellationToken = default)
     {
         var normalized = steamId.Trim();
-        var user = await _db.Users.AsNoTracking()
-            .FirstOrDefaultAsync(u => u.SteamId == normalized, cancellationToken);
+        var user = await _users.GetBySteamIdAsync(normalized, cancellationToken);
         if (user is null)
         {
             return null;
         }
 
-        var syncRow = await _db.UserSyncStatuses.AsNoTracking()
-            .FirstOrDefaultAsync(s => s.UserId == user.Id, cancellationToken);
-
+        var syncRow = await _syncStatuses.GetByUserIdAsync(user.Id, cancellationToken);
         return BuildStatus(user, syncRow);
     }
 

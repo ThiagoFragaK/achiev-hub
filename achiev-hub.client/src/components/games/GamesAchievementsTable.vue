@@ -42,6 +42,11 @@ import { getSessionSteamId } from '@/lib/steam'
 import { formatGlobalPercentage, globalPercentageColorClass } from '@/lib/globalPercentage'
 import { getAchievements as fetchAchievements } from '@/services/gamesService'
 import TableComponent from '@/components/global/TableComponent.vue'
+import {
+    applyPagedResult,
+    createPagination,
+    resetPagination
+} from '@/utils/PaginationHelper'
 
 export default {
     name: 'GamesAchievementsTable',
@@ -79,12 +84,7 @@ export default {
                     { key: 'globalPercentage', label: 'Global %' },
                     { key: 'unlocked', label: 'Unlocked' }
                 ],
-                pagination: {
-                    currentPage: 1,
-                    perPage: 15,
-                    totalPages: 1,
-                    totalCount: 0
-                }
+                pagination: createPagination({ perPage: 15 })
             }
         }
     },
@@ -122,8 +122,7 @@ export default {
             if (!steamId) {
                 this.error = 'Steam ID is missing from your session.'
                 this.table.data = []
-                this.table.pagination.totalCount = 0
-                this.table.pagination.totalPages = 1
+                resetPagination(this.table.pagination)
                 return
             }
             if (!gameId) {
@@ -141,15 +140,11 @@ export default {
                     this.table.pagination.perPage,
                     this.filters
                 )
-                this.table.data = result?.data ?? []
-                this.table.pagination.currentPage = result?.currentPage ?? this.table.pagination.currentPage
-                this.table.pagination.totalPages = Math.max(1, result?.lastPage ?? 1)
-                this.table.pagination.totalCount = result?.totalCount ?? this.table.data.length
+                this.table.data = applyPagedResult(this.table.pagination, result)
             } catch {
                 this.error = 'Steam API is unreachable.'
                 this.table.data = []
-                this.table.pagination.totalCount = 0
-                this.table.pagination.totalPages = 1
+                resetPagination(this.table.pagination)
             } finally {
                 this.isLoading = false
             }
