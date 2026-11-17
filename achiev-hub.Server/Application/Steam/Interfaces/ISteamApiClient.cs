@@ -7,7 +7,10 @@ public interface ISteamApiClient
     Task<SteamIdValidationResult> ValidateIdAsync(string steamId, CancellationToken cancellationToken = default);
     Task<Player?> GetPlayerBySteamIdAsync(string steamId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RecentlyPlayedGame>> GetRecentlyPlayedGamesAsync(string steamId, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<OwnedGame>> GetOwnedGamesAsync(string steamId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<OwnedGame>> GetOwnedGamesAsync(
+        string steamId,
+        IReadOnlyCollection<int>? appIdsFilter = null,
+        CancellationToken cancellationToken = default);
     Task<PlayerAchievementsResult?> GetPlayerAchievementsAsync(string steamId, int appId, CancellationToken cancellationToken = default);
     Task<GameSchema?> GetGameSchemaAsync(int appId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<GlobalAchievementPercentage>?> GetGlobalAchievementPercentagesAsync(int appId, CancellationToken cancellationToken = default);
