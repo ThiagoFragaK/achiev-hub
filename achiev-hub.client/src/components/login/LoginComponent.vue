@@ -28,7 +28,7 @@
                         class="form-control"
                         :class="{ 'is-invalid': steamIdError }"
                         :aria-invalid="steamIdError"
-                        :disabled="loading"
+                        :disabled="isLoading || isLoadingSteam"
                     />
                     <div
                         v-if="steamIdError"
@@ -49,7 +49,7 @@
                         autocomplete="current-password"
                         class="form-control"
                         :class="{ 'is-invalid': !!loginError }"
-                        :disabled="loading"
+                        :disabled="isLoading || isLoadingSteam"
                     />
                 </div>
 
@@ -63,16 +63,16 @@
                             <button 
                                 type="submit" 
                                 class="btn btn-primary btn-md w-100" 
-                                :disabled="loading"
+                                :disabled="isLoading || isLoadingSteam"
                             >
-                                {{ loading ? 'Logging in…' : 'Login' }}
+                                {{ isLoading ? 'Logging in…' : 'Login' }}
                             </button>
                         </div>
                         <div class="col-12">
                             <button
                                 type="button"
                                 class="btn btn-info btn-md w-100"
-                                :disabled="loading"
+                                :disabled="isLoading || isLoadingSteam"
                                 @click="onSteamLogin"
                             >
                                 <img
@@ -82,7 +82,7 @@
                                     height="15"
                                     aria-hidden="true"
                                 />
-                                Steam Login
+                                {{ isLoadingSteam ? 'Logging in…' : 'Steam Login' }}
                             </button>
                         </div>
                     </div>
@@ -91,7 +91,7 @@
                             <button
                                 type="button"
                                 class="btn btn-sm btn-secondary w-100"
-                                :disabled="loading"
+                                :disabled="isLoading || isLoadingSteam"
                                 @click="onRegister"
                             >
                                 Register
@@ -127,7 +127,8 @@ export default {
             steamIdError: false,
             loginError: '',
             readyMessage: '',
-            loading: false
+            isLoading: false,
+            isLoadingSteam: false
         }
     },
     async mounted() {
@@ -141,14 +142,14 @@ export default {
             this.loginError = this.$route.query.steam_error
         }
         if (typeof this.$route.query.steam_code === 'string') {
-            this.loading = true
+            this.isLoadingSteam = true
             try {
                 await exchangeSteamOpenIdCode(this.$route.query.steam_code)
                 this.redirectAfterLogin()
             } catch (error) {
                 this.loginError = error.body?.message || error.message || 'Steam login failed'
             } finally {
-                this.loading = false
+                this.isLoadingSteam = false
             }
         }
     },
@@ -157,6 +158,7 @@ export default {
             this.$router.push('/register')
         },
         onSteamLogin() {
+            this.isLoadingSteam = true
             beginSteamOpenIdLogin()
         },
         redirectAfterLogin() {
@@ -169,14 +171,14 @@ export default {
             this.loginError = ''
             if (this.steamIdError) return
 
-            this.loading = true
+            this.isLoading = true
             try {
                 await login(this.steamId.trim(), this.password)
                 this.redirectAfterLogin()
             } catch (error) {
                 this.loginError = error.body?.message || error.message || 'Login failed'
             } finally {
-                this.loading = false
+                this.isLoading = false
             }
         }
     }
