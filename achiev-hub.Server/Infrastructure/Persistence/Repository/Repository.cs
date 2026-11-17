@@ -1,15 +1,11 @@
 using System.Linq.Expressions;
-using achiev_hub.Server.Infrastructure.Persistence;
-using achiev_hub.Server.Domain.Entities;
-using achiev_hub.Server.Domain.Interfaces;
 using achiev_hub.Server.Application.Common;
 using achiev_hub.Server.Application.Common.Interfaces;
-using achiev_hub.Server.Application.Steam;
-using achiev_hub.Server.Application.Steam.Interfaces;
+using achiev_hub.Server.Domain.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
-namespace achiev_hub.Server.Infrastructure.Persistence;
+namespace achiev_hub.Server.Infrastructure.Persistence.Repository;
 
 public class Repository<T> : IRepository<T> where T : class, IEntity
 {
