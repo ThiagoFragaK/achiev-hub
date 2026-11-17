@@ -1,3 +1,4 @@
+using achiev_hub.Server.Application.Games;
 using achiev_hub.Server.Application.Goals;
 using achiev_hub.Server.Application.Goals.Interfaces;
 using achiev_hub.Server.Domain.Enums;
@@ -19,16 +20,49 @@ public class GoalsController : ApiControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<GoalDto>>> GetAll(
+    public async Task<ActionResult<PagedResultDto<GoalDto>>> GetAll(
+        [FromQuery] GoalStatus? status,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 15,
+        [FromQuery] int? appId = null,
+        [FromQuery] decimal? minCompletion = null,
+        [FromQuery] decimal? minEndGoal = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (ResolveUserId() is not int userId)
+        {
+            return Ok(new PagedResultDto<GoalDto>
+            {
+                Data = [],
+                CurrentPage = 1,
+                LastPage = 1,
+                PerPage = pageSize <= 0 ? 15 : pageSize,
+                TotalCount = 0
+            });
+        }
+
+        var filters = new GoalListFilterDto
+        {
+            Status = status,
+            AppId = appId,
+            MinCompletion = minCompletion,
+            MinEndGoal = minEndGoal
+        };
+
+        return Ok(await _goalService.GetForUserAsync(userId, page, pageSize, filters, cancellationToken));
+    }
+
+    [HttpGet("filter-games")]
+    public async Task<ActionResult<IReadOnlyList<GoalFilterGameDto>>> GetFilterGames(
         [FromQuery] GoalStatus? status,
         CancellationToken cancellationToken)
     {
         if (ResolveUserId() is not int userId)
         {
-            return Ok(Array.Empty<GoalDto>());
+            return Ok(Array.Empty<GoalFilterGameDto>());
         }
 
-        return Ok(await _goalService.GetForUserAsync(userId, status, cancellationToken));
+        return Ok(await _goalService.GetFilterGamesAsync(userId, status, cancellationToken));
     }
 
     [HttpGet("eligible-games")]

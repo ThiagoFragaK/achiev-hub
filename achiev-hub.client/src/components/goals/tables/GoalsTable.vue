@@ -1,11 +1,30 @@
 <template>
     <div>
         <TabsComponent v-model="statusFilter" :tabs="statusTabs">
+            <template #append>
+                <button
+                    type="button"
+                    class="btn btn-outline-light btn-sm"
+                    aria-label="Filter goals"
+                    aria-controls="goals-filters"
+                    @click="toggleFilters"
+                >
+                    <LucideIcon icon="Funnel" :size="18" />
+                </button>
+            </template>
+            <GoalsFilters
+                ref="GoalsFilters"
+                :filters="filters"
+                :games="games"
+                @apply-filters="applyFilters"
+            />
             <div v-if="error" class="alert alert-danger" role="alert">{{ error }}</div>
             <TableComponent
                 :data="table.data"
                 :columns="table.columns"
                 :isLoading="table.isLoading"
+                :pagination="table.pagination"
+                @change-page="onPageChange"
             >
                 <template #cell-game="{ data }">
                     <div class="d-flex align-items-center gap-2">
@@ -45,6 +64,9 @@
                     <span class="badge" :class="statusBadgeClass(data.row.status)">
                         {{ statusLabel(data.row.status) }}
                     </span>
+                </template>
+                <template #cell-completion="{ data }">
+                    {{ formatPercentage(completionOf(data.row)) }}
                 </template>
                 <template #cell-endGoal="{ data }">
                     {{ formatPercentage(data.row.percentageGoal) }}
@@ -112,8 +134,10 @@
 import TableComponent from '@/components/global/TableComponent.vue'
 import TabsComponent from '@/components/global/TabsComponent.vue'
 import ConfirmModal from '@/components/global/ConfirmModal.vue'
+import LucideIcon from '@/components/global/LucideIcon.vue'
+import GoalsFilters from '@/components/goals/GoalsFilters.vue'
 import GoalAchievementsModal from '@/components/goals/modals/GoalAchievementsModal.vue'
-import { abandonGoal, getGoals, reopenGoal } from '@/services/goalsService'
+import { abandonGoal, getGoalFilterGames, getGoals, reopenGoal } from '@/services/goalsService'
 import { formatPercentage } from '@/utils/NumberFormat'
 
 const STATUS = {
@@ -128,13 +152,25 @@ const STATUS_BY_FILTER = {
     abandoned: STATUS.Abandoned
 }
 
+function completionOf(row) {
+    const total = Number(row?.achievementsTotal) || 0
+    if (total <= 0) {
+        return 0
+    }
+    const missing = Number(row?.achievementsMissing) || 0
+    const unlocked = Math.max(0, total - missing)
+    return (unlocked / total) * 100
+}
+
 export default {
     name: 'GoalsTable',
     components: {
         TableComponent,
         TabsComponent,
         ConfirmModal,
-        GoalAchievementsModal
+        GoalAchievementsModal,
+        GoalsFilters,
+        LucideIcon
     },
     data() {
         return {
@@ -145,6 +181,12 @@ export default {
                 { name: 'completed', label: 'Completed' },
                 { name: 'abandoned', label: 'Abandoned' }
             ],
+            filters: {
+                appId: '',
+                minCompletion: '',
+                minEndGoal: ''
+            },
+            games: [],
             actionLoadingId: null,
             actionKind: null,
             pendingAbandonRow: null,
@@ -156,9 +198,16 @@ export default {
                     { key: 'game', label: 'Game' },
                     { key: 'achievements', label: 'Achievements' },
                     { key: 'status', label: 'Status' },
+                    { key: 'completion', label: 'Completion percentage' },
                     { key: 'endGoal', label: 'End goal' },
                     { key: 'actions', label: '' }
-                ]
+                ],
+                pagination: {
+                    currentPage: 1,
+                    perPage: 15,
+                    totalPages: 1,
+                    totalCount: 0
+                }
             }
         }
     },
@@ -178,14 +227,33 @@ export default {
     },
     watch: {
         statusFilter() {
+            this.table.pagination.currentPage = 1
+            this.loadFilterGames()
             this.load()
         }
     },
     async created() {
-        await this.load()
+        await Promise.all([this.loadFilterGames(), this.load()])
     },
     methods: {
         formatPercentage,
+        completionOf,
+        toggleFilters() {
+            this.$refs.GoalsFilters?.toggleFilters()
+        },
+        applyFilters(filters) {
+            this.filters = { ...filters }
+            this.table.pagination.currentPage = 1
+            this.load()
+        },
+        async onPageChange(page) {
+            const next = Math.max(1, Number(page) || 1)
+            if (this.table.pagination.currentPage === next) {
+                return
+            }
+            this.table.pagination.currentPage = next
+            await this.load()
+        },
         isActive(status) {
             return status === STATUS.Active || status === 'Active'
         },
@@ -202,14 +270,33 @@ export default {
             if (status === STATUS.Abandoned || status === 'Abandoned') return 'text-bg-secondary'
             return 'text-bg-primary'
         },
+        async loadFilterGames() {
+            try {
+                const status = STATUS_BY_FILTER[this.statusFilter]
+                this.games = await getGoalFilterGames(status) || []
+            } catch {
+                this.games = []
+            }
+        },
         async load() {
             this.table.isLoading = true
             this.error = ''
             try {
                 const status = STATUS_BY_FILTER[this.statusFilter]
-                this.table.data = await getGoals(status) || []
+                const result = await getGoals(
+                    status,
+                    this.table.pagination.currentPage,
+                    this.table.pagination.perPage,
+                    this.filters
+                )
+                this.table.data = result?.data ?? []
+                this.table.pagination.currentPage = result?.currentPage ?? 1
+                this.table.pagination.totalPages = Math.max(1, result?.lastPage ?? 1)
+                this.table.pagination.totalCount = result?.totalCount ?? 0
             } catch (err) {
                 this.table.data = []
+                this.table.pagination.totalCount = 0
+                this.table.pagination.totalPages = 1
                 this.error = err?.message || 'Failed to load goals.'
             } finally {
                 this.table.isLoading = false
@@ -219,7 +306,7 @@ export default {
             this.$refs.achievementsModal?.open(row)
         },
         async onAchievementsSaved() {
-            await this.load()
+            await Promise.all([this.loadFilterGames(), this.load()])
         },
         onAbandon(row) {
             if (!row?.id) {
@@ -248,7 +335,7 @@ export default {
                 await abandonGoal(row.id)
                 this.pendingAbandonRow = null
                 this.$refs.abandonModal?.close()
-                await this.load()
+                await Promise.all([this.loadFilterGames(), this.load()])
             } catch (err) {
                 this.error = err?.message || 'Failed to abandon goal.'
                 this.$refs.abandonModal?.close()
@@ -270,7 +357,7 @@ export default {
                 await reopenGoal(row.id)
                 this.pendingReopenRow = null
                 this.$refs.reopenModal?.close()
-                await this.load()
+                await Promise.all([this.loadFilterGames(), this.load()])
             } catch (err) {
                 this.error = err?.message || 'Failed to reopen goal.'
                 this.$refs.reopenModal?.close()

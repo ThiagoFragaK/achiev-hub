@@ -1,5 +1,6 @@
 using achiev_hub.Server.Application.Common;
 using achiev_hub.Server.Application.Common.Interfaces;
+using achiev_hub.Server.Application.Games;
 using achiev_hub.Server.Application.Goals.Interfaces;
 using achiev_hub.Server.Application.Users.Interfaces;
 using achiev_hub.Server.Domain.Entities;
@@ -20,15 +21,77 @@ public class GoalService : IGoalService
         _usersGames = usersGames;
     }
 
-    public async Task<IReadOnlyList<GoalDto>> GetForUserAsync(
+    public async Task<PagedResultDto<GoalDto>> GetForUserAsync(
+        int userId,
+        int page = 1,
+        int pageSize = 15,
+        GoalListFilterDto? filters = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (pageSize <= 0)
+        {
+            pageSize = 15;
+        }
+
+        var query = _db.Goals
+            .AsNoTracking()
+            .Include(g => g.Game)
+            .Include(g => g.GoalAchievements)
+            .Where(g => g.UserId == userId);
+
+        if (filters?.Status is GoalStatus status)
+        {
+            query = query.Where(g => g.Status == status);
+        }
+
+        if (filters?.AppId is int appId && appId > 0)
+        {
+            var steamAppId = appId.ToString();
+            query = query.Where(g => g.Game.GameSteamId == steamAppId);
+        }
+
+        if (filters?.MinEndGoal is decimal minEndGoal)
+        {
+            query = query.Where(g => g.PercentageGoal >= minEndGoal);
+        }
+
+        if (filters?.MinCompletion is decimal minCompletion && minCompletion > 0)
+        {
+            query = query.Where(g =>
+                g.GoalAchievements.Count > 0
+                && (g.GoalAchievements.Count - g.AchievementsMissing) * 100m / g.GoalAchievements.Count
+                    >= minCompletion);
+        }
+
+        query = query.OrderByDescending(g => g.CreatedAt);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var lastPage = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize));
+        var currentPage = page <= 0 ? 1 : Math.Min(page, lastPage);
+        var skip = (currentPage - 1) * pageSize;
+
+        var goals = await query
+            .Skip(skip)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedResultDto<GoalDto>
+        {
+            Data = goals.Select(Map).ToList(),
+            CurrentPage = currentPage,
+            LastPage = lastPage,
+            PerPage = pageSize,
+            TotalCount = totalCount
+        };
+    }
+
+    public async Task<IReadOnlyList<GoalFilterGameDto>> GetFilterGamesAsync(
         int userId,
         GoalStatus? status = null,
         CancellationToken cancellationToken = default)
     {
         var query = _db.Goals
             .AsNoTracking()
-            .Include(g => g.Game)
-            .Include(g => g.GoalAchievements)
             .Where(g => g.UserId == userId);
 
         if (status.HasValue)
@@ -36,11 +99,28 @@ public class GoalService : IGoalService
             query = query.Where(g => g.Status == status.Value);
         }
 
-        var goals = await query
-            .OrderByDescending(g => g.CreatedAt)
+        var rows = await query
+            .Select(g => new { g.Game.GameSteamId, g.Game.Name })
+            .Distinct()
+            .OrderBy(g => g.Name)
             .ToListAsync(cancellationToken);
 
-        return goals.Select(Map).ToList();
+        var games = new List<GoalFilterGameDto>();
+        foreach (var row in rows)
+        {
+            if (!int.TryParse(row.GameSteamId, out var appId))
+            {
+                continue;
+            }
+
+            games.Add(new GoalFilterGameDto
+            {
+                AppId = appId,
+                GameName = row.Name
+            });
+        }
+
+        return games;
     }
 
     public async Task<GoalDto> GetByIdAsync(int userId, int id, CancellationToken cancellationToken = default)

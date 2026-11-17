@@ -31,6 +31,13 @@
                     {{ tab.label }}
                 </a>
             </li>
+            <li
+                v-if="$slots.append"
+                class="nav-item d-flex align-items-center ms-auto"
+                role="presentation"
+            >
+                <slot name="append" />
+            </li>
         </ul>
         <div class="tab-content mt-3">
             <div
@@ -98,6 +105,7 @@ export default {
 .tabs-bar {
     gap: 0.35rem;
     flex-wrap: wrap;
+    width: 100%;
 }
 
 .tabs-bar .nav-link {
