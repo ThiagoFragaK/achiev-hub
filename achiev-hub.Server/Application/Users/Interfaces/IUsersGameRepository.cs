@@ -35,6 +35,10 @@ public interface IUsersGameRepository
         int userId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<PercentageBandCountRow>> GetPercentageBandCountsAsync(
+        int userId,
+        CancellationToken cancellationToken = default);
+
     Task<PagedResultDto<LibraryGameRow>> GetLibraryPageAsync(
         int userId,
         LibraryGameQuery query,
@@ -85,4 +89,11 @@ public sealed class LibraryGameRow
     public long? LastPlayedUnix { get; set; }
     public bool HasAchievements { get; set; }
     public decimal AchievementsPercentage { get; set; }
+}
+
+public sealed class PercentageBandCountRow
+{
+    public string Key { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+    public int Count { get; set; }
 }

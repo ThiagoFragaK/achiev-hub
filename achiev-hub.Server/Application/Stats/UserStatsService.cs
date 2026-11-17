@@ -161,13 +161,33 @@ public class UserStatsService : IUserStatsService
         int userId,
         CancellationToken cancellationToken = default)
     {
-        var percentages = await _usersGames.GetCommunityVisiblePercentagesAsync(userId, cancellationToken);
-        return BuildPercentageBands(percentages);
+        var bands = await _usersGames.GetPercentageBandCountsAsync(userId, cancellationToken);
+        return new GamesPercentageBandsDto
+        {
+            Bands = bands
+                .Select(b => new PercentageBandCountDto
+                {
+                    Key = b.Key,
+                    Label = b.Label,
+                    Count = b.Count
+                })
+                .ToList()
+        };
     }
 
     public GamesPercentageBandsDto GetEmptyGamesPercentageBands()
     {
-        return BuildPercentageBands([]);
+        return new GamesPercentageBandsDto
+        {
+            Bands = PercentageBandDefs
+                .Select(def => new PercentageBandCountDto
+                {
+                    Key = def.Key,
+                    Label = def.Label,
+                    Count = 0
+                })
+                .ToList()
+        };
     }
 
     public async Task<GamesForAverageDto> GetGamesForAverageAsync(

@@ -19,11 +19,16 @@ public class SteamGamesController : ApiControllerBase
 {
     private readonly IGamesService _gamesService;
     private readonly ISteamSyncService _steamSyncService;
+    private readonly ISteamSyncClient _steamSyncClient;
 
-    public SteamGamesController(IGamesService gamesService, ISteamSyncService steamSyncService)
+    public SteamGamesController(
+        IGamesService gamesService,
+        ISteamSyncService steamSyncService,
+        ISteamSyncClient steamSyncClient)
     {
         _gamesService = gamesService;
         _steamSyncService = steamSyncService;
+        _steamSyncClient = steamSyncClient;
     }
 
     [HttpGet("recent")]
@@ -199,17 +204,13 @@ public class SteamGamesController : ApiControllerBase
 
         try
         {
-            await _steamSyncService.SyncLibraryAsync(
-                userId,
-                steamId,
-                LibrarySyncScope.Full,
-                cancellationToken);
-            await _steamSyncService.SyncAchievementsForUserAsync(
-                userId,
-                steamId,
-                AchievementSyncScope.AllOwnedWithStats,
-                cancellationToken);
-            return Ok(new { success = true, message = "Library synced." });
+            var jobId = await _steamSyncClient.PublishSyncLibraryAsync(userId, steamId, cancellationToken);
+            return Accepted(new
+            {
+                enqueued = true,
+                jobId,
+                message = "Library sync queued."
+            });
         }
         catch (Exception ex)
         {

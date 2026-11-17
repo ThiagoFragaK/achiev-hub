@@ -30,10 +30,10 @@ public class UserService : IUserService
         _users = users;
     }
 
-    public async Task<IReadOnlyList<UserDto>> GetAllAsync(CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<UserDto>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        var users = await _users.GetAllAsync(cancellationToken);
-        return users.Select(Map).ToList();
+        throw new InvalidOperationException(
+            "Listing all users is disabled. Query by id.");
     }
 
     public async Task<UserDto> GetByIdAsync(int id, CancellationToken cancellationToken = default)

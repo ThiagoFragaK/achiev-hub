@@ -44,7 +44,14 @@ public sealed class SteamOpenIdValidator
         var realm = ResolveRealm(request);
         var returnTo = QueryHelpers.AddQueryString(returnToBase, "state", state);
 
-        _cache.Set(StateCacheKey(state), returnTo, TimeSpan.FromMinutes(10));
+        _cache.Set(
+            StateCacheKey(state),
+            returnTo,
+            new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10),
+                Size = 1
+            });
 
         var query = new Dictionary<string, string?>
         {
@@ -122,7 +129,14 @@ public sealed class SteamOpenIdValidator
             return SteamOpenIdResult.Fail("Steam check_authentication failed.");
         }
 
-        _cache.Set(nonceKey, true, TimeSpan.FromHours(24));
+        _cache.Set(
+            nonceKey,
+            true,
+            new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(24),
+                Size = 1
+            });
         return SteamOpenIdResult.Ok(steamId);
     }
 

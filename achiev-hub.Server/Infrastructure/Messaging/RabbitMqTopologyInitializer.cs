@@ -9,6 +9,8 @@ namespace achiev_hub.Server.Infrastructure.Messaging;
 /// Declares every queue and dead-letter exchange in <see cref="SteamSyncQueueNames"/> at startup.
 /// Arguments must stay identical across deployments: RabbitMQ rejects a redeclare with different
 /// arguments (PRECONDITION_FAILED).
+/// After changing queue bounds (x-max-length / TTL), delete the existing queues once (or apply
+/// matching policies) before restarting so declare succeeds.
 /// </summary>
 public sealed class RabbitMqTopologyInitializer : IStartupTask
 {
@@ -70,12 +72,19 @@ public sealed class RabbitMqTopologyInitializer : IStartupTask
             arguments: null,
             cancellationToken: cancellationToken);
 
+        var dlqArgs = new Dictionary<string, object?>
+        {
+            ["x-max-length"] = 5_000,
+            ["x-overflow"] = "drop-head",
+            ["x-message-ttl"] = (int)TimeSpan.FromDays(7).TotalMilliseconds
+        };
+
         await channel.QueueDeclareAsync(
             queue: deadLetterQueue,
             durable: true,
             exclusive: false,
             autoDelete: false,
-            arguments: null,
+            arguments: dlqArgs,
             cancellationToken: cancellationToken);
 
         await channel.QueueBindAsync(
@@ -86,7 +95,9 @@ public sealed class RabbitMqTopologyInitializer : IStartupTask
 
         var args = new Dictionary<string, object?>
         {
-            ["x-dead-letter-exchange"] = deadLetterExchange
+            ["x-dead-letter-exchange"] = deadLetterExchange,
+            ["x-max-length"] = 10_000,
+            ["x-overflow"] = "drop-head"
         };
 
         await channel.QueueDeclareAsync(

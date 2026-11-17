@@ -197,6 +197,8 @@ public class GoalRepository : IGoalRepository
         DateTimeOffset? acknowledgedAt,
         CancellationToken cancellationToken = default)
     {
+        const int maxUnacknowledged = 50;
+
         return await _db.Goals
             .AsNoTracking()
             .Include(g => g.Game)
@@ -207,6 +209,7 @@ public class GoalRepository : IGoalRepository
                 && g.CompletedAt != null
                 && (acknowledgedAt == null || g.CompletedAt > acknowledgedAt))
             .OrderByDescending(g => g.CompletedAt)
+            .Take(maxUnacknowledged)
             .ToListAsync(cancellationToken);
     }
 

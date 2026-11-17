@@ -18,6 +18,7 @@ public class SteamSyncService : ISteamSyncService
     private const int ManualSyncCooldownMinutes = 30;
     private const int ManualSyncMaxPerDay = 10;
     private const int GlobalPercentTtlHours = 24;
+    private const int LibraryBatchSize = 250;
 
     private readonly IUserRepository _users;
     private readonly IGameRepository _games;
@@ -124,10 +125,13 @@ public class SteamSyncService : ISteamSyncService
             }
         }
 
+        var playtime2Weeks = recentGames.Sum(g => g.Playtime2WeeksMinutes);
+
         if (byAppId.Count == 0)
         {
-            user.Playtime2WeeksMinutes = recentGames.Sum(g => g.Playtime2WeeksMinutes);
+            user.Playtime2WeeksMinutes = playtime2Weeks;
             await _unitOfWork.SaveChangesAsync(cancellationToken);
+            _unitOfWork.ClearChangeTracker();
             _cache.Remove(RecentGamesCacheKeys.ForSteamId(steamId));
             _logger.LogInformation(
                 "Synced library ({Scope}) for user {UserId}: 0 games",
@@ -136,84 +140,105 @@ public class SteamSyncService : ISteamSyncService
             return;
         }
 
-        var steamIds = byAppId.Keys.Select(id => id.ToString()).ToList();
-        var existingGames = await _games.GetTrackedBySteamIdsAsync(steamIds, cancellationToken);
+        var inputs = byAppId.Values.ToList();
+        var gameIdBySteamId = new Dictionary<string, int>(StringComparer.Ordinal);
 
-        var gamesBySteamId = existingGames
-            .ToDictionary(g => g.GameSteamId, StringComparer.Ordinal);
-
-        foreach (var input in byAppId.Values)
+        for (var offset = 0; offset < inputs.Count; offset += LibraryBatchSize)
         {
-            var steamAppId = input.AppId.ToString();
-            var iconHash = SteamMediaUrls.ToStorageHash(input.ImageUrl);
-            if (!gamesBySteamId.TryGetValue(steamAppId, out var game))
-            {
-                game = new Game
-                {
-                    GameSteamId = steamAppId,
-                    Name = string.IsNullOrWhiteSpace(input.Name) ? steamAppId : input.Name.Trim(),
-                    ImageUrl = iconHash,
-                    HasCommunityVisibleStats = input.HasCommunityVisibleStats
-                };
-                _games.Add(game);
-                gamesBySteamId[steamAppId] = game;
-            }
-            else
-            {
-                if (!string.IsNullOrWhiteSpace(input.Name))
-                {
-                    game.Name = input.Name.Trim();
-                }
+            var batch = inputs.Skip(offset).Take(LibraryBatchSize).ToList();
+            var steamIds = batch.Select(i => i.AppId.ToString()).ToList();
+            var existingGames = await _games.GetTrackedBySteamIdsAsync(steamIds, cancellationToken);
+            var gamesBySteamId = existingGames.ToDictionary(g => g.GameSteamId, StringComparer.Ordinal);
 
-                if (!string.IsNullOrWhiteSpace(iconHash))
+            foreach (var input in batch)
+            {
+                var steamAppId = input.AppId.ToString();
+                var iconHash = SteamMediaUrls.ToStorageHash(input.ImageUrl);
+                if (!gamesBySteamId.TryGetValue(steamAppId, out var game))
                 {
-                    game.ImageUrl = iconHash;
+                    game = new Game
+                    {
+                        GameSteamId = steamAppId,
+                        Name = string.IsNullOrWhiteSpace(input.Name) ? steamAppId : input.Name.Trim(),
+                        ImageUrl = iconHash,
+                        HasCommunityVisibleStats = input.HasCommunityVisibleStats
+                    };
+                    _games.Add(game);
+                    gamesBySteamId[steamAppId] = game;
                 }
-
-                if (input.HasCommunityVisibleStats.HasValue)
+                else
                 {
-                    game.HasCommunityVisibleStats = input.HasCommunityVisibleStats;
+                    if (!string.IsNullOrWhiteSpace(input.Name))
+                    {
+                        game.Name = input.Name.Trim();
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(iconHash))
+                    {
+                        game.ImageUrl = iconHash;
+                    }
+
+                    if (input.HasCommunityVisibleStats.HasValue)
+                    {
+                        game.HasCommunityVisibleStats = input.HasCommunityVisibleStats;
+                    }
                 }
             }
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            foreach (var (steamAppId, game) in gamesBySteamId)
+            {
+                gameIdBySteamId[steamAppId] = game.Id;
+            }
+
+            _unitOfWork.ClearChangeTracker();
         }
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-        var persistedGameIds = gamesBySteamId.Values.Select(g => g.Id).ToList();
-        var existingUsersGames = await _usersGames.GetTrackedByUserAndGameIdsAsync(
-            userId,
-            persistedGameIds,
-            cancellationToken);
-
-        var usersGamesByGameId = existingUsersGames.ToDictionary(ug => ug.GameId);
-
-        foreach (var input in byAppId.Values)
+        for (var offset = 0; offset < inputs.Count; offset += LibraryBatchSize)
         {
-            var steamAppId = input.AppId.ToString();
-            var game = gamesBySteamId[steamAppId];
+            var batch = inputs.Skip(offset).Take(LibraryBatchSize).ToList();
+            var gameIds = batch
+                .Select(i => gameIdBySteamId[i.AppId.ToString()])
+                .Distinct()
+                .ToList();
+            var existingUsersGames = await _usersGames.GetTrackedByUserAndGameIdsAsync(
+                userId,
+                gameIds,
+                cancellationToken);
+            var usersGamesByGameId = existingUsersGames.ToDictionary(ug => ug.GameId);
 
-            if (!usersGamesByGameId.TryGetValue(game.Id, out var usersGame))
+            foreach (var input in batch)
             {
-                usersGame = new UsersGame
+                var gameId = gameIdBySteamId[input.AppId.ToString()];
+                if (!usersGamesByGameId.TryGetValue(gameId, out var usersGame))
                 {
-                    UserId = userId,
-                    GameId = game.Id,
-                    AchievementsPercentage = 0
-                };
-                _usersGames.Add(usersGame);
-                usersGamesByGameId[game.Id] = usersGame;
+                    usersGame = new UsersGame
+                    {
+                        UserId = userId,
+                        GameId = gameId,
+                        AchievementsPercentage = 0
+                    };
+                    _usersGames.Add(usersGame);
+                    usersGamesByGameId[gameId] = usersGame;
+                }
+
+                usersGame.PlaytimeMinutes = input.PlaytimeMinutes;
+                if (input.LastPlayedUnix.HasValue)
+                {
+                    usersGame.LastPlayedUnix = input.LastPlayedUnix;
+                }
             }
 
-            usersGame.PlaytimeMinutes = input.PlaytimeMinutes;
-            if (input.LastPlayedUnix.HasValue)
-            {
-                usersGame.LastPlayedUnix = input.LastPlayedUnix;
-            }
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+            _unitOfWork.ClearChangeTracker();
         }
 
-        user.Playtime2WeeksMinutes = recentGames.Sum(g => g.Playtime2WeeksMinutes);
-
+        user = await _users.GetTrackedByIdAsync(userId, cancellationToken)
+            ?? throw new InvalidOperationException($"User {userId} was not found.");
+        user.Playtime2WeeksMinutes = playtime2Weeks;
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+        _unitOfWork.ClearChangeTracker();
 
         _cache.Remove(RecentGamesCacheKeys.ForSteamId(steamId));
 
@@ -222,7 +247,7 @@ public class SteamSyncService : ISteamSyncService
             scope,
             userId,
             byAppId.Count,
-            user.Playtime2WeeksMinutes);
+            playtime2Weeks);
     }
 
     public async Task SyncGameAchievementsAsync(
@@ -331,6 +356,7 @@ public class SteamSyncService : ISteamSyncService
                 userId,
                 appId,
                 playerResult?.Error);
+            _unitOfWork.ClearChangeTracker();
             return;
         }
 
@@ -338,10 +364,9 @@ public class SteamSyncService : ISteamSyncService
             .Where(a => a.Achieved == 1 && !string.IsNullOrWhiteSpace(a.ApiName))
             .ToDictionary(a => a.ApiName!, a => a, StringComparer.OrdinalIgnoreCase);
 
-        var refreshedCatalog = await _achievements.GetTrackedByGameIdAsync(game.Id, cancellationToken);
-
-        var achievementIdsByApiName = refreshedCatalog
-            .ToDictionary(a => a.ApiName, a => a.Id, StringComparer.OrdinalIgnoreCase);
+        // IDs are populated on tracked entities after SaveChanges — avoid a second catalog query.
+        var achievementIdsByApiName = catalogByApiName
+            .ToDictionary(kv => kv.Key, kv => kv.Value.Id, StringComparer.OrdinalIgnoreCase);
 
         var existingUnlocks = await _usersAchievements.GetTrackedByUserAndGameAsync(
             userId,
@@ -382,7 +407,7 @@ public class SteamSyncService : ISteamSyncService
             _usersAchievements.Remove(stale);
         }
 
-        var totalAchievements = refreshedCatalog.Count;
+        var totalAchievements = catalogByApiName.Count;
         var unlockedCount = unlockedAchievementIds.Count;
         usersGame.AchievementsPercentage = totalAchievements == 0
             ? 0
@@ -392,6 +417,7 @@ public class SteamSyncService : ISteamSyncService
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         await RecalculateUserAvgPercentageAsync(userId, cancellationToken);
         await _goals.RefreshForGameAsync(userId, game.Id, cancellationToken);
+        _unitOfWork.ClearChangeTracker();
 
         if (isManualRefresh)
         {
@@ -435,6 +461,10 @@ public class SteamSyncService : ISteamSyncService
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Achievement sync failed for user {UserId} app {AppId}", userId, appId);
+            }
+            finally
+            {
+                _unitOfWork.ClearChangeTracker();
             }
         }
     }
@@ -605,7 +635,14 @@ public class SteamSyncService : ISteamSyncService
 
         var state = new ManualSyncState(today, count, now);
         var untilMidnight = new DateTimeOffset(today.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero) - now;
-        _cache.Set(key, state, untilMidnight > TimeSpan.Zero ? untilMidnight : TimeSpan.FromDays(1));
+        _cache.Set(
+            key,
+            state,
+            new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = untilMidnight > TimeSpan.Zero ? untilMidnight : TimeSpan.FromDays(1),
+                Size = 1
+            });
     }
 
     private async Task RefreshPlaytimeForGameAsync(
