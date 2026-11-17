@@ -1,10 +1,20 @@
+using achiev_hub.Server.Application.Games;
 using achiev_hub.Server.Domain.Enums;
 
 namespace achiev_hub.Server.Application.Goals.Interfaces;
 
 public interface IGoalService
 {
-    Task<IReadOnlyList<GoalDto>> GetForUserAsync(int userId, GoalStatus? status = null, CancellationToken cancellationToken = default);
+    Task<PagedResultDto<GoalDto>> GetForUserAsync(
+        int userId,
+        int page = 1,
+        int pageSize = 15,
+        GoalListFilterDto? filters = null,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<GoalFilterGameDto>> GetFilterGamesAsync(
+        int userId,
+        GoalStatus? status = null,
+        CancellationToken cancellationToken = default);
     Task<GoalDto> GetByIdAsync(int userId, int id, CancellationToken cancellationToken = default);
     Task<GoalDto?> GetActiveByAppIdAsync(int userId, int appId, CancellationToken cancellationToken = default);
     Task<GoalDto> CreateAsync(int userId, CreateGoalRequest request, CancellationToken cancellationToken = default);

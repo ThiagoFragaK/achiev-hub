@@ -18,6 +18,20 @@ public class GoalDto
     public IReadOnlyList<int> AchievementIds { get; set; } = [];
 }
 
+public class GoalListFilterDto
+{
+    public GoalStatus? Status { get; set; }
+    public int? AppId { get; set; }
+    public decimal? MinCompletion { get; set; }
+    public decimal? MinEndGoal { get; set; }
+}
+
+public class GoalFilterGameDto
+{
+    public int AppId { get; set; }
+    public string GameName { get; set; } = string.Empty;
+}
+
 public class CreateGoalRequest
 {
     public int AppId { get; set; }
