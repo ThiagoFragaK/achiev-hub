@@ -57,7 +57,7 @@
                 </tr>
             </tbody>
         </table>
-        <div v-if="pagination" class="d-flex justify-content-center">
+        <div v-if="pagination && pagination.totalPages > 1" class="d-flex justify-content-center">
             <PaginationComponent
                 :current-page="pagination.currentPage"
                 :total-pages="pagination.totalPages"
