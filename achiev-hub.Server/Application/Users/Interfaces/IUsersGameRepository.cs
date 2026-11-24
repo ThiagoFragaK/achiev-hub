@@ -39,6 +39,14 @@ public interface IUsersGameRepository
         int userId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<PercentageBandGameRow>> GetPercentageBandGamesAsync(
+        int userId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<CompletedGamesYearCountRow>> GetCompletedGamesYearCountsAsync(
+        int userId,
+        CancellationToken cancellationToken = default);
+
     Task<PagedResultDto<LibraryGameRow>> GetLibraryPageAsync(
         int userId,
         LibraryGameQuery query,
@@ -95,5 +103,21 @@ public sealed class PercentageBandCountRow
 {
     public string Key { get; set; } = string.Empty;
     public string Label { get; set; } = string.Empty;
+    public int Count { get; set; }
+}
+
+public sealed class PercentageBandGameRow
+{
+    public string GameSteamId { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string? ImageUrl { get; set; }
+    public int PlaytimeMinutes { get; set; }
+    public decimal AchievementsPercentage { get; set; }
+    public string BandKey { get; set; } = string.Empty;
+}
+
+public sealed class CompletedGamesYearCountRow
+{
+    public int Year { get; set; }
     public int Count { get; set; }
 }

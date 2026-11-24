@@ -45,6 +45,27 @@ public class PercentageBandCountDto
     public int Count { get; set; }
 }
 
+public class GamesPercentageBandGamesDto
+{
+    public IReadOnlyList<PercentageBandGamesDto> Bands { get; set; } = [];
+}
+
+public class PercentageBandGamesDto
+{
+    public string Key { get; set; } = string.Empty;
+    public string Label { get; set; } = string.Empty;
+    public IReadOnlyList<PercentageBandGameDto> Games { get; set; } = [];
+}
+
+public class PercentageBandGameDto
+{
+    public int AppId { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string? Icon { get; set; }
+    public double Playtime { get; set; }
+    public decimal AchievementsPercentage { get; set; }
+}
+
 public class GamesForAverageDto
 {
     public decimal CurrentAverage { get; set; }
@@ -57,4 +78,16 @@ public class GameForAverageDto
     public int AppId { get; set; }
     public string Name { get; set; } = string.Empty;
     public decimal AchievementsPercentage { get; set; }
+}
+
+public class CompletedGamesByYearDto
+{
+    public IReadOnlyList<int> AvailableYears { get; set; } = [];
+    public IReadOnlyList<YearlyCompletedGameCountDto> Series { get; set; } = [];
+}
+
+public class YearlyCompletedGameCountDto
+{
+    public int Year { get; set; }
+    public int Count { get; set; }
 }

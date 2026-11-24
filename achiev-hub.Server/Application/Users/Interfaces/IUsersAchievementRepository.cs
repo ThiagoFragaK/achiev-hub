@@ -50,6 +50,15 @@ public interface IUsersAchievementRepository
         int maximumRows,
         CancellationToken cancellationToken = default);
 
+    Task<PagedResultDto<RecentAchievementRow>> GetUnlockedPageForMonthAsync(
+        int userId,
+        int year,
+        int month,
+        int page,
+        int pageSize,
+        string? nameQuery = null,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<UsersAchievement>> GetTrackedByUserAndGameAsync(
         int userId,
         int gameId,

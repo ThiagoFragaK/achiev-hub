@@ -1,17 +1,6 @@
+using achiev_hub.Server.Application.Common;
 using achiev_hub.Server.Application.Games;
-using achiev_hub.Server.Application.Games.Interfaces;
-using achiev_hub.Server.Application.Achievements;
-using achiev_hub.Server.Application.Achievements.Interfaces;
-using achiev_hub.Server.Application.Steam;
-using achiev_hub.Server.Application.Steam.Interfaces;
 using achiev_hub.Server.Application.Stats;
-using achiev_hub.Server.Application.Stats.Interfaces;
-using achiev_hub.Server.Application.Users;
-using achiev_hub.Server.Application.Users.Interfaces;
-using achiev_hub.Server.Application.Goals;
-using achiev_hub.Server.Application.Goals.Interfaces;
-using achiev_hub.Server.Application.Auth;
-using achiev_hub.Server.Application.Auth.Interfaces;
 
 namespace achiev_hub.Server.Application.Stats.Interfaces;
 public interface IUserStatsService
@@ -28,11 +17,28 @@ public interface IUserStatsService
 
     AchievementsByMonthDto GetEmptyAchievementsByMonth();
 
+    Task<PagedResultDto<RecentAchievementDto>> GetAchievementsForMonthAsync(
+        int userId,
+        int year,
+        int month,
+        int page,
+        int pageSize,
+        string? nameQuery = null,
+        CancellationToken cancellationToken = default);
+
     Task<GamesPercentageBandsDto> GetGamesPercentageBandsAsync(int userId, CancellationToken cancellationToken = default);
 
     GamesPercentageBandsDto GetEmptyGamesPercentageBands();
 
+    Task<GamesPercentageBandGamesDto> GetGamesPercentageBandGamesAsync(int userId, CancellationToken cancellationToken = default);
+
+    GamesPercentageBandGamesDto GetEmptyGamesPercentageBandGames();
+
     Task<GamesForAverageDto> GetGamesForAverageAsync(int userId, CancellationToken cancellationToken = default);
 
     GamesForAverageDto GetEmptyGamesForAverage();
+
+    Task<CompletedGamesByYearDto> GetCompletedGamesByYearAsync(int userId, CancellationToken cancellationToken = default);
+
+    CompletedGamesByYearDto GetEmptyCompletedGamesByYear();
 }
