@@ -30,7 +30,7 @@
                 </TabsComponent>
             </div>
             <div class="col-12 col-lg-4">
-                <GamesPercentageBandGraph :height="chartHeight" />
+                <GamesPercentageTierGraph :height="chartHeight" />
             </div>
             <div class="col-12">
                 <div class="stats-list-panel">
@@ -52,7 +52,7 @@
 import AppShell from '@/components/layout/AppShell.vue'
 import TabsComponent from '@/components/global/TabsComponent.vue'
 import AchievementsYearlyGraph from '@/components/stats/graphs/AchievementsYearlyGraph.vue'
-import GamesPercentageBandGraph from '@/components/stats/graphs/GamesPercentageBandGraph.vue'
+import GamesPercentageTierGraph from '@/components/stats/graphs/GamesPercentageTierGraph.vue'
 import CompletedGamesYearlyGraph from '@/components/stats/graphs/CompletedGamesYearlyGraph.vue'
 import AchievementsByMonthList from '@/components/stats/AchievementsByMonthList.vue'
 import GamesPercentageBandList from '@/components/stats/GamesPercentageBandList.vue'
@@ -65,7 +65,7 @@ export default {
         AppShell,
         TabsComponent,
         AchievementsYearlyGraph,
-        GamesPercentageBandGraph,
+        GamesPercentageTierGraph,
         CompletedGamesYearlyGraph,
         AchievementsByMonthList,
         GamesPercentageBandList
