@@ -5,7 +5,7 @@
                 <p class="text-uppercase text-secondary small fw-medium mb-0 me-auto">
                     Games by completion
                 </p>
-                <div class="btn-group" role="group" aria-label="Band filter">
+                <div class="btn-group" role="group" aria-label="Tier filter">
                     <button
                         type="button"
                         class="btn btn-sm"
@@ -66,7 +66,7 @@ const BAND_COLORS = {
 }
 
 export default {
-    name: 'GamesPercentageBandGraph',
+    name: 'GamesPercentageTierGraph',
     components: {
         DonutChart
     },

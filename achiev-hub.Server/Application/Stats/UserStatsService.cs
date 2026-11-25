@@ -1,4 +1,5 @@
 using achiev_hub.Server.Application.Achievements.Interfaces;
+using achiev_hub.Server.Application.Common;
 using achiev_hub.Server.Application.Games;
 using achiev_hub.Server.Application.Games.Interfaces;
 using achiev_hub.Server.Application.Stats.Interfaces;
@@ -157,6 +158,44 @@ public class UserStatsService : IUserStatsService
         };
     }
 
+    public async Task<PagedResultDto<RecentAchievementDto>> GetAchievementsForMonthAsync(
+        int userId,
+        int year,
+        int month,
+        int page,
+        int pageSize,
+        string? nameQuery = null,
+        CancellationToken cancellationToken = default)
+    {
+        var pageResult = await _usersAchievements.GetUnlockedPageForMonthAsync(
+            userId,
+            year,
+            month,
+            page,
+            pageSize,
+            nameQuery,
+            cancellationToken);
+
+        var data = pageResult.Data.Select(row =>
+        {
+            var appId = int.TryParse(row.GameSteamId, out var parsed) ? parsed : 0;
+            return new RecentAchievementDto
+            {
+                Name = row.AchievementName,
+                Description = row.Description,
+                Icon = SteamMediaUrls.AppIconUrl(row.GameSteamId, row.ImageUrlUnlock),
+                AppId = appId,
+                GameName = row.GameName,
+                Unlocked = row.UnlockDate.HasValue
+                    ? FormatDateTimeFromUtc(row.UnlockDate.Value)
+                    : "-",
+                GlobalPercentage = row.GlobalPercentage
+            };
+        }).ToList();
+
+        return PagedResultDto<RecentAchievementDto>.From(data, pageResult.Pagination);
+    }
+
     public async Task<GamesPercentageBandsDto> GetGamesPercentageBandsAsync(
         int userId,
         CancellationToken cancellationToken = default)
@@ -179,12 +218,70 @@ public class UserStatsService : IUserStatsService
     {
         return new GamesPercentageBandsDto
         {
-            Bands = PercentageBandDefs
+            Bands = PercentageBands.All
                 .Select(def => new PercentageBandCountDto
                 {
                     Key = def.Key,
                     Label = def.Label,
                     Count = 0
+                })
+                .ToList()
+        };
+    }
+
+    public async Task<GamesPercentageBandGamesDto> GetGamesPercentageBandGamesAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await _usersGames.GetPercentageBandGamesAsync(userId, cancellationToken);
+        var gamesByBand = new Dictionary<string, List<PercentageBandGameDto>>(StringComparer.Ordinal);
+
+        foreach (var row in rows)
+        {
+            if (!int.TryParse(row.GameSteamId, out var appId))
+            {
+                continue;
+            }
+
+            if (!gamesByBand.TryGetValue(row.BandKey, out var list))
+            {
+                list = [];
+                gamesByBand[row.BandKey] = list;
+            }
+
+            list.Add(new PercentageBandGameDto
+            {
+                AppId = appId,
+                Name = row.Name,
+                Icon = SteamMediaUrls.AppIconUrl(row.GameSteamId, row.ImageUrl),
+                Playtime = row.PlaytimeMinutes == 0 ? 0 : Math.Round(row.PlaytimeMinutes / 60.0, 1),
+                AchievementsPercentage = row.AchievementsPercentage
+            });
+        }
+
+        return new GamesPercentageBandGamesDto
+        {
+            Bands = PercentageBands.All
+                .Select(def => new PercentageBandGamesDto
+                {
+                    Key = def.Key,
+                    Label = def.Label,
+                    Games = gamesByBand.GetValueOrDefault(def.Key) ?? []
+                })
+                .ToList()
+        };
+    }
+
+    public GamesPercentageBandGamesDto GetEmptyGamesPercentageBandGames()
+    {
+        return new GamesPercentageBandGamesDto
+        {
+            Bands = PercentageBands.All
+                .Select(def => new PercentageBandGamesDto
+                {
+                    Key = def.Key,
+                    Label = def.Label,
+                    Games = []
                 })
                 .ToList()
         };
@@ -234,6 +331,38 @@ public class UserStatsService : IUserStatsService
             CurrentAverage = 0,
             GamesInAverage = 0,
             Games = []
+        };
+    }
+
+    public async Task<CompletedGamesByYearDto> GetCompletedGamesByYearAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        var yearCounts = await _usersGames.GetCompletedGamesYearCountsAsync(userId, cancellationToken);
+        var filled = BuildPerYearFromCounts(yearCounts.ToDictionary(r => r.Year, r => r.Count));
+
+        return new CompletedGamesByYearDto
+        {
+            AvailableYears = filled
+                .Select(item => item.Year)
+                .OrderByDescending(year => year)
+                .ToList(),
+            Series = filled
+                .Select(item => new YearlyCompletedGameCountDto
+                {
+                    Year = item.Year,
+                    Count = item.Count
+                })
+                .ToList()
+        };
+    }
+
+    public CompletedGamesByYearDto GetEmptyCompletedGamesByYear()
+    {
+        return new CompletedGamesByYearDto
+        {
+            AvailableYears = [],
+            Series = []
         };
     }
 
@@ -412,38 +541,19 @@ public class UserStatsService : IUserStatsService
         };
     }
 
-    private static readonly (string Key, string Label, Func<decimal, bool> Match)[] PercentageBandDefs =
-    [
-        ("100", "100%", p => p == 100m),
-        ("gt80", "> 80%", p => p > 80m && p < 100m),
-        ("gt60", "> 60%", p => p > 60m && p <= 80m),
-        ("gt50", "> 50%", p => p > 50m && p <= 60m),
-        ("gt30", "> 30%", p => p > 30m && p <= 50m),
-        ("gt10", "> 10%", p => p > 10m && p <= 30m),
-        ("gt0", "> 0%", p => p > 0m && p <= 10m),
-        ("0", "0%", p => p == 0m)
-    ];
-
-    private static GamesPercentageBandsDto BuildPercentageBands(IReadOnlyCollection<decimal> percentages)
-    {
-        return new GamesPercentageBandsDto
-        {
-            Bands = PercentageBandDefs
-                .Select(def => new PercentageBandCountDto
-                {
-                    Key = def.Key,
-                    Label = def.Label,
-                    Count = percentages.Count(def.Match)
-                })
-                .ToList()
-        };
-    }
-
     private static DateTime ToLocalDate(DateTime storedUtc)
     {
         var utc = storedUtc.Kind == DateTimeKind.Utc
             ? storedUtc
             : DateTime.SpecifyKind(storedUtc, DateTimeKind.Utc);
         return TimeZoneInfo.ConvertTimeFromUtc(utc, DateTimeZone).Date;
+    }
+
+    private static string FormatDateTimeFromUtc(DateTime storedUtc)
+    {
+        var utc = storedUtc.Kind == DateTimeKind.Utc
+            ? storedUtc
+            : DateTime.SpecifyKind(storedUtc, DateTimeKind.Utc);
+        return TimeZoneInfo.ConvertTimeFromUtc(utc, DateTimeZone).ToString("dd/MM/yyyy HH:mm:ss");
     }
 }

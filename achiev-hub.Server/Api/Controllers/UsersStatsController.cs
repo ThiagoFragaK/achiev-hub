@@ -64,6 +64,37 @@ public class UsersStatsController : ApiControllerBase
         return Ok(await _userStatsService.GetAchievementsByMonthAsync(userId, cancellationToken));
     }
 
+    [HttpGet("achievements-by-month/{year:int}/{month:int}")]
+    public async Task<ActionResult<PagedResultDto<RecentAchievementDto>>> GetAchievementsForMonth(
+        int year,
+        int month,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? name = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (month is < 1 or > 12)
+        {
+            return BadRequest("Month must be between 1 and 12.");
+        }
+
+        var size = pageSize <= 0 ? 10 : Math.Min(pageSize, 10);
+
+        if (ResolveUserId() is not int userId)
+        {
+            return Ok(PagedResultDto<RecentAchievementDto>.Empty(size));
+        }
+
+        return Ok(await _userStatsService.GetAchievementsForMonthAsync(
+            userId,
+            year,
+            month,
+            page,
+            size,
+            name,
+            cancellationToken));
+    }
+
     [HttpGet("games-percentage-bands")]
     public async Task<ActionResult<GamesPercentageBandsDto>> GetGamesPercentageBands(CancellationToken cancellationToken)
     {
@@ -75,6 +106,17 @@ public class UsersStatsController : ApiControllerBase
         return Ok(await _userStatsService.GetGamesPercentageBandsAsync(userId, cancellationToken));
     }
 
+    [HttpGet("games-percentage-band-games")]
+    public async Task<ActionResult<GamesPercentageBandGamesDto>> GetGamesPercentageBandGames(CancellationToken cancellationToken)
+    {
+        if (ResolveUserId() is not int userId)
+        {
+            return Ok(_userStatsService.GetEmptyGamesPercentageBandGames());
+        }
+
+        return Ok(await _userStatsService.GetGamesPercentageBandGamesAsync(userId, cancellationToken));
+    }
+
     [HttpGet("games-for-average")]
     public async Task<ActionResult<GamesForAverageDto>> GetGamesForAverage(CancellationToken cancellationToken)
     {
@@ -84,5 +126,16 @@ public class UsersStatsController : ApiControllerBase
         }
 
         return Ok(await _userStatsService.GetGamesForAverageAsync(userId, cancellationToken));
+    }
+
+    [HttpGet("completed-games-by-year")]
+    public async Task<ActionResult<CompletedGamesByYearDto>> GetCompletedGamesByYear(CancellationToken cancellationToken)
+    {
+        if (ResolveUserId() is not int userId)
+        {
+            return Ok(_userStatsService.GetEmptyCompletedGamesByYear());
+        }
+
+        return Ok(await _userStatsService.GetCompletedGamesByYearAsync(userId, cancellationToken));
     }
 }

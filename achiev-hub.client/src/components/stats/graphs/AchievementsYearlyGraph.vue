@@ -1,34 +1,8 @@
 <template>
     <div class="card h-100">
         <div class="card-body">
-            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-                <p class="text-uppercase text-secondary small fw-medium mb-0 me-auto">
-                    Yearly achievements by month
-                </p>
-                <div class="btn-group" role="group" aria-label="Year range">
-                    <button
-                        v-for="option in rangeOptions"
-                        :key="option.value"
-                        type="button"
-                        class="btn btn-sm"
-                        :class="yearRange === option.value ? 'btn-primary' : 'btn-outline-secondary'"
-                        @click="setYearRange(option.value)"
-                    >
-                        {{ option.label }}
-                    </button>
-                </div>
-                <button
-                    v-if="availableYears.length > 0"
-                    type="button"
-                    class="btn btn-sm"
-                    :class="showYearPicker ? 'btn-primary' : 'btn-outline-secondary'"
-                    @click="showYearPicker = !showYearPicker"
-                >
-                    Years
-                </button>
-            </div>
             <p v-if="loadError" class="text-danger small mb-3">{{ loadError }}</p>
-            <div v-if="showYearPicker && availableYears.length > 0" class="mb-3">
+            <div v-if="availableYears.length > 0" class="mb-3">
                 <div class="d-flex flex-wrap gap-2">
                     <button
                         v-for="year in availableYears"
@@ -73,21 +47,20 @@ export default {
         height: {
             type: [Number, String],
             default: 280
+        },
+        yearRange: {
+            type: String,
+            default: 'last5'
         }
     },
+    emits: ['update:yearRange'],
     data() {
         return {
             loadError: '',
             availableYears: [],
             series: [],
-            yearRange: 'last5',
             selectedYears: [],
-            showYearPicker: false,
-            monthLabels: MONTH_LABELS,
-            rangeOptions: [
-                { value: 'last5', label: 'Last 5 years' },
-                { value: 'all', label: 'All' }
-            ]
+            monthLabels: MONTH_LABELS
         }
     },
     computed: {
@@ -110,6 +83,14 @@ export default {
                 }))
         }
     },
+    watch: {
+        yearRange(range) {
+            if (range === 'custom') {
+                return
+            }
+            this.applyRange(range)
+        }
+    },
     created() {
         this.loadData()
     },
@@ -120,17 +101,14 @@ export default {
                 const data = await getAchievementsByMonth()
                 this.availableYears = data?.availableYears ?? []
                 this.series = data?.series ?? []
-                this.applyRange(this.yearRange)
+                const range = this.yearRange === 'custom' ? 'last5' : this.yearRange
+                this.applyRange(range)
             } catch (err) {
                 this.loadError = err?.message || 'Failed to load achievements by month.'
                 this.availableYears = []
                 this.series = []
                 this.selectedYears = []
             }
-        },
-        setYearRange(range) {
-            this.yearRange = range
-            this.applyRange(range)
         },
         applyRange(range) {
             const years = this.availableYears.slice()
@@ -161,11 +139,11 @@ export default {
                 selected.length === last5.length &&
                 last5.every((y) => selected.includes(y))
             if (allSelected) {
-                this.yearRange = 'all'
+                this.$emit('update:yearRange', 'all')
             } else if (isLast5) {
-                this.yearRange = 'last5'
+                this.$emit('update:yearRange', 'last5')
             } else {
-                this.yearRange = 'custom'
+                this.$emit('update:yearRange', 'custom')
             }
         }
     }

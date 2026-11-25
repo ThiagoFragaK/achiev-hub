@@ -2,14 +2,15 @@
     <nav class="mt-3" aria-label="Pagination">
         <ul class="pagination justify-content-center">
             <li class="page-item" :class="{ disabled: current === 1 }">
-                <a
+                <button
+                    type="button"
                     class="page-link d-flex align-items-center justify-content-center"
-                    href="#"
                     aria-label="Previous page"
-                    @click.prevent="changePage(current - 1)"
+                    :disabled="current === 1"
+                    @click="changePage(current - 1)"
                 >
                     <LucideIcon icon="ChevronsLeft" :size="18" />
-                </a>
+                </button>
             </li>
 
             <li
@@ -19,26 +20,27 @@
                 :class="{ active: item === current, disabled: item === 'ellipsis' }"
             >
                 <span v-if="item === 'ellipsis'" class="page-link">…</span>
-                <a
+                <button
                     v-else
+                    type="button"
                     class="page-link"
-                    href="#"
                     :aria-current="item === current ? 'page' : undefined"
-                    @click.prevent="changePage(item)"
+                    @click="changePage(item)"
                 >
                     {{ item }}
-                </a>
+                </button>
             </li>
 
             <li class="page-item" :class="{ disabled: current === totalPages }">
-                <a
+                <button
+                    type="button"
                     class="page-link d-flex align-items-center justify-content-center"
-                    href="#"
                     aria-label="Next page"
-                    @click.prevent="changePage(current + 1)"
+                    :disabled="current === totalPages"
+                    @click="changePage(current + 1)"
                 >
                     <LucideIcon icon="ChevronsRight" :size="18" />
-                </a>
+                </button>
             </li>
         </ul>
     </nav>

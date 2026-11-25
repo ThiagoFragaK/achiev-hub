@@ -1,4 +1,5 @@
 using achiev_hub.Server.Application.Common;
+using achiev_hub.Server.Application.Stats;
 using achiev_hub.Server.Application.Users.Interfaces;
 using achiev_hub.Server.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -142,6 +143,7 @@ public class UsersGameRepository : IUsersGameRepository
         int userId,
         CancellationToken cancellationToken = default)
     {
+        // Ranges mirror PercentageBands.All (must stay aligned for EF translation).
         var totals = await _db.UsersGames
             .AsNoTracking()
             .Where(ug => ug.UserId == userId && ug.Game.HasCommunityVisibleStats == true)
@@ -159,17 +161,89 @@ public class UsersGameRepository : IUsersGameRepository
             })
             .FirstOrDefaultAsync(cancellationToken);
 
-        return
-        [
-            new PercentageBandCountRow { Key = "100", Label = "100%", Count = totals?.C100 ?? 0 },
-            new PercentageBandCountRow { Key = "gt80", Label = "> 80%", Count = totals?.Gt80 ?? 0 },
-            new PercentageBandCountRow { Key = "gt60", Label = "> 60%", Count = totals?.Gt60 ?? 0 },
-            new PercentageBandCountRow { Key = "gt50", Label = "> 50%", Count = totals?.Gt50 ?? 0 },
-            new PercentageBandCountRow { Key = "gt30", Label = "> 30%", Count = totals?.Gt30 ?? 0 },
-            new PercentageBandCountRow { Key = "gt10", Label = "> 10%", Count = totals?.Gt10 ?? 0 },
-            new PercentageBandCountRow { Key = "gt0", Label = "> 0%", Count = totals?.Gt0 ?? 0 },
-            new PercentageBandCountRow { Key = "0", Label = "0%", Count = totals?.C0 ?? 0 }
-        ];
+        var countsByKey = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["100"] = totals?.C100 ?? 0,
+            ["gt80"] = totals?.Gt80 ?? 0,
+            ["gt60"] = totals?.Gt60 ?? 0,
+            ["gt50"] = totals?.Gt50 ?? 0,
+            ["gt30"] = totals?.Gt30 ?? 0,
+            ["gt10"] = totals?.Gt10 ?? 0,
+            ["gt0"] = totals?.Gt0 ?? 0,
+            ["0"] = totals?.C0 ?? 0
+        };
+
+        return PercentageBands.All
+            .Select(def => new PercentageBandCountRow
+            {
+                Key = def.Key,
+                Label = def.Label,
+                Count = countsByKey.GetValueOrDefault(def.Key)
+            })
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<PercentageBandGameRow>> GetPercentageBandGamesAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await _db.UsersGames
+            .AsNoTracking()
+            .Where(ug => ug.UserId == userId && ug.Game.HasCommunityVisibleStats == true)
+            .OrderByDescending(ug => ug.PlaytimeMinutes)
+            .ThenBy(ug => ug.Game.Name)
+            .Select(ug => new
+            {
+                ug.Game.GameSteamId,
+                ug.Game.Name,
+                ug.Game.ImageUrl,
+                ug.PlaytimeMinutes,
+                ug.AchievementsPercentage
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(row => new PercentageBandGameRow
+            {
+                GameSteamId = row.GameSteamId,
+                Name = row.Name,
+                ImageUrl = row.ImageUrl,
+                PlaytimeMinutes = row.PlaytimeMinutes,
+                AchievementsPercentage = row.AchievementsPercentage,
+                BandKey = PercentageBands.ResolveKey(row.AchievementsPercentage)
+            })
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<CompletedGamesYearCountRow>> GetCompletedGamesYearCountsAsync(
+        int userId,
+        CancellationToken cancellationToken = default)
+    {
+        // Completion year = latest unlock timestamp for games currently at 100%.
+        var completionYears = await _db.UsersGames
+            .AsNoTracking()
+            .Where(ug =>
+                ug.UserId == userId
+                && ug.Game.HasCommunityVisibleStats == true
+                && ug.AchievementsPercentage == 100m)
+            .Select(ug => _db.UsersAchievements
+                .Where(ua =>
+                    ua.UserId == ug.UserId
+                    && ua.GameId == ug.GameId
+                    && ua.UnlockDate != null)
+                .Max(ua => (DateTime?)ua.UnlockDate))
+            .Where(maxUnlock => maxUnlock != null)
+            .Select(maxUnlock => maxUnlock!.Value.Year)
+            .ToListAsync(cancellationToken);
+
+        return completionYears
+            .GroupBy(year => year)
+            .Select(g => new CompletedGamesYearCountRow
+            {
+                Year = g.Key,
+                Count = g.Count()
+            })
+            .ToList();
     }
 
     public async Task<PagedResultDto<LibraryGameRow>> GetLibraryPageAsync(

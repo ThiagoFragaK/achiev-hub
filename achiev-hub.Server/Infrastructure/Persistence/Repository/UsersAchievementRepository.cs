@@ -182,6 +182,62 @@ public class UsersAchievementRepository : IUsersAchievementRepository
         return PagedResultDto<RecentAchievementRow>.From(rows, pagination);
     }
 
+    public async Task<PagedResultDto<RecentAchievementRow>> GetUnlockedPageForMonthAsync(
+        int userId,
+        int year,
+        int month,
+        int page,
+        int pageSize,
+        string? nameQuery = null,
+        CancellationToken cancellationToken = default)
+    {
+        var unlockQuery = _db.UsersAchievements
+            .AsNoTracking()
+            .Where(ua =>
+                ua.UserId == userId
+                && ua.UnlockDate != null
+                && ua.UnlockDate.Value.Year == year
+                && ua.UnlockDate.Value.Month == month);
+
+        if (!string.IsNullOrWhiteSpace(nameQuery))
+        {
+            var pattern = $"%{nameQuery.Trim()}%";
+            unlockQuery = unlockQuery.Where(ua => EF.Functions.ILike(ua.Achievement.Name, pattern));
+        }
+
+        var totalCount = await unlockQuery.CountAsync(cancellationToken);
+        var pagination = PaginationDto.Create(page, pageSize, totalCount, defaultPageSize: 10);
+
+        if (totalCount == 0)
+        {
+            return PagedResultDto<RecentAchievementRow>.From([], pagination);
+        }
+
+        var take = Math.Min(pagination.PerPage, totalCount - pagination.Skip);
+        if (take <= 0)
+        {
+            return PagedResultDto<RecentAchievementRow>.From([], pagination);
+        }
+
+        var rows = await unlockQuery
+            .OrderByDescending(ua => ua.UnlockDate)
+            .Skip(pagination.Skip)
+            .Take(take)
+            .Select(ua => new RecentAchievementRow
+            {
+                AchievementName = ua.Achievement.Name,
+                Description = ua.Achievement.Description,
+                ImageUrlUnlock = ua.Achievement.ImageUrlUnlock,
+                GlobalPercentage = ua.Achievement.GlobalPercentage,
+                UnlockDate = ua.UnlockDate,
+                GameName = ua.Game.Name,
+                GameSteamId = ua.Game.GameSteamId
+            })
+            .ToListAsync(cancellationToken);
+
+        return PagedResultDto<RecentAchievementRow>.From(rows, pagination);
+    }
+
     public async Task<IReadOnlyList<UsersAchievement>> GetTrackedByUserAndGameAsync(
         int userId,
         int gameId,
